@@ -26,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import static com.datastax.driver.core.ProtocolVersion.*;
 import static com.datastax.driver.core.ProtocolVersion.V4;
 import static com.datastax.driver.core.SchemaElement.*;
 
@@ -71,7 +72,7 @@ class Responses {
                         blockFor = body.readInt();
                         int failures = body.readInt();
                         Map<InetAddress, Integer> failuresMap;
-                        if (version.compareTo(ProtocolVersion.V5) < 0) {
+                        if (version.compareTo(V5) < 0) {
                             failuresMap = Collections.emptyMap();
                         } else {
                             failuresMap = new HashMap<InetAddress, Integer>();
@@ -401,7 +402,7 @@ class Responses {
 
                     MD5Digest resultMetadataId = null;
                     if (flags.contains(Flag.METADATA_CHANGED)) {
-                        assert protocolVersion == ProtocolVersion.V5 : "METADATA_CHANGED flag is supported starting from v5";
+                        assert protocolVersion == V5 : "METADATA_CHANGED flag is supported starting from v5";
                         assert !flags.contains(Flag.NO_METADATA) : "METADATA_CHANGED and NO_METADATA are mutually exclusive flags";
                         resultMetadataId = MD5Digest.wrap(CBUtil.readBytes(body));
                     }
