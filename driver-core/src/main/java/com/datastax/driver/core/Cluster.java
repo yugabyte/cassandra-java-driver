@@ -2218,16 +2218,35 @@ public class Cluster implements Closeable {
         }
 
         public PreparedStatement addPrepared(PreparedStatement stmt) {
-            PreparedStatement previous = preparedQueries.putIfAbsent(stmt.getPreparedId().id, stmt);
-            if (previous != null) {
-                logger.warn("Re-preparing already prepared query is generally an anti-pattern and will likely affect performance. "
-                        + "Consider preparing the statement only once. Query='{}'", stmt.getQueryString());
+            MD5Digest id = stmt.getPreparedId().boundValuesMetadata.id;
+            while (true) {
+
+                PreparedStatement previous = preparedQueries.putIfAbsent(id, stmt);
 
                 // The one object in the cache will get GCed once it's not referenced by the client anymore since we use a weak reference.
                 // So we need to make sure that the instance we do return to the user is the one that is in the cache.
-                return previous;
+                if (previous == null || previous.getPreparedId().resultSetMetadata.id == null)
+                    return stmt;
+
+                // check if the resultset metadata, if any, has changed in the interim
+                if (previous.getPreparedId().resultSetMetadata.id.equals(
+                        stmt.getPreparedId().resultSetMetadata.id)) {
+
+                    logger.warn("Re-preparing already prepared query is generally an anti-pattern and will likely affect performance. "
+                            + "Consider preparing the statement only once. Query='{}'", stmt.getQueryString());
+                    return previous;
+
+                } else {
+
+                    // the resultset metadata changed since our version was cached;
+                    // in this case we need to force the replacement of the cached object
+                    // with the new one.
+                    if (preparedQueries.replace(id, previous, stmt)) {
+                        return stmt;
+                    }
+                    // we raced; try again
+                }
             }
-            return stmt;
         }
 
         /**

@@ -62,14 +62,33 @@ abstract class ArrayBackedResultSet implements ResultSet {
 
                 ColumnDefinitions columnDefs;
                 if (r.metadata.columns == null) {
+                    // if resultset metadata is not present, this means that
+                    // the statement being executed is a BoundStatement (EXECUTE request),
+                    // not a RegularStatement (QUERY request), because the driver
+                    // only ever sets the flag SKIP_METADATA to true for bound statements,
+                    // never for regular ones.
                     if (statement instanceof StatementWrapper) {
                         statement = ((StatementWrapper) statement).getWrappedStatement();
                     }
                     assert statement instanceof BoundStatement;
-                    columnDefs = ((BoundStatement) statement).statement.getPreparedId().resultSetMetadata;
+                    columnDefs = ((BoundStatement) statement).statement.getPreparedId().resultSetMetadata.variables;
                     assert columnDefs != null;
                 } else {
+                    // metadata is always present for regular statements (QUERY requests);
+                    // it might also be present for bound statements (EXECUTE requests)
+                    // if the metadata has changed server-side.
                     columnDefs = r.metadata.columns;
+                    if (statement instanceof BoundStatement) {
+                        // r.metadata.metadataId is necessarily present
+                        // if the flag METADATA_CHANGED was set,
+                        // see Responses.Result.Rows.Metadata.decode(),
+                        // unless we are using v1, in which case every ROWS response
+                        // contains full metadata information.
+                        assert protocolVersion == ProtocolVersion.V1 || r.metadata.metadataId != null;
+                        BoundStatement bs = ((BoundStatement) statement);
+                        // the resultset metadata changed, update the prepared statement accordingly.
+                        bs.preparedStatement().getPreparedId().resultSetMetadata = new PreparedId.PreparedMetadata(r.metadata.metadataId, r.metadata.columns);
+                    }
                 }
 
                 Token.Factory tokenFactory = (session == null) ? null
