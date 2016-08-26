@@ -20,13 +20,13 @@ import com.datastax.driver.core.exceptions.*;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapMaker;
 import com.google.common.util.concurrent.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.flush.FlushConsolidationHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.Timeout;
@@ -36,12 +36,9 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,7 +59,7 @@ class Connection {
     private static final Logger logger = LoggerFactory.getLogger(Connection.class);
     private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
-    private static final boolean DISABLE_COALESCING = SystemProperties.getBoolean("com.datastax.driver.DISABLE_COALESCING", false);
+    private static final int FLUSH_THRESHOLD = SystemProperties.getInt("com.datastax.driver.FLUSH_THRESHOLD", 256);
 
     enum State {OPEN, TRASHED, RESURRECTING, GONE}
 
@@ -532,11 +529,8 @@ class Connection {
         logger.trace("{}, stream {}, writing request {}", this, request.getStreamId(), request);
         writer.incrementAndGet();
 
-        if (DISABLE_COALESCING) {
-            channel.writeAndFlush(request).addListener(writeHandler(request, handler));
-        } else {
-            flush(new FlushItem(channel, request, writeHandler(request, handler)));
-        }
+        channel.writeAndFlush(request).addListener(writeHandler(request, handler));
+
         if (startTimeout)
             handler.startTimeout();
 
@@ -844,92 +838,6 @@ class Connection {
             nettyOptions.onClusterClose(eventLoopGroup);
             nettyOptions.onClusterClose(timer);
         }
-    }
-
-    private static final class Flusher implements Runnable {
-        final WeakReference<EventLoop> eventLoopRef;
-        final Queue<FlushItem> queued = new ConcurrentLinkedQueue<FlushItem>();
-        final AtomicBoolean running = new AtomicBoolean(false);
-        final HashSet<Channel> channels = new HashSet<Channel>();
-        int runsWithNoWork = 0;
-
-        private Flusher(EventLoop eventLoop) {
-            this.eventLoopRef = new WeakReference<EventLoop>(eventLoop);
-        }
-
-        void start() {
-            if (!running.get() && running.compareAndSet(false, true)) {
-                EventLoop eventLoop = eventLoopRef.get();
-                if (eventLoop != null)
-                    eventLoop.execute(this);
-            }
-        }
-
-        @Override
-        public void run() {
-
-            boolean doneWork = false;
-            FlushItem flush;
-            while (null != (flush = queued.poll())) {
-                Channel channel = flush.channel;
-                if (channel.isActive()) {
-                    channels.add(channel);
-                    channel.write(flush.request).addListener(flush.listener);
-                    doneWork = true;
-                }
-            }
-
-            // Always flush what we have (don't artificially delay to try to coalesce more messages)
-            for (Channel channel : channels)
-                channel.flush();
-            channels.clear();
-
-            if (doneWork) {
-                runsWithNoWork = 0;
-            } else {
-                // either reschedule or cancel
-                if (++runsWithNoWork > 5) {
-                    running.set(false);
-                    if (queued.isEmpty() || !running.compareAndSet(false, true))
-                        return;
-                }
-            }
-
-            EventLoop eventLoop = eventLoopRef.get();
-            if (eventLoop != null && !eventLoop.isShuttingDown()) {
-                eventLoop.schedule(this, 10000, TimeUnit.NANOSECONDS);
-            }
-        }
-    }
-
-    private static final ConcurrentMap<EventLoop, Flusher> flusherLookup = new MapMaker()
-            .concurrencyLevel(16)
-            .weakKeys()
-            .makeMap();
-
-    private static class FlushItem {
-        final Channel channel;
-        final Object request;
-        final ChannelFutureListener listener;
-
-        private FlushItem(Channel channel, Object request, ChannelFutureListener listener) {
-            this.channel = channel;
-            this.request = request;
-            this.listener = listener;
-        }
-    }
-
-    private void flush(FlushItem item) {
-        EventLoop loop = item.channel.eventLoop();
-        Flusher flusher = flusherLookup.get(loop);
-        if (flusher == null) {
-            Flusher alt = flusherLookup.putIfAbsent(loop, flusher = new Flusher(loop));
-            if (alt != null)
-                flusher = alt;
-        }
-
-        flusher.queued.add(item);
-        flusher.start();
     }
 
     class Dispatcher extends SimpleChannelInboundHandler<Message.Response> {
@@ -1330,6 +1238,8 @@ class Connection {
             pipeline.addLast("idleStateHandler", idleStateHandler);
 
             pipeline.addLast("dispatcher", connection.dispatcher);
+
+            pipeline.addLast("flusher", new FlushConsolidationHandler(FLUSH_THRESHOLD));
 
             nettyOptions.afterChannelInitialized(channel);
         }
