@@ -20,9 +20,6 @@ import org.assertj.core.api.AbstractAssert;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- *
- */
 public class ColumnDefinitionsAssert extends AbstractAssert<ColumnDefinitionsAssert, ColumnDefinitions> {
 
     public ColumnDefinitionsAssert(ColumnDefinitions actual) {
@@ -40,6 +37,11 @@ public class ColumnDefinitionsAssert extends AbstractAssert<ColumnDefinitionsAss
         } catch (Exception e) {
             fail(String.format("Expected actual to contain variable %s of type %s, but it did not", name, type), e);
         }
+        return this;
+    }
+
+    public ColumnDefinitionsAssert doesNotContainVariable(String name) {
+        assertThat(actual.getIndexOf(name)).isEqualTo(-1);
         return this;
     }
 }

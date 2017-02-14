@@ -23,6 +23,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static com.datastax.driver.core.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @CassandraVersion("3.12")
 public class PreparedStatementInvalidationTest extends CCMTestsSupport {
@@ -35,6 +36,10 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     @BeforeMethod
     public void createTable() throws Exception {
         execute("CREATE TABLE PreparedStatementInvalidationTest (a int PRIMARY KEY, b int, c int);");
+        execute("INSERT INTO PreparedStatementInvalidationTest (a, b, c) VALUES (1, 1, 1);");
+        execute("INSERT INTO PreparedStatementInvalidationTest (a, b, c) VALUES (2, 2, 2);");
+        execute("INSERT INTO PreparedStatementInvalidationTest (a, b, c) VALUES (3, 3, 3);");
+        execute("INSERT INTO PreparedStatementInvalidationTest (a, b, c) VALUES (4, 4, 4);");
     }
 
     @AfterMethod
@@ -43,7 +48,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     }
 
     @Test(groups = "short")
-    public void should_update_statement_id_when_metadata_changed() {
+    public void should_update_statement_id_when_metadata_changed_across_executions() {
         // given
         PreparedStatement ps = session().prepare("SELECT * FROM PreparedStatementInvalidationTest WHERE a = ?");
         MD5Digest idBefore = ps.getPreparedId().resultSetMetadata.id;
@@ -61,6 +66,42 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
                 .hasSize(4)
                 .containsVariable("d", DataType.cint());
         assertThat(rows.getColumnDefinitions())
+                .hasSize(4)
+                .containsVariable("d", DataType.cint());
+    }
+
+    @Test(groups = "short")
+    public void should_update_statement_id_when_metadata_changed_across_pages() throws Exception {
+        // given
+        PreparedStatement ps = session().prepare("SELECT * FROM PreparedStatementInvalidationTest");
+        ResultSet rows = session().execute(ps.bind().setFetchSize(2));
+        assertThat(rows.isFullyFetched()).isFalse();
+        MD5Digest idBefore = ps.getPreparedId().resultSetMetadata.id;
+        ColumnDefinitions definitionsBefore = rows.getColumnDefinitions();
+        assertThat(definitionsBefore)
+                .hasSize(3)
+                .doesNotContainVariable("d");
+        // consume the first page
+        int remaining = rows.getAvailableWithoutFetching();
+        while (remaining-- > 0) {
+            try {
+                rows.one().getInt("d");
+                fail("expected an error");
+            } catch (IllegalArgumentException e) { /*expected*/ }
+        }
+
+        // when
+        session().execute("ALTER TABLE PreparedStatementInvalidationTest ADD d int");
+
+        // then
+        // this should trigger a background fetch of the second page, and therefore update the definitions
+        for (Row row : rows) {
+            assertThat(row.isNull("d")).isTrue();
+        }
+        MD5Digest idAfter = ps.getPreparedId().resultSetMetadata.id;
+        ColumnDefinitions definitionsAfter = rows.getColumnDefinitions();
+        assertThat(idBefore).isNotEqualTo(idAfter);
+        assertThat(definitionsAfter)
                 .hasSize(4)
                 .containsVariable("d", DataType.cint());
     }
