@@ -136,8 +136,9 @@ class Connection {
         try {
             Bootstrap bootstrap = factory.newBootstrap();
             ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
+            FrameCompressor compressor = protocolOptions.getCompression().compressor(protocolVersion);
             bootstrap.handler(
-                    new Initializer(this, protocolVersion, protocolOptions.getCompression().compressor(), protocolOptions.getSSLOptions(),
+                    new Initializer(this, protocolVersion, compressor, protocolOptions.getSSLOptions(),
                             factory.configuration.getPoolingOptions().getHeartbeatIntervalSeconds(),
                             factory.configuration.getNettyOptions(),
                             factory.configuration.getCodecRegistry()));
@@ -1440,10 +1441,8 @@ class Connection {
             pipeline.addLast("frameDecoder", new Frame.Decoder());
             pipeline.addLast("frameEncoder", frameEncoder);
 
-            if (compressor != null) {
-                pipeline.addLast("frameDecompressor", new Frame.Decompressor(compressor));
-                pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
-            }
+            pipeline.addLast("frameDecompressor", new Frame.Decompressor(compressor));
+            pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
 
             pipeline.addLast("messageDecoder", messageDecoder);
             pipeline.addLast("messageEncoder", messageEncoderFor(protocolVersion));

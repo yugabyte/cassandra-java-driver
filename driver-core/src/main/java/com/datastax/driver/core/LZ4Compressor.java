@@ -27,7 +27,7 @@ class LZ4Compressor extends FrameCompressor {
 
     private static final Logger logger = LoggerFactory.getLogger(LZ4Compressor.class);
 
-    static final LZ4Compressor instance;
+    static final LZ4Compressor INSTANCE;
 
     static {
         LZ4Compressor i;
@@ -40,12 +40,13 @@ class LZ4Compressor extends FrameCompressor {
             i = null;
             logger.warn("Error loading LZ4 library ({}). LZ4 compression will not be available for the protocol.", e.toString());
         }
-        instance = i;
+        INSTANCE = i;
     }
 
     private static final int INTEGER_BYTES = 4;
-    private final net.jpountz.lz4.LZ4Compressor compressor;
-    private final net.jpountz.lz4.LZ4FastDecompressor decompressor;
+
+    final net.jpountz.lz4.LZ4Compressor compressor;
+    final net.jpountz.lz4.LZ4FastDecompressor decompressor;
 
     private LZ4Compressor() {
         final LZ4Factory lz4Factory = LZ4Factory.fastestInstance();

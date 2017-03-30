@@ -26,7 +26,7 @@ abstract class FrameCompressor {
 
     abstract Frame decompress(Frame frame) throws IOException;
 
-    protected static ByteBuffer inputNioBuffer(ByteBuf buf) {
+    static ByteBuffer inputNioBuffer(ByteBuf buf) {
         // Using internalNioBuffer(...) as we only hold the reference in this method and so can
         // reduce Object allocations.
         int index = buf.readerIndex();
@@ -34,7 +34,7 @@ abstract class FrameCompressor {
         return buf.nioBufferCount() == 1 ? buf.internalNioBuffer(index, len) : buf.nioBuffer(index, len);
     }
 
-    protected static ByteBuffer outputNioBuffer(ByteBuf buf) {
+    static ByteBuffer outputNioBuffer(ByteBuf buf) {
         int index = buf.writerIndex();
         int len = buf.writableBytes();
         return buf.nioBufferCount() == 1 ? buf.internalNioBuffer(index, len) : buf.nioBuffer(index, len);

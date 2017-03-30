@@ -22,8 +22,10 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.*;
 
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
+
 
 /**
  * A frame for the CQL binary protocol.
@@ -294,25 +296,33 @@ class Frame {
         private final FrameCompressor compressor;
 
         Decompressor(FrameCompressor compressor) {
-            assert compressor != null;
             this.compressor = compressor;
         }
 
         @Override
         protected void decode(ChannelHandlerContext ctx, Frame frame, List<Object> out) throws Exception {
             if (frame.header.flags.contains(Header.Flag.COMPRESSED)) {
-                // All decompressors allocate a new buffer for the decompressed data, so this is the last time
-                // we have a reference to the compressed body (and therefore a chance to release it).
-                ByteBuf compressedBody = frame.body;
-                try {
-                    out.add(compressor.decompress(frame));
-                } finally {
-                    compressedBody.release();
-                }
+                assert compressor != null;
+                out.add(decompressAndRelease(frame, compressor));
+            } else if (frame.header.version.supportsChecksums()) {
+                out.add(decompressAndRelease(frame, ChecksumCompressor.INSTANCE));
             } else {
                 out.add(frame);
             }
         }
+
+        private static Frame decompressAndRelease(Frame frame, FrameCompressor compressor) throws IOException {
+            // All decompressors allocate a new buffer for the decompressed data, so this is the last time
+            // we have a reference to the compressed body (and therefore a chance to release it).
+            @SuppressWarnings("UnnecessaryLocalVariable")
+            ByteBuf uncompressedBody = frame.body;
+            try {
+                return compressor.decompress(frame);
+            } finally {
+                uncompressedBody.release();
+            }
+        }
+
     }
 
     static class Compressor extends MessageToMessageEncoder<Frame> {
@@ -320,24 +330,44 @@ class Frame {
         private final FrameCompressor compressor;
 
         Compressor(FrameCompressor compressor) {
-            assert compressor != null;
             this.compressor = compressor;
         }
 
         @Override
         protected void encode(ChannelHandlerContext ctx, Frame frame, List<Object> out) throws Exception {
+            boolean supportsChecksums = frame.header.version.supportsChecksums();
             // Never compress STARTUP messages
             if (frame.header.opcode == Message.Request.Type.STARTUP.opcode) {
-                out.add(frame);
+                if (supportsChecksums)
+                    out.add(compressAndRelease(frame, ChecksumCompressor.INSTANCE));
+                else
+                    out.add(frame);
             } else {
-                frame.header.flags.add(Header.Flag.COMPRESSED);
-                // See comment in decode()
-                ByteBuf uncompressedBody = frame.body;
-                try {
-                    out.add(compressor.compress(frame));
-                } finally {
-                    uncompressedBody.release();
+                if (compressor != null)
+                    frame.header.flags.add(Header.Flag.COMPRESSED);
+                if (supportsChecksums) {
+                    if (compressor != null)
+                        out.add(compressAndRelease(frame, compressor));
+                    else
+                        out.add(compressAndRelease(frame, ChecksumCompressor.INSTANCE));
+                } else {
+                    if (compressor != null)
+                        out.add(compressAndRelease(frame, compressor));
+                    else
+                        out.add(frame);
                 }
+            }
+
+        }
+
+        private static Frame compressAndRelease(Frame frame, FrameCompressor compressor) throws IOException {
+            // see comment in decompressAndRelease
+            @SuppressWarnings("UnnecessaryLocalVariable")
+            ByteBuf uncompressedBody = frame.body;
+            try {
+                return compressor.compress(frame);
+            } finally {
+                uncompressedBody.release();
             }
         }
     }

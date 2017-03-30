@@ -28,7 +28,7 @@ class SnappyCompressor extends FrameCompressor {
 
     private static final Logger logger = LoggerFactory.getLogger(SnappyCompressor.class);
 
-    static final SnappyCompressor instance;
+    static final SnappyCompressor INSTANCE;
 
     static {
         SnappyCompressor i;
@@ -41,7 +41,7 @@ class SnappyCompressor extends FrameCompressor {
             i = null;
             logger.warn("Error loading Snappy library ({}). Snappy compression will not be available for the protocol.", e.toString());
         }
-        instance = i;
+        INSTANCE = i;
     }
 
     private SnappyCompressor() {

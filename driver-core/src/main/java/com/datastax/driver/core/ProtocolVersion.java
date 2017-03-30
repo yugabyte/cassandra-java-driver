@@ -104,4 +104,8 @@ public enum ProtocolVersion {
             throw new IllegalArgumentException("No protocol version matching integer version " + i);
         return version;
     }
+
+    public boolean supportsChecksums() {
+        return this.compareTo(V5) >= 0;
+    }
 }
