@@ -50,19 +50,7 @@ public class KeyspaceMetadata {
 
         String name = row.getString(KS_NAME);
         boolean durableWrites = row.getBool(DURABLE_WRITES);
-
-        Map<String, String> replicationOptions = new HashMap<String, String>();
-        replicationOptions.put("class", row.getString(STRATEGY_CLASS));
-        replicationOptions.putAll(SimpleJSONParser.parseStringMap(row.getString(STRATEGY_OPTIONS)));
-
-        KeyspaceMetadata ksm = new KeyspaceMetadata(name, durableWrites, replicationOptions);
-
-        if (udtRows == null)
-            return ksm;
-
-        ksm.addUserTypes(udtRows);
-
-        return ksm;
+        return new KeyspaceMetadata(name, durableWrites, row.getMap("replication", String.class, String.class));
     }
 
     /**
