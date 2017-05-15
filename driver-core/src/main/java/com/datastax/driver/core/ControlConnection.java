@@ -50,7 +50,7 @@ class ControlConnection implements Host.StateListener, Connection.Owner {
         }
     }
 
-    private static final String SELECT_KEYSPACES = "SELECT * FROM system.schema_keyspaces";
+    private static final String SELECT_KEYSPACES = "SELECT * FROM system_schema.keyspaces";
     private static final String SELECT_COLUMN_FAMILIES = "SELECT * FROM system.schema_columnfamilies";
     private static final String SELECT_COLUMNS = "SELECT * FROM system.schema_columns";
     private static final String SELECT_USERTYPES = "SELECT * FROM system.schema_usertypes";
@@ -360,15 +360,9 @@ class ControlConnection implements Host.StateListener, Connection.Owner {
         DefaultResultSetFuture ksFuture = isSchemaOrKeyspace
                 ? new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(SELECT_KEYSPACES + whereClause))
                 : null;
-        DefaultResultSetFuture udtFuture = (isSchemaOrKeyspace && supportsUdts(cassandraVersion) || targetType == TYPE)
-                ? new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(SELECT_USERTYPES + whereClause))
-                : null;
-        DefaultResultSetFuture cfFuture = (isSchemaOrKeyspace || targetType == TABLE)
-                ? new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(SELECT_COLUMN_FAMILIES + whereClause))
-                : null;
-        DefaultResultSetFuture colsFuture = (isSchemaOrKeyspace || targetType == TABLE)
-                ? new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(SELECT_COLUMNS + whereClause))
-                : null;
+        DefaultResultSetFuture udtFuture = null;
+        DefaultResultSetFuture cfFuture = null;
+        DefaultResultSetFuture colsFuture = null;
 
         if (ksFuture != null)
             connection.write(ksFuture);

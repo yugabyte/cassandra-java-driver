@@ -48,17 +48,9 @@ public class KeyspaceMetadata {
     }
 
     static KeyspaceMetadata build(Row row) {
-
         String name = row.getString(KS_NAME);
         boolean durableWrites = row.getBool(DURABLE_WRITES);
-
-        Map<String, String> replicationOptions = new HashMap<String, String>();
-        replicationOptions.put("class", row.getString(STRATEGY_CLASS));
-        replicationOptions.putAll(SimpleJSONParser.parseStringMap(row.getString(STRATEGY_OPTIONS)));
-
-        KeyspaceMetadata ksm = new KeyspaceMetadata(name, durableWrites, replicationOptions);
-
-        return ksm;
+        return new KeyspaceMetadata(name, durableWrites, row.getMap("replication", String.class, String.class));
     }
 
     /**
