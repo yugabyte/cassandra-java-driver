@@ -26,7 +26,7 @@
 
     <groupId>com.datastax.cassandra</groupId>
     <artifactId>cassandra-driver-parent</artifactId>
-    <version>3.2.1-SNAPSHOT</version>
+    <version>3.2.0-yb-1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>DataStax Java Driver for Apache Cassandra</name>
     <description>A driver for Apache Cassandra 1.2+ that works exclusively with the Cassandra Query Language version 3
@@ -491,6 +491,14 @@
                 </configuration>
             </plugin>
         </plugins>
+        <!-- Added by YugaByte for S3 artifact publishing. -->
+        <extensions>
+            <extension>
+                <groupId>org.kuali.maven.wagons</groupId>
+                <artifactId>maven-s3-wagon</artifactId>
+                <version>1.1.9</version>
+            </extension>
+        </extensions>
     </build>
 
     <licenses>
@@ -515,4 +523,16 @@
             <organization>DataStax</organization>
         </developer>
     </developers>
+
+    <!-- To publish our own artifacts into the internal S3-based Maven repository. -->
+    <distributionManagement>
+        <repository>
+            <id>s3.release</id>
+            <url>s3://releases.yugabyte.com</url>
+        </repository>
+        <snapshotRepository>
+            <id>s3.snapshot</id>
+            <url>s3://snapshots.yugabyte.com</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
