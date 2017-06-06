@@ -63,8 +63,12 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet> implements Result
                     Responses.Result rm = (Responses.Result) response;
                     switch (rm.kind) {
                         case SET_KEYSPACE:
+                            final String ks = ((Responses.Result.SetKeyspace) rm).keyspace;
+                            logger.debug("Handling SET_KEYSPACE: {} -> {}", session.poolsState.keyspace, ks);
+                            // update the keyspace in this connection
+                            connection.updateInternalKeyspace(ks);
                             // propagate the keyspace change to other connections
-                            session.poolsState.setKeyspace(((Responses.Result.SetKeyspace) rm).keyspace);
+                            session.poolsState.setKeyspace(ks);
                             set(ArrayBackedResultSet.fromMessage(rm, session, protocolVersion, info, statement));
                             break;
                         case SCHEMA_CHANGE:

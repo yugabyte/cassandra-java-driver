@@ -549,6 +549,17 @@ class Connection {
         }
     }
 
+    void updateInternalKeyspace(final String keyspace) {
+        SetKeyspaceAttempt existingAttempt = targetKeyspace.get();
+        if (MoreObjects.equal(existingAttempt.keyspace, keyspace))
+            return;
+
+        logger.debug("{} Reset internal keyspace {} -> {}", this, existingAttempt.keyspace, keyspace);
+        final ListenableFuture<Connection> thisFuture = Futures.immediateFuture(this);
+        final SetKeyspaceAttempt attempt = new SetKeyspaceAttempt(keyspace, thisFuture);
+        targetKeyspace.compareAndSet(existingAttempt, attempt);
+    }
+
     /**
      * Write a request on this connection.
      *
@@ -739,7 +750,8 @@ class Connection {
 
     @Override
     public String toString() {
-        return String.format("Connection[%s, inFlight=%d, closed=%b]", name, inFlight.get(), isClosed());
+        return String.format("Connection[%s, inFlight=%d, closed=%b, keyspace=%s:%b]", name, inFlight.get(), isClosed(),
+            targetKeyspace.get().keyspace, targetKeyspace.get().future.isDone());
     }
 
     static class Factory {
