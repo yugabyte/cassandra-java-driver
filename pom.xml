@@ -511,9 +511,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.com:datastax/java-driver.git</connection>
-        <developerConnection>scm:git:git@github.com:datastax/java-driver.git</developerConnection>
-        <url>https://github.com/datastax/java-driver</url>
+        <connection>scm:git:git@bitbucket.org:yugabyte/datastax-java-driver.git</connection>
+        <developerConnection>scm:git:git@bitbucket.org:yugabyte/datastax-java-driver.git</developerConnection>
+        <url>https://bitbucket.org/yugabyte/datastax-java-driver</url>
         <tag>HEAD</tag>
     </scm>
 
