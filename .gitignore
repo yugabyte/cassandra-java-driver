@@ -16,3 +16,5 @@ notes
 .java-version
 
 *.sw?
+*.releaseBackup
+release.properties
