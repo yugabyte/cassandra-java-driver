@@ -515,7 +515,6 @@
         <developerConnection>scm:git:git@bitbucket.org:yugabyte/datastax-java-driver.git</developerConnection>
         <url>https://bitbucket.org/yugabyte/datastax-java-driver</url>
         <tag>HEAD</tag>
-        <branch>3.2.0-yb-x</branch>
     </scm>
 
     <developers>
