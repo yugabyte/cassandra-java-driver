@@ -496,7 +496,7 @@ class Connection {
 
     ListenableFuture<Connection> setKeyspaceAsync(final String keyspace) throws ConnectionException, BusyConnectionException {
         SetKeyspaceAttempt existingAttempt = targetKeyspace.get();
-        if (MoreObjects.equal(existingAttempt.keyspace, keyspace))
+        if (MoreObjects.equal(existingAttempt.keyspace, keyspace) || keyspace == null)
             return existingAttempt.future;
 
         final SettableFuture<Connection> ksFuture = SettableFuture.create();

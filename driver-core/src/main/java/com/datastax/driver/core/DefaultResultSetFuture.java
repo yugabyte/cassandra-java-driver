@@ -88,8 +88,9 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet> implements Result
                                             // If that the one keyspace we are logged in, reset to null (it shouldn't really happen but ...)
                                             // Note: Actually, Cassandra doesn't do that so we don't either as this could confuse prepared statements.
                                             // We'll add it back if CASSANDRA-5358 changes that behavior
-                                            //if (scc.keyspace.equals(session.poolsState.keyspace))
-                                            //    session.poolsState.setKeyspace(null);
+                                            if (scc.targetKeyspace.equals(session.poolsState.keyspace))
+                                                session.poolsState.setKeyspace(null);
+
                                             final KeyspaceMetadata removedKeyspace = cluster.metadata.removeKeyspace(scc.targetKeyspace);
                                             if (removedKeyspace != null) {
                                                 cluster.executor.submit(new Runnable() {
