@@ -1388,7 +1388,7 @@ public class Cluster implements Closeable {
         // new one join the cluster).
         // Note: we could move this down to the session level, but since prepared statement are global to a node,
         // this would yield a slightly less clear behavior.
-        ConcurrentMap<MD5Digest, PreparedStatement> preparedQueries;
+        public ConcurrentMap<MD5Digest, PreparedStatement> preparedQueries;
 
         final Set<Host.StateListener> listeners;
         final Set<LatencyTracker> latencyTrackers = new CopyOnWriteArraySet<LatencyTracker>();
@@ -2225,7 +2225,8 @@ public class Cluster implements Closeable {
 
                 // The one object in the cache will get GCed once it's not referenced by the client anymore since we use a weak reference.
                 // So we need to make sure that the instance we do return to the user is the one that is in the cache.
-                return previous;
+                if (com.google.common.base.Objects.equal(previous.getPreparedId().resultSetMetadata.id, stmt.getPreparedId().resultSetMetadata.id))
+                    return previous;
             }
             return stmt;
         }

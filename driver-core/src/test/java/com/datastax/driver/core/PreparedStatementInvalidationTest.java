@@ -36,7 +36,6 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
 
     @BeforeMethod(groups = "short", alwaysRun = true)
     public void setup() throws Exception {
-        resetTestSession();
         execute("CREATE TABLE prepared_statement_invalidation_test (a int PRIMARY KEY, b int, c int);");
         execute("INSERT INTO prepared_statement_invalidation_test (a, b, c) VALUES (1, 1, 1);");
         execute("INSERT INTO prepared_statement_invalidation_test (a, b, c) VALUES (2, 2, 2);");
@@ -138,9 +137,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
         session1.execute("ALTER TABLE prepared_statement_invalidation_test ADD d int");
 
         rows1 = session1.execute(ps1.bind(1));
-        System.out.println("rows1.all(); = " + rows1.all());
         rows2 = session2.execute(ps2.bind(1));
-        rows2.all();
 
         MD5Digest id1b = ps1.getPreparedId().resultSetMetadata.id;
         MD5Digest id2b = ps2.getPreparedId().resultSetMetadata.id;
