@@ -532,15 +532,14 @@
         </developer>
     </developers>
 
-    <!-- To publish our own artifacts into the internal S3-based Maven repository. -->
     <distributionManagement>
         <repository>
-            <id>s3.release</id>
-            <url>s3://releases.yugabyte.com</url>
+            <id>${yugabyte.releases.repository.id}</id>
+            <url>${yugabyte.releases.repository.url}</url>
         </repository>
         <snapshotRepository>
-            <id>s3.snapshot</id>
-            <url>s3://snapshots.yugabyte.com</url>
+            <id>${yugabyte.snapshots.repository.id}</id>
+            <url>${yugabyte.snapshots.repository.url}</url>
         </snapshotRepository>
     </distributionManagement>
 </project>
