@@ -15,15 +15,27 @@
  */
 package com.datastax.oss.driver.api.core.metadata.schema;
 
-/** A schema element that can be "described" by CQL create queries. */
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+
+/** A schema element that can be described in terms of CQL {@code CREATE} statements. */
 public interface Describable {
 
-  /** Returns a single CQL statement that creates the element. */
-  String describe();
+  /**
+   * Returns a single CQL statement that creates the element.
+   *
+   * @param pretty if {@code true}, make the output more human-readable (line breaks, indents, and
+   *     {@link CqlIdentifier#asCql(boolean) pretty identifiers}). If {@code false}, return the
+   *     statement on a single line with minimal formatting.
+   */
+  String describe(boolean pretty);
 
   /**
    * Returns a CQL script that creates the element and all of its children. For example: a schema
-   * and its tables, types, etc.; a tables and its indices.
+   * with its tables, materialized views, types, etc. A table with its indices.
+   *
+   * @param pretty if {@code true}, make the output more human-readable (line breaks, indents, and
+   *     {@link CqlIdentifier#asCql(boolean) pretty identifiers}). If {@code false}, return each
+   *     statement on a single line with minimal formatting.
    */
-  String describeWithChildren();
+  String describeWithChildren(boolean pretty);
 }
