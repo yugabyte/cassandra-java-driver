@@ -86,9 +86,13 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
    * @param listenToClusterEvents whether to register for TOPOLOGY_CHANGE and STATUS_CHANGE events.
    *     If the control connection has already initialized with another value, this is ignored.
    *     SCHEMA_CHANGE events are always registered.
+   * @param reconnectOnFailure whether to schedule a reconnection if the initial attempt fails (this
+   *     does not affect the returned future, which always represent the outcome of the initial
+   *     attempt only).
    */
-  public CompletionStage<Void> init(boolean listenToClusterEvents) {
-    RunOrSchedule.on(adminExecutor, () -> singleThreaded.init(listenToClusterEvents));
+  public CompletionStage<Void> init(boolean listenToClusterEvents, boolean reconnectOnFailure) {
+    RunOrSchedule.on(
+        adminExecutor, () -> singleThreaded.init(listenToClusterEvents, reconnectOnFailure));
     return singleThreaded.initFuture;
   }
 
@@ -221,7 +225,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           .register(NodeStateEvent.class, RunOrSchedule.on(adminExecutor, this::onStateEvent));
     }
 
-    private void init(boolean listenToClusterEvents) {
+    private void init(boolean listenToClusterEvents, boolean reconnectOnFailure) {
       assert adminExecutor.inEventLoop();
       if (initWasCalled) {
         return;
@@ -237,7 +241,16 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
       Queue<Node> nodes = context.loadBalancingPolicyWrapper().newQueryPlan();
 
-      connect(nodes, null, () -> initFuture.complete(null), initFuture::completeExceptionally);
+      connect(
+          nodes,
+          null,
+          () -> initFuture.complete(null),
+          error -> {
+            if (reconnectOnFailure && !closeWasCalled) {
+              reconnection.start();
+            }
+            initFuture.completeExceptionally(error);
+          });
     }
 
     private CompletionStage<Boolean> reconnect() {

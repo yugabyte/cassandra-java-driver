@@ -15,8 +15,10 @@
  */
 package com.datastax.oss.driver.internal.core.metadata;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.google.common.collect.ImmutableMap;
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -41,6 +43,11 @@ public class DefaultMetadata implements Metadata {
   @Override
   public Map<InetSocketAddress, Node> getNodes() {
     return nodes;
+  }
+
+  @Override
+  public Map<CqlIdentifier, KeyspaceMetadata> getKeyspaces() {
+    return null;
   }
 
   public DefaultMetadata addNode(Node toAdd) {

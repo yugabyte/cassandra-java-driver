@@ -45,7 +45,7 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
         .thenReturn(CompletableFuture.completedFuture(channel1));
 
     // When
-    controlConnection.init(true);
+    controlConnection.init(true, false);
     waitForPendingAdminTasks();
     DriverChannelOptions channelOptions = optionsCaptor.getValue();
 
@@ -68,7 +68,7 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
         .thenReturn(CompletableFuture.completedFuture(channel1));
 
     // When
-    controlConnection.init(false);
+    controlConnection.init(false, false);
     waitForPendingAdminTasks();
     DriverChannelOptions channelOptions = optionsCaptor.getValue();
 
@@ -86,7 +86,7 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
         ArgumentCaptor.forClass(DriverChannelOptions.class);
     Mockito.when(channelFactory.connect(eq(ADDRESS1), optionsCaptor.capture()))
         .thenReturn(CompletableFuture.completedFuture(channel1));
-    controlConnection.init(true);
+    controlConnection.init(true, false);
     waitForPendingAdminTasks();
     EventCallback callback = optionsCaptor.getValue().eventCallback;
     StatusChangeEvent event =
@@ -108,7 +108,7 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
         ArgumentCaptor.forClass(DriverChannelOptions.class);
     Mockito.when(channelFactory.connect(eq(ADDRESS1), optionsCaptor.capture()))
         .thenReturn(CompletableFuture.completedFuture(channel1));
-    controlConnection.init(true);
+    controlConnection.init(true, false);
     waitForPendingAdminTasks();
     EventCallback callback = optionsCaptor.getValue().eventCallback;
     TopologyChangeEvent event =
@@ -130,7 +130,7 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
         ArgumentCaptor.forClass(DriverChannelOptions.class);
     Mockito.when(channelFactory.connect(eq(ADDRESS1), optionsCaptor.capture()))
         .thenReturn(CompletableFuture.completedFuture(channel1));
-    controlConnection.init(false);
+    controlConnection.init(false, false);
     waitForPendingAdminTasks();
     EventCallback callback = optionsCaptor.getValue().eventCallback;
     SchemaChangeEvent event =

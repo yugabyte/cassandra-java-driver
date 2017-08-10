@@ -186,7 +186,7 @@ public class DefaultCluster implements Cluster {
           }
         }
         if (needSchemaRefresh) {
-          metadataManager.refreshSchema(SchemaElementKind.WHOLE_SCHEMA, null, null, null);
+          metadataManager.refreshSchema(SchemaElementKind.FULL_SCHEMA, null, null, null);
         }
         metadataManager.firstSchemaRefreshFuture().thenAccept(this::afterInitialSchemaRefresh);
 

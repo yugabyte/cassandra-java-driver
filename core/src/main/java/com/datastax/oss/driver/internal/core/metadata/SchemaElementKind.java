@@ -21,11 +21,12 @@ import java.util.Map;
 
 /** The different kinds of objects in a schema. */
 public enum SchemaElementKind {
-  WHOLE_SCHEMA(
-      // Dummy placeholder, this kind never comes from the server, only internally
-      "WHOLE_SCHEMA"),
+  // Note that FULL_SCHEMA and VIEW are not defined at the protocol level, they're only used
+  // internally.
+  FULL_SCHEMA("FULL_SCHEMA"),
   KEYSPACE(ProtocolConstants.SchemaChangeTarget.KEYSPACE),
   TABLE(ProtocolConstants.SchemaChangeTarget.TABLE),
+  VIEW("VIEW"),
   TYPE(ProtocolConstants.SchemaChangeTarget.TYPE),
   FUNCTION(ProtocolConstants.SchemaChangeTarget.FUNCTION),
   AGGREGATE(ProtocolConstants.SchemaChangeTarget.AGGREGATE),

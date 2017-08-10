@@ -19,6 +19,9 @@ import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaQueries;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRows;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
@@ -39,6 +42,7 @@ public class MetadataManager implements AsyncAutoCloseable {
   private final String logPrefix;
   private final EventExecutor adminExecutor;
   private final SingleThreaded singleThreaded;
+  private final ControlConnection controlConnection;
   private volatile DefaultMetadata metadata; // must be updated on adminExecutor only
 
   public MetadataManager(InternalDriverContext context) {
@@ -46,6 +50,7 @@ public class MetadataManager implements AsyncAutoCloseable {
     this.logPrefix = context.clusterName();
     this.adminExecutor = context.nettyOptions().adminEventExecutorGroup().next();
     this.singleThreaded = new SingleThreaded();
+    this.controlConnection = context.controlConnection();
     this.metadata = DefaultMetadata.EMPTY;
   }
 
@@ -115,10 +120,26 @@ public class MetadataManager implements AsyncAutoCloseable {
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.removeNode(address));
   }
 
-  public void refreshSchema(
+  public CompletionStage<Void> refreshSchema(
       SchemaElementKind kind, String keyspace, String object, List<String> arguments) {
-    // TODO refresh schema metadata, only complete the future once it's done
-    singleThreaded.firstSchemaRefreshFuture.complete(null);
+
+    //TODO check if metadata disabled in config
+    //TODO create an event to force (even if disabled in config)
+
+    return maybeInitControlConnection()
+        .thenCompose(
+            v ->
+                SchemaQueries.newInstance(context, logPrefix)
+                    .execute(kind, keyspace, object, arguments))
+        .thenApplyAsync(singleThreaded::refreshSchema, adminExecutor);
+  }
+
+  // The control connection may or may not have been initialized already by TopologyMonitor.
+  private CompletionStage<Void> maybeInitControlConnection() {
+    return singleThreaded.firstSchemaRefreshFuture.isDone()
+        // Not the first schema refresh, so we know init was attempted already
+        ? singleThreaded.firstSchemaRefreshFuture
+        : controlConnection.init(false, true);
   }
 
   /**
@@ -191,6 +212,11 @@ public class MetadataManager implements AsyncAutoCloseable {
 
     private void removeNode(InetSocketAddress address) {
       refresh(new RemoveNodeRefresh(metadata, address, logPrefix));
+    }
+
+    private Void refreshSchema(SchemaRows schemaRows) {
+      // TODO complete firstSchemaRefreshFuture at the end
+      throw new UnsupportedOperationException("TODO");
     }
 
     private void close() {

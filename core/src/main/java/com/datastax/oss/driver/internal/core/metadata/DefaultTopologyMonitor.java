@@ -74,7 +74,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     if (closeFuture.isDone()) {
       return CompletableFutures.failedFuture(new IllegalStateException("closed"));
     }
-    return controlConnection.init(true);
+    return controlConnection.init(true, false);
   }
 
   @Override
