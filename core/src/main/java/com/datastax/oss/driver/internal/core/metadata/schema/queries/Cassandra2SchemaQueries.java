@@ -13,66 +13,66 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.metadata.schema;
+package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Optional;
 
-class Cassandra3SchemaQueries extends SchemaQueries {
-  Cassandra3SchemaQueries(
+class Cassandra2SchemaQueries extends SchemaQueries {
+  Cassandra2SchemaQueries(
       DriverChannel channel, Node node, DriverConfigProfile config, String logPrefix) {
     super(channel, node, config, logPrefix);
   }
 
   @Override
   protected String selectKeyspacesQuery() {
-    return "SELECT * FROM system_schema.keyspaces";
+    return "SELECT * FROM system.schema_keyspaces";
   }
 
   @Override
   protected String selectTablesQuery() {
-    return "SELECT * FROM system_schema.tables";
+    return "SELECT * FROM system.schema_columnfamilies";
   }
 
   @Override
   protected Optional<String> selectViewsQuery() {
-    return Optional.of("SELECT * FROM system_schema.views");
+    return Optional.empty();
   }
 
   @Override
   protected Optional<String> selectIndexesQuery() {
-    return Optional.of("SELECT * FROM system_schema.indexes");
+    return Optional.empty();
   }
 
   @Override
   protected String selectColumnsQuery() {
-    return "SELECT * FROM system_schema.columns";
+    return "SELECT * FROM system.schema_columns";
   }
 
   @Override
   protected String selectTypesQuery() {
-    return "SELECT * FROM system_schema.types";
+    return "SELECT * FROM system.schema_usertypes";
   }
 
   @Override
   protected String selectFunctionsQuery() {
-    return "SELECT * FROM system_schema.functions";
+    return "SELECT * FROM system.schema_functions";
   }
 
   @Override
   protected String selectAggregatesQuery() {
-    return "SELECT * FROM system_schema.aggregates";
+    return "SELECT * FROM system.schema_aggregates";
   }
 
   @Override
   protected String tableNameColumn() {
-    return "table_name";
+    return "columnfamily_name";
   }
 
   @Override
   protected String signatureColumn() {
-    return "argument_types";
+    return "signature";
   }
 }

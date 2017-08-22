@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.metadata.schema;
+package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
 import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.config.CoreDriverOption;
@@ -23,9 +23,11 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.SchemaElementKind;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
@@ -48,7 +50,6 @@ import org.slf4j.LoggerFactory;
 public abstract class SchemaQueries {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaQueries.class);
-  private static final CassandraVersion CASSANDRA_300 = CassandraVersion.parse("3.0.0");
   private static final TypeCodec<List<String>> LIST_OF_TEXT = TypeCodecs.listOf(TypeCodecs.TEXT);
 
   public static SchemaQueries newInstance(InternalDriverContext context, String logPrefix) {
@@ -70,13 +71,13 @@ public abstract class SchemaQueries {
           "[{}] Cassandra version missing for {}, defaulting to {}",
           logPrefix,
           node,
-          CASSANDRA_300);
-      cassandraVersion = CASSANDRA_300;
+          CassandraVersion.V3_0_0);
+      cassandraVersion = CassandraVersion.V3_0_0;
     }
     DriverConfigProfile config = context.config().getDefaultProfile();
     LOG.debug(
         "[{}] Sending schema queries to {} with version {}", logPrefix, node, cassandraVersion);
-    return (cassandraVersion.compareTo(CASSANDRA_300) < 0)
+    return (cassandraVersion.compareTo(CassandraVersion.V3_0_0) < 0)
         ? new Cassandra2SchemaQueries(channel, node, config, logPrefix)
         : new Cassandra3SchemaQueries(channel, node, config, logPrefix);
   }
@@ -119,34 +120,43 @@ public abstract class SchemaQueries {
 
   protected abstract String selectAggregatesQuery();
 
+  /** {@code table_name} or {@code columnfamily_name}, depending on the server version */
   protected abstract String tableNameColumn();
 
   protected abstract String signatureColumn();
 
   public CompletionStage<SchemaRows> execute(
-      SchemaElementKind kind, String keyspace, String object, List<String> arguments) {
+      SchemaChangeType type,
+      SchemaChangeScope scope,
+      String keyspace,
+      String object,
+      List<String> arguments) {
     RunOrSchedule.on(
-        adminExecutor, () -> executeOnAdminExecutor(kind, keyspace, object, arguments));
+        adminExecutor, () -> executeOnAdminExecutor(type, scope, keyspace, object, arguments));
     return schemaRowsFuture;
   }
 
   private void executeOnAdminExecutor(
-      SchemaElementKind kind, String keyspace, String object, List<String> arguments) {
+      SchemaChangeType type,
+      SchemaChangeScope scope,
+      String keyspace,
+      String object,
+      List<String> arguments) {
     assert adminExecutor.inEventLoop();
 
-    schemaRowsBuilder = new SchemaRows.Builder(node, kind, tableNameColumn(), logPrefix);
+    schemaRowsBuilder = new SchemaRows.Builder(node, type, scope, tableNameColumn(), logPrefix);
 
-    String whereClause = buildWhereClause(kind, keyspace, object, arguments);
+    String whereClause = buildWhereClause(scope, keyspace, object, arguments);
 
     boolean isFullOrKeyspace =
-        kind == SchemaElementKind.FULL_SCHEMA || kind == SchemaElementKind.KEYSPACE;
+        scope == SchemaChangeScope.FULL_SCHEMA || scope == SchemaChangeScope.KEYSPACE;
     if (isFullOrKeyspace) {
       query(selectKeyspacesQuery() + whereClause, schemaRowsBuilder::withKeyspaces);
     }
-    if (isFullOrKeyspace || kind == SchemaElementKind.TYPE) {
+    if (isFullOrKeyspace || scope == SchemaChangeScope.TYPE) {
       query(selectTypesQuery() + whereClause, schemaRowsBuilder::withTypes);
     }
-    if (isFullOrKeyspace || kind == SchemaElementKind.TABLE) {
+    if (isFullOrKeyspace || scope == SchemaChangeScope.TABLE) {
       query(selectTablesQuery() + whereClause, schemaRowsBuilder::withTables);
       query(selectColumnsQuery() + whereClause, schemaRowsBuilder::withColumns);
       selectIndexesQuery()
@@ -156,23 +166,23 @@ public abstract class SchemaQueries {
               select -> {
                 // Individual view notifications are sent with the TABLE type, we need to translate
                 // to VIEW to generate the appropriate WHERE clause.
-                SchemaElementKind whereClauseKind =
-                    (kind == SchemaElementKind.TABLE ? SchemaElementKind.VIEW : kind);
+                SchemaChangeScope whereClauseKind =
+                    (scope == SchemaChangeScope.TABLE ? SchemaChangeScope.VIEW : scope);
                 String viewWhereClause =
                     buildWhereClause(whereClauseKind, keyspace, object, arguments);
                 query(select + viewWhereClause, schemaRowsBuilder::withViews);
               });
     }
-    if (isFullOrKeyspace || kind == SchemaElementKind.FUNCTION) {
+    if (isFullOrKeyspace || scope == SchemaChangeScope.FUNCTION) {
       query(selectFunctionsQuery() + whereClause, schemaRowsBuilder::withFunctions);
     }
-    if (isFullOrKeyspace || kind == SchemaElementKind.AGGREGATE) {
+    if (isFullOrKeyspace || scope == SchemaChangeScope.AGGREGATE) {
       query(selectAggregatesQuery() + whereClause, schemaRowsBuilder::withAggregates);
     }
   }
 
   private void query(
-      String queryString, Function<Iterable<AdminResult.Row>, SchemaRows.Builder> builderUpdater) {
+      String queryString, Function<Iterable<AdminRow>, SchemaRows.Builder> builderUpdater) {
     assert adminExecutor.inEventLoop();
 
     pendingQueries += 1;
@@ -189,7 +199,7 @@ public abstract class SchemaQueries {
   private void handleResult(
       AdminResult result,
       Throwable error,
-      Function<Iterable<AdminResult.Row>, SchemaRows.Builder> builderUpdater) {
+      Function<Iterable<AdminRow>, SchemaRows.Builder> builderUpdater) {
     if (schemaRowsFuture.isDone()) { // Another query failed already, ignore
       return;
     }
@@ -216,23 +226,23 @@ public abstract class SchemaQueries {
   }
 
   private String buildWhereClause(
-      SchemaElementKind kind, String keyspace, String object, List<String> arguments) {
-    if (kind == SchemaElementKind.FULL_SCHEMA) {
+      SchemaChangeScope kind, String keyspace, String object, List<String> arguments) {
+    if (kind == SchemaChangeScope.FULL_SCHEMA) {
       return "";
     } else {
       String whereClause = String.format(" WHERE keyspace_name = '%s'", keyspace);
-      if (kind == SchemaElementKind.TABLE) {
+      if (kind == SchemaChangeScope.TABLE) {
         whereClause += String.format(" AND %s = '%s'", tableNameColumn(), object);
-      } else if (kind == SchemaElementKind.VIEW) {
+      } else if (kind == SchemaChangeScope.VIEW) {
         whereClause += String.format(" AND view_name = '%s'", object);
-      } else if (kind == SchemaElementKind.TYPE) {
+      } else if (kind == SchemaChangeScope.TYPE) {
         whereClause += String.format(" AND type_name = '%s'", object);
-      } else if (kind == SchemaElementKind.FUNCTION) {
+      } else if (kind == SchemaChangeScope.FUNCTION) {
         whereClause +=
             String.format(
                 " AND function_name = '%s' AND %s = %s",
                 object, signatureColumn(), LIST_OF_TEXT.format(arguments));
-      } else if (kind == SchemaElementKind.AGGREGATE) {
+      } else if (kind == SchemaChangeScope.AGGREGATE) {
         whereClause +=
             String.format(
                 " AND aggregate_name = '%s' AND %s = %s",

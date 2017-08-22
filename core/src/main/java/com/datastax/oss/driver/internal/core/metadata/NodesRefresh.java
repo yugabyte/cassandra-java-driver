@@ -36,7 +36,7 @@ abstract class NodesRefresh extends MetadataRefresh {
   protected abstract Map<InetSocketAddress, Node> computeNewNodes();
 
   @Override
-  void compute() {
+  public void compute() {
     Map<InetSocketAddress, Node> newNodes = computeNewNodes();
     newMetadata = (newNodes == null) ? oldMetadata : new DefaultMetadata(newNodes);
     // TODO recompute token map (even if node list hasn't changed, b/c tokens might have changed)

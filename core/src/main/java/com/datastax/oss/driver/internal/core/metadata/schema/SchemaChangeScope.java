@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.metadata;
+package com.datastax.oss.driver.internal.core.metadata.schema;
 
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
-/** The different kinds of objects in a schema. */
-public enum SchemaElementKind {
+/** The scope of a schema change. */
+public enum SchemaChangeScope {
   // Note that FULL_SCHEMA and VIEW are not defined at the protocol level, they're only used
   // internally.
   FULL_SCHEMA("FULL_SCHEMA"),
@@ -34,25 +34,25 @@ public enum SchemaElementKind {
 
   private final String protocolString;
 
-  SchemaElementKind(String protocolString) {
+  SchemaChangeScope(String protocolString) {
     this.protocolString = protocolString;
   }
 
-  private static final Map<String, SchemaElementKind> BY_PROTOCOL_STRING;
+  private static final Map<String, SchemaChangeScope> BY_PROTOCOL_STRING;
 
   static {
-    ImmutableMap.Builder<String, SchemaElementKind> builder = ImmutableMap.builder();
-    for (SchemaElementKind kind : values()) {
-      builder.put(kind.protocolString, kind);
+    ImmutableMap.Builder<String, SchemaChangeScope> builder = ImmutableMap.builder();
+    for (SchemaChangeScope scope : values()) {
+      builder.put(scope.protocolString, scope);
     }
     BY_PROTOCOL_STRING = builder.build();
   }
 
-  public static SchemaElementKind fromProtocolString(String protocolString) {
-    SchemaElementKind kind = BY_PROTOCOL_STRING.get(protocolString);
-    if (kind == null) {
+  public static SchemaChangeScope fromProtocolString(String protocolString) {
+    SchemaChangeScope scope = BY_PROTOCOL_STRING.get(protocolString);
+    if (scope == null) {
       throw new IllegalArgumentException("Unsupported schema type: " + protocolString);
     }
-    return kind;
+    return scope;
   }
 }

@@ -18,6 +18,7 @@ package com.datastax.oss.driver.internal.core.metadata.schema;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.Describable;
 import com.google.common.base.Strings;
+import java.util.function.Consumer;
 
 /**
  * A simple builder that is used internally for the queries of {@link Describable} schema elements.
@@ -29,6 +30,7 @@ public class ScriptBuilder {
   private final StringBuilder builder = new StringBuilder();
   private int indent;
   private boolean isAtLineStart;
+  private boolean isFirstOption = true;
 
   public ScriptBuilder(boolean pretty) {
     this.pretty = pretty;
@@ -58,6 +60,12 @@ public class ScriptBuilder {
     return this;
   }
 
+  public ScriptBuilder forceNewLine(int count) {
+    builder.append(Strings.repeat("\n", count));
+    isAtLineStart = true;
+    return this;
+  }
+
   public ScriptBuilder increaseIndent() {
     indent += 1;
     return this;
@@ -66,6 +74,24 @@ public class ScriptBuilder {
   public ScriptBuilder decreaseIndent() {
     if (indent > 0) {
       indent -= 1;
+    }
+    return this;
+  }
+
+  /** Appends "WITH " the first time it's called, then "AND " the next times. */
+  public ScriptBuilder andWith() {
+    if (isFirstOption) {
+      append("WITH ");
+      isFirstOption = false;
+    } else {
+      append("AND ");
+    }
+    return this;
+  }
+
+  public <E> ScriptBuilder forEach(Iterable<E> iterable, Consumer<E> action) {
+    for (E e : iterable) {
+      action.accept(e);
     }
     return this;
   }

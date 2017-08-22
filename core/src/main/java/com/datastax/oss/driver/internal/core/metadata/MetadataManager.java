@@ -20,8 +20,11 @@ import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaQueries;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRows;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueries;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
@@ -121,17 +124,38 @@ public class MetadataManager implements AsyncAutoCloseable {
   }
 
   public CompletionStage<Void> refreshSchema(
-      SchemaElementKind kind, String keyspace, String object, List<String> arguments) {
+      SchemaChangeType type,
+      SchemaChangeScope scope,
+      String keyspace,
+      String object,
+      List<String> arguments) {
 
     //TODO check if metadata disabled in config
+    //TODO debounce
     //TODO create an event to force (even if disabled in config)
 
-    return maybeInitControlConnection()
-        .thenCompose(
-            v ->
-                SchemaQueries.newInstance(context, logPrefix)
-                    .execute(kind, keyspace, object, arguments))
-        .thenApplyAsync(singleThreaded::refreshSchema, adminExecutor);
+    if (type == SchemaChangeType.DROPPED) {
+      // TODO no need to query, create a refresh and apply it directly
+      throw new UnsupportedOperationException("TODO handle schema drops");
+    } else {
+      return maybeInitControlConnection()
+          // 1. Query system tables
+          .thenCompose(
+              v ->
+                  SchemaQueries.newInstance(context, logPrefix)
+                      .execute(type, scope, keyspace, object, arguments))
+          // 2. Parse the rows into metadata objects, put them in a MetadataRefresh
+          // 3. Apply the MetadataRefresh
+          .thenApplyAsync(singleThreaded::refreshSchema, adminExecutor)
+          .whenComplete(
+              (v, error) -> {
+                if (error != null) {
+                  LOG.warn(
+                      "[{}] Unexpected error while refreshing schema, skipping", logPrefix, error);
+                }
+                singleThreaded.firstSchemaRefreshFuture.complete(null);
+              });
+    }
   }
 
   // The control connection may or may not have been initialized already by TopologyMonitor.
@@ -215,8 +239,13 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private Void refreshSchema(SchemaRows schemaRows) {
-      // TODO complete firstSchemaRefreshFuture at the end
-      throw new UnsupportedOperationException("TODO");
+      assert adminExecutor.inEventLoop();
+      MetadataRefresh schemaRefresh =
+          new SchemaParser(schemaRows, metadata, context, logPrefix).parse();
+      if (schemaRefresh != null) {
+        refresh(schemaRefresh);
+      }
+      return null;
     }
 
     private void close() {

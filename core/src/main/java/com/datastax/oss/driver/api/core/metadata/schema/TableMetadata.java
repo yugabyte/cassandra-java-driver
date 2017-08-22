@@ -16,12 +16,96 @@
 package com.datastax.oss.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.metadata.schema.parsing.RelationParser;
 import java.util.Map;
 
 /** A table in the schema metadata. */
 public interface TableMetadata extends RelationMetadata {
 
-  Map<CqlIdentifier, IndexMetadata> getIndices();
+  boolean isCompactStorage();
 
-  Map<CqlIdentifier, MaterializedViewMetadata> getViews();
+  Map<CqlIdentifier, IndexMetadata> getIndexes();
+
+  @Override
+  default String describe(boolean pretty) {
+    ScriptBuilder builder =
+        new ScriptBuilder(pretty)
+            .append("CREATE TABLE ")
+            .append(getKeyspace())
+            .append(".")
+            .append(getName())
+            .append(" (")
+            .newLine()
+            .increaseIndent();
+
+    for (ColumnMetadata column : getColumns().values()) {
+      builder.append(column.getName()).append(" ").append(column.getType().asCql(true, pretty));
+      if (column.isStatic()) {
+        builder.append(" static");
+      }
+      builder.append(",").newLine();
+    }
+
+    // PK
+    builder.append("PRIMARY KEY (");
+    if (getPartitionKey().size() == 1) { // PRIMARY KEY (k
+      builder.append(getPartitionKey().get(0).getName());
+    } else { // PRIMARY KEY ((k1, k2)
+      builder.append("(");
+      boolean first = true;
+      for (ColumnMetadata pkColumn : getPartitionKey()) {
+        if (first) {
+          first = false;
+        } else {
+          builder.append(", ");
+        }
+        builder.append(pkColumn.getName());
+      }
+      builder.append(")");
+    }
+    // PRIMARY KEY (<pk portion>, cc1, cc2, cc3)
+    for (ColumnMetadata clusteringColumn : getClusteringColumns().keySet()) {
+      builder.append(", ").append(clusteringColumn.getName());
+    }
+    builder.append(")");
+
+    builder.newLine().decreaseIndent().append(")");
+
+    if (isCompactStorage()) {
+      builder.newLine().andWith().append("COMPACT STORAGE");
+    }
+    if (getClusteringColumns().containsValue(ClusteringOrder.DESC)) {
+      builder.newLine().andWith().append("CLUSTERING ORDER BY (");
+      boolean first = true;
+      for (Map.Entry<ColumnMetadata, ClusteringOrder> entry : getClusteringColumns().entrySet()) {
+        if (first) {
+          first = false;
+        } else {
+          builder.append(", ");
+        }
+        builder.append(entry.getKey().getName()).append(" ").append(entry.getValue().name());
+      }
+      builder.append(")");
+    }
+    Map<CqlIdentifier, Object> options = getOptions();
+    RelationParser.appendOptions(options, builder);
+    return builder.append(";").build();
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This describes the table and all of its indices. Contrary to previous driver versions, views
+   * are <b>not</b> included.
+   */
+  @Override
+  default String describeWithChildren(boolean pretty) {
+    String createTable = describe(pretty);
+    ScriptBuilder builder = new ScriptBuilder(pretty).append(createTable);
+    for (IndexMetadata indexMetadata : getIndexes().values()) {
+      builder.forceNewLine(2).append(indexMetadata.describeWithChildren(pretty));
+    }
+    return builder.build();
+  }
 }

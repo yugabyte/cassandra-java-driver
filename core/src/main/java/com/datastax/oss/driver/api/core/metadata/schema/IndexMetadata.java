@@ -16,11 +16,16 @@
 package com.datastax.oss.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.google.common.collect.Maps;
+import java.util.Map;
 
 /** A secondary index in the schema metadata. */
 public interface IndexMetadata extends Describable {
 
-  TableMetadata getTable();
+  CqlIdentifier getKeyspace();
+
+  CqlIdentifier getTable();
 
   CqlIdentifier getName();
 
@@ -29,13 +34,71 @@ public interface IndexMetadata extends Describable {
   String getTarget();
 
   /**
-   * Whether this index is custom. If so, {@link #getClassName()} returns the name of the
-   * server-side implementation.
+   * If this index is custom, the name of the server-side implementation. Otherwise, {@code null}.
    */
-  boolean isCustom();
+  default String getClassName() {
+    return getOptions().get("class_name");
+  }
 
-  /** @see #isCustom() */
-  String getClassName();
+  /**
+   * The options of the index.
+   *
+   * <p>This directly reflects the corresponding column of the system table ( {@code
+   * system.schema_columns.index_options} in Cassandra <= 2.2, or {@code
+   * system_schema.indexes.options} in later versions).
+   *
+   * <p>Note that some of these options might also be exposed as standalone fields in this
+   * interface, namely {@link #getClassName()} and {{@link #getTarget()}}.
+   */
+  Map<String, String> getOptions();
 
-  String getOption(String name);
+  @Override
+  default String describe(boolean pretty) {
+    ScriptBuilder builder = new ScriptBuilder(pretty);
+    if (getClassName() != null) {
+      builder
+          .append("CREATE CUSTOM INDEX ")
+          .append(getName())
+          .append(" ON ")
+          .append(getKeyspace())
+          .append(".")
+          .append(getTable())
+          .append(String.format(" (%s)", getTarget()))
+          .newLine()
+          .append(String.format("USING '%s'", getClassName()));
+
+      // Some options already appear in the CREATE statement, ignore them
+      Map<String, String> describedOptions =
+          Maps.filterKeys(getOptions(), k -> !"target".equals(k) && !"class_name".equals(k));
+      if (!describedOptions.isEmpty()) {
+        builder.newLine().append("WITH OPTIONS = {").newLine().increaseIndent();
+        boolean first = true;
+        for (Map.Entry<String, String> option : describedOptions.entrySet()) {
+          if (first) {
+            first = false;
+          } else {
+            builder.append(",").newLine();
+          }
+          builder.append(String.format("'%s' : '%s'", option.getKey(), option.getValue()));
+        }
+        builder.decreaseIndent().append("}");
+      }
+    } else {
+      builder
+          .append("CREATE INDEX ")
+          .append(getName())
+          .append(" ON ")
+          .append(getKeyspace())
+          .append(".")
+          .append(getTable())
+          .append(String.format(" (%s);", getTarget()));
+    }
+    return builder.build();
+  }
+
+  @Override
+  default String describeWithChildren(boolean pretty) {
+    // An index has no children
+    return describe(pretty);
+  }
 }

@@ -27,9 +27,10 @@ import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
-import com.datastax.oss.driver.internal.core.metadata.SchemaElementKind;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
@@ -194,7 +195,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     context
         .metadataManager()
         .refreshSchema(
-            SchemaElementKind.fromProtocolString(sce.target),
+            SchemaChangeType.fromProtocolString(sce.changeType),
+            SchemaChangeScope.fromProtocolString(sce.target),
             sce.keyspace,
             sce.object,
             sce.arguments);
@@ -369,7 +371,15 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                   try {
                     // This does nothing if the LBP is initialized already
                     context.loadBalancingPolicyWrapper().init();
-                    context.metadataManager().refreshSchema(null, null, null, null);
+                    context
+                        .metadataManager()
+                        .refreshSchema(
+                            SchemaChangeType.UPDATED,
+                            SchemaChangeScope.FULL_SCHEMA,
+                            null,
+                            null,
+                            null);
+                    // TODO avoid refreshing the token map twice
                   } catch (Throwable t) {
                     LOG.warn("[{}] Unexpected error on control connection reconnect", logPrefix, t);
                   }

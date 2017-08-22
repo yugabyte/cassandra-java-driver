@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.metadata.schema;
+package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
-import com.datastax.oss.driver.internal.core.metadata.SchemaElementKind;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
 import com.google.common.collect.ImmutableList;
 import java.util.Iterator;
 import java.util.Queue;
@@ -43,7 +45,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_type() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.TYPE, "ks", "type", null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null);
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -57,9 +59,10 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.types.keySet()).containsOnly("ks");
-              assertThat(rows.types.get("ks")).hasSize(1);
-              assertThat(rows.types.get("ks").iterator().next().getString("type_name"))
+              assertThat(rows.changeType).isEqualTo(SchemaChangeType.UPDATED);
+              assertThat(rows.types.keySet()).containsOnly(KS_ID);
+              assertThat(rows.types.get(KS_ID)).hasSize(1);
+              assertThat(rows.types.get(KS_ID).iterator().next().getString("type_name"))
                   .isEqualTo("type");
             });
   }
@@ -67,7 +70,12 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_function() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.FUNCTION, "ks", "add", ImmutableList.of("int", "int"));
+        queries.execute(
+            SchemaChangeType.UPDATED,
+            SchemaChangeScope.FUNCTION,
+            "ks",
+            "add",
+            ImmutableList.of("int", "int"));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -82,9 +90,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.functions.keySet()).containsOnly("ks");
-              assertThat(rows.functions.get("ks")).hasSize(1);
-              assertThat(rows.functions.get("ks").iterator().next().getString("function_name"))
+              assertThat(rows.functions.keySet()).containsOnly(KS_ID);
+              assertThat(rows.functions.get(KS_ID)).hasSize(1);
+              assertThat(rows.functions.get(KS_ID).iterator().next().getString("function_name"))
                   .isEqualTo("add");
             });
   }
@@ -92,7 +100,12 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_aggregate() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.AGGREGATE, "ks", "add", ImmutableList.of("int", "int"));
+        queries.execute(
+            SchemaChangeType.UPDATED,
+            SchemaChangeScope.AGGREGATE,
+            "ks",
+            "add",
+            ImmutableList.of("int", "int"));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -107,9 +120,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.aggregates.keySet()).containsOnly("ks");
-              assertThat(rows.aggregates.get("ks")).hasSize(1);
-              assertThat(rows.aggregates.get("ks").iterator().next().getString("aggregate_name"))
+              assertThat(rows.aggregates.keySet()).containsOnly(KS_ID);
+              assertThat(rows.aggregates.get(KS_ID)).hasSize(1);
+              assertThat(rows.aggregates.get(KS_ID).iterator().next().getString("aggregate_name"))
                   .isEqualTo("add");
             });
   }
@@ -117,7 +130,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_table() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.TABLE, "ks", "foo", null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
 
     // Table
     Call call = queries.calls.poll();
@@ -141,15 +154,20 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.tables.keySet()).containsOnly("ks");
-              assertThat(rows.tables.get("ks")).hasSize(1);
-              assertThat(rows.tables.get("ks").iterator().next().getString("columnfamily_name"))
+              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
+              assertThat(rows.tables.get(KS_ID)).hasSize(1);
+              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
                   .isEqualTo("foo");
 
-              assertThat(rows.columns.keySet()).containsOnly("ks");
-              assertThat(rows.columns.get("ks").keySet()).containsOnly("foo");
+              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
+              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
               assertThat(
-                      rows.columns.get("ks").get("foo").iterator().next().getString("column_name"))
+                      rows.columns
+                          .get(KS_ID)
+                          .get(FOO_ID)
+                          .iterator()
+                          .next()
+                          .getString("column_name"))
                   .isEqualTo("k");
             });
   }
@@ -157,7 +175,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_keyspace() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.KEYSPACE, "ks", null, null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null);
 
     // Keyspace
     Call call = queries.calls.poll();
@@ -206,34 +224,39 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
               assertThat(rows.keyspaces.get(0).getString("keyspace_name")).isEqualTo("ks");
 
               // Types
-              assertThat(rows.types.keySet()).containsOnly("ks");
-              assertThat(rows.types.get("ks")).hasSize(1);
-              assertThat(rows.types.get("ks").iterator().next().getString("type_name"))
+              assertThat(rows.types.keySet()).containsOnly(KS_ID);
+              assertThat(rows.types.get(KS_ID)).hasSize(1);
+              assertThat(rows.types.get(KS_ID).iterator().next().getString("type_name"))
                   .isEqualTo("type");
 
               // Tables
-              assertThat(rows.tables.keySet()).containsOnly("ks");
-              assertThat(rows.tables.get("ks")).hasSize(1);
-              assertThat(rows.tables.get("ks").iterator().next().getString("columnfamily_name"))
+              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
+              assertThat(rows.tables.get(KS_ID)).hasSize(1);
+              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
                   .isEqualTo("foo");
 
               // Rows
-              assertThat(rows.columns.keySet()).containsOnly("ks");
-              assertThat(rows.columns.get("ks").keySet()).containsOnly("foo");
+              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
+              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
               assertThat(
-                      rows.columns.get("ks").get("foo").iterator().next().getString("column_name"))
+                      rows.columns
+                          .get(KS_ID)
+                          .get(FOO_ID)
+                          .iterator()
+                          .next()
+                          .getString("column_name"))
                   .isEqualTo("k");
 
               // Functions
-              assertThat(rows.functions.keySet()).containsOnly("ks");
-              assertThat(rows.functions.get("ks")).hasSize(1);
-              assertThat(rows.functions.get("ks").iterator().next().getString("function_name"))
+              assertThat(rows.functions.keySet()).containsOnly(KS_ID);
+              assertThat(rows.functions.get(KS_ID)).hasSize(1);
+              assertThat(rows.functions.get(KS_ID).iterator().next().getString("function_name"))
                   .isEqualTo("add");
 
               // Aggregates
-              assertThat(rows.aggregates.keySet()).containsOnly("ks");
-              assertThat(rows.aggregates.get("ks")).hasSize(1);
-              assertThat(rows.aggregates.get("ks").iterator().next().getString("aggregate_name"))
+              assertThat(rows.aggregates.keySet()).containsOnly(KS_ID);
+              assertThat(rows.aggregates.get(KS_ID)).hasSize(1);
+              assertThat(rows.aggregates.get(KS_ID).iterator().next().getString("aggregate_name"))
                   .isEqualTo("add");
             });
   }
@@ -241,7 +264,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_full_schema() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.FULL_SCHEMA, null, null, null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, null, null, null);
 
     // Keyspace
     Call call = queries.calls.poll();
@@ -287,34 +310,39 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
               assertThat(rows.keyspaces.get(1).getString("keyspace_name")).isEqualTo("ks2");
 
               // Types
-              assertThat(rows.types.keySet()).containsOnly("ks1");
-              assertThat(rows.types.get("ks1")).hasSize(1);
-              assertThat(rows.types.get("ks1").iterator().next().getString("type_name"))
+              assertThat(rows.types.keySet()).containsOnly(KS1_ID);
+              assertThat(rows.types.get(KS1_ID)).hasSize(1);
+              assertThat(rows.types.get(KS1_ID).iterator().next().getString("type_name"))
                   .isEqualTo("type");
 
               // Tables
-              assertThat(rows.tables.keySet()).containsOnly("ks1");
-              assertThat(rows.tables.get("ks1")).hasSize(1);
-              assertThat(rows.tables.get("ks1").iterator().next().getString("columnfamily_name"))
+              assertThat(rows.tables.keySet()).containsOnly(KS1_ID);
+              assertThat(rows.tables.get(KS1_ID)).hasSize(1);
+              assertThat(rows.tables.get(KS1_ID).iterator().next().getString("columnfamily_name"))
                   .isEqualTo("foo");
 
               // Rows
-              assertThat(rows.columns.keySet()).containsOnly("ks1");
-              assertThat(rows.columns.get("ks1").keySet()).containsOnly("foo");
+              assertThat(rows.columns.keySet()).containsOnly(KS1_ID);
+              assertThat(rows.columns.get(KS1_ID).keySet()).containsOnly(FOO_ID);
               assertThat(
-                      rows.columns.get("ks1").get("foo").iterator().next().getString("column_name"))
+                      rows.columns
+                          .get(KS1_ID)
+                          .get(FOO_ID)
+                          .iterator()
+                          .next()
+                          .getString("column_name"))
                   .isEqualTo("k");
 
               // Functions
-              assertThat(rows.functions.keySet()).containsOnly("ks2");
-              assertThat(rows.functions.get("ks2")).hasSize(1);
-              assertThat(rows.functions.get("ks2").iterator().next().getString("function_name"))
+              assertThat(rows.functions.keySet()).containsOnly(KS2_ID);
+              assertThat(rows.functions.get(KS2_ID)).hasSize(1);
+              assertThat(rows.functions.get(KS2_ID).iterator().next().getString("function_name"))
                   .isEqualTo("add");
 
               // Aggregates
-              assertThat(rows.aggregates.keySet()).containsOnly("ks2");
-              assertThat(rows.aggregates.get("ks2")).hasSize(1);
-              assertThat(rows.aggregates.get("ks2").iterator().next().getString("aggregate_name"))
+              assertThat(rows.aggregates.keySet()).containsOnly(KS2_ID);
+              assertThat(rows.aggregates.get(KS2_ID)).hasSize(1);
+              assertThat(rows.aggregates.get(KS2_ID).iterator().next().getString("aggregate_name"))
                   .isEqualTo("add");
             });
   }
@@ -326,7 +354,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     // But those scenarios require more queries to mock, so use type instead (the underlying logic
     // is shared).
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.TYPE, "ks", "type", null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null);
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -342,9 +370,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.types.keySet()).containsOnly("ks");
-              assertThat(rows.types.get("ks")).hasSize(2);
-              Iterator<AdminResult.Row> iterator = rows.types.get("ks").iterator();
+              assertThat(rows.types.keySet()).containsOnly(KS_ID);
+              assertThat(rows.types.get(KS_ID)).hasSize(2);
+              Iterator<AdminRow> iterator = rows.types.get(KS_ID).iterator();
               assertThat(iterator.next().getString("type_name")).isEqualTo("type1");
               assertThat(iterator.next().getString("type_name")).isEqualTo("type2");
             });
@@ -353,7 +381,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_ignore_malformed_rows() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaElementKind.TABLE, "ks", "foo", null);
+        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
 
     // Table
     Call call = queries.calls.poll();
@@ -386,15 +414,20 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.tables.keySet()).containsOnly("ks");
-              assertThat(rows.tables.get("ks")).hasSize(1);
-              assertThat(rows.tables.get("ks").iterator().next().getString("columnfamily_name"))
+              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
+              assertThat(rows.tables.get(KS_ID)).hasSize(1);
+              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
                   .isEqualTo("foo");
 
-              assertThat(rows.columns.keySet()).containsOnly("ks");
-              assertThat(rows.columns.get("ks").keySet()).containsOnly("foo");
+              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
+              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
               assertThat(
-                      rows.columns.get("ks").get("foo").iterator().next().getString("column_name"))
+                      rows.columns
+                          .get(KS_ID)
+                          .get(FOO_ID)
+                          .iterator()
+                          .next()
+                          .getString("column_name"))
                   .isEqualTo("k");
             });
   }

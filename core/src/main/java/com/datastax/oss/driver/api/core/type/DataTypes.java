@@ -63,6 +63,10 @@ public class DataTypes {
     return new DefaultListType(elementType, false);
   }
 
+  public static ListType listOf(DataType elementType, boolean frozen) {
+    return new DefaultListType(elementType, frozen);
+  }
+
   public static ListType frozenListOf(DataType elementType) {
     return new DefaultListType(elementType, true);
   }
@@ -71,12 +75,20 @@ public class DataTypes {
     return new DefaultSetType(elementType, false);
   }
 
+  public static SetType setOf(DataType elementType, boolean frozen) {
+    return new DefaultSetType(elementType, frozen);
+  }
+
   public static SetType frozenSetOf(DataType elementType) {
     return new DefaultSetType(elementType, true);
   }
 
   public static MapType mapOf(DataType keyType, DataType valueType) {
     return new DefaultMapType(keyType, valueType, false);
+  }
+
+  public static MapType mapOf(DataType keyType, DataType valueType, boolean frozen) {
+    return new DefaultMapType(keyType, valueType, frozen);
   }
 
   public static MapType frozenMapOf(DataType keyType, DataType valueType) {

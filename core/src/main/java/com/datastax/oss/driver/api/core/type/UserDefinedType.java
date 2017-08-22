@@ -46,6 +46,8 @@ public interface UserDefinedType extends DataType, Describable {
 
   List<DataType> getFieldTypes();
 
+  UserDefinedType copy(boolean newFrozen);
+
   UdtValue newValue();
 
   AttachmentPoint getAttachmentPoint();

@@ -23,7 +23,7 @@ import java.util.UUID;
 /** A table or materialized view in the schema metadata. */
 public interface RelationMetadata extends Describable {
 
-  KeyspaceMetadata getKeyspace();
+  CqlIdentifier getKeyspace();
 
   CqlIdentifier getName();
 
@@ -36,5 +36,13 @@ public interface RelationMetadata extends Describable {
 
   Map<CqlIdentifier, ColumnMetadata> getColumns();
 
-  TableOptionsMetadata getOptions();
+  /**
+   * The options of this table or materialized view.
+   *
+   * <p>This corresponds to the {@code WITH} clauses in the {@code CREATE} statement that would
+   * recreate this element. The exact set of keys and the types of the values depend on the server
+   * version that this metadata was extracted from. For example, in Cassandra 2.2 and below, {@code
+   * WITH caching} takes a string argument, whereas starting with Cassandra 3.0 it is a map.
+   */
+  Map<CqlIdentifier, Object> getOptions();
 }

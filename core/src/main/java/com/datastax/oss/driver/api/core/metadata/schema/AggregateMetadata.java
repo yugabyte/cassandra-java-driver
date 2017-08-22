@@ -15,22 +15,24 @@
  */
 package com.datastax.oss.driver.api.core.metadata.schema;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
 
 /** A CQL aggregate in the schema metadata. */
 public interface AggregateMetadata extends Describable {
-  KeyspaceMetadata getKeyspace();
+  CqlIdentifier getKeyspace();
 
   FunctionSignature getSignature();
 
   /**
-   * The final function of this aggregate, or {@code null} if there is none.
+   * The signature of the final function of this aggregate, or {@code null} if there is none.
    *
    * <p>This is the function specified with {@code FINALFUNC} in the {@code CREATE AGGREGATE...}
    * statement. It transforms the final value after the aggregation is complete.
    */
-  FunctionMetadata getFinalFunc();
+  FunctionSignature getFinalFuncSignature();
 
   /**
    * The initial state value of this aggregate, or {@code null} if there is none.
@@ -60,12 +62,12 @@ public interface AggregateMetadata extends Describable {
   DataType getReturnType();
 
   /**
-   * The state function of this aggregate.
+   * The signature of the state function of this aggregate.
    *
    * <p>This is the function specified with {@code SFUNC} in the {@code CREATE AGGREGATE...}
    * statement. It aggregates the current state with each row to produce a new state.
    */
-  FunctionMetadata getStateFunc();
+  FunctionSignature getStateFuncSignature();
 
   /**
    * The state type of this aggregate.
@@ -75,4 +77,50 @@ public interface AggregateMetadata extends Describable {
    * rows.
    */
   DataType getStateType();
+
+  @Override
+  default String describeWithChildren(boolean pretty) {
+    // An aggregate has no children
+    return describe(pretty);
+  }
+
+  @Override
+  default String describe(boolean pretty) {
+    ScriptBuilder builder = new ScriptBuilder(pretty);
+    builder
+        .append("CREATE AGGREGATE ")
+        .append(getKeyspace())
+        .append(".")
+        .append(getSignature().getName())
+        .append("(");
+    boolean first = true;
+    for (int i = 0; i < getSignature().getParameterTypes().size(); i++) {
+      if (first) {
+        first = false;
+      } else {
+        builder.append(",");
+      }
+      DataType type = getSignature().getParameterTypes().get(i);
+      builder.append(type.asCql(false, pretty));
+    }
+    builder
+        .append(")")
+        .newLine()
+        .append("SFUNC ")
+        .append(getStateFuncSignature().getName())
+        .newLine()
+        .append("STYPE ")
+        .append(getStateType().asCql(false, pretty));
+
+    if (getFinalFuncSignature() != null) {
+      builder.newLine().append("FINALFUNC ").append(getFinalFuncSignature().getName());
+    }
+    if (getInitCond() != null) {
+      builder.newLine().append("INITCOND ").append(formatInitCond());
+    }
+    return builder.append(";").build();
+  }
+
+  /** Formats the {@link #getInitCond() initial state value} for inclusion in a CQL statement. */
+  String formatInitCond();
 }

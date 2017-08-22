@@ -17,12 +17,13 @@ package com.datastax.oss.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataType;
+import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
 import java.util.List;
 
 /** A CQL function in the schema metadata. */
 public interface FunctionMetadata extends Describable {
 
-  KeyspaceMetadata getKeyspace();
+  CqlIdentifier getKeyspace();
 
   FunctionSignature getSignature();
 
@@ -39,4 +40,47 @@ public interface FunctionMetadata extends Describable {
   String getLanguage();
 
   DataType getReturnType();
+
+  @Override
+  default String describe(boolean pretty) {
+    ScriptBuilder builder = new ScriptBuilder(pretty);
+    builder
+        .append("CREATE FUNCTION ")
+        .append(getKeyspace())
+        .append(".")
+        .append(getSignature().getName())
+        .append("(");
+    boolean first = true;
+    for (int i = 0; i < getSignature().getParameterTypes().size(); i++) {
+      if (first) {
+        first = false;
+      } else {
+        builder.append(",");
+      }
+      DataType type = getSignature().getParameterTypes().get(i);
+      CqlIdentifier name = getParameterNames().get(i);
+      builder.append(name).append(" ").append(type.asCql(false, pretty));
+    }
+    return builder
+        .append(")")
+        .newLine()
+        .append(isCalledOnNullInput() ? "CALLED ON NULL INPUT" : "RETURNS NULL ON NULL INPUT")
+        .newLine()
+        .append("RETURNS ")
+        .append(getReturnType().asCql(false, true))
+        .newLine()
+        .append("LANGUAGE ")
+        .append(getLanguage())
+        .newLine()
+        .append("AS '")
+        .append(getBody())
+        .append("';")
+        .build();
+  }
+
+  @Override
+  default String describeWithChildren(boolean pretty) {
+    // A function has no children
+    return describe(pretty);
+  }
 }

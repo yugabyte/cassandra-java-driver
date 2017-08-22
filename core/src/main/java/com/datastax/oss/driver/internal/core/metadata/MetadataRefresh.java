@@ -32,7 +32,7 @@ import java.util.List;
  *
  * @see Cluster#getMetadata()
  */
-abstract class MetadataRefresh {
+public abstract class MetadataRefresh {
   final DefaultMetadata oldMetadata;
   DefaultMetadata newMetadata;
   final List<Object> events;
@@ -44,5 +44,5 @@ abstract class MetadataRefresh {
     this.events = new ArrayList<>();
   }
 
-  abstract void compute();
+  public abstract void compute();
 }

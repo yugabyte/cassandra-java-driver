@@ -149,7 +149,7 @@ public class DataTypeIT {
                   || dataType == DataTypes.SMALLINT
                   || dataType == DataTypes.DATE
                   || dataType == DataTypes.TIME) {
-                return version.compareTo(CassandraVersion.parse("2.2.0")) >= 0;
+                return version.compareTo(CassandraVersion.V2_2_0) >= 0;
               }
               return true;
             })

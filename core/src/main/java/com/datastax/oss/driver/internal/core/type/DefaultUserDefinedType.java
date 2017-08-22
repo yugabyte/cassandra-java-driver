@@ -117,6 +117,14 @@ public class DefaultUserDefinedType implements UserDefinedType {
   }
 
   @Override
+  public UserDefinedType copy(boolean newFrozen) {
+    return (newFrozen == frozen)
+        ? this
+        : new DefaultUserDefinedType(
+            keyspace, name, newFrozen, fieldNames, fieldTypes, attachmentPoint);
+  }
+
+  @Override
   public UdtValue newValue() {
     return new DefaultUdtValue(this);
   }

@@ -21,11 +21,13 @@ import com.datastax.oss.driver.api.core.type.DataType;
 /** A column in the schema metadata. */
 public interface ColumnMetadata {
 
+  CqlIdentifier getKeyspace();
+
   /**
-   * The parent element that this column belongs to (can be a {@link TableMetadata} or a {@link
-   * MaterializedViewMetadata}).
+   * The identifier of the {@link TableMetadata} or a {@link ViewMetadata} that this column belongs
+   * to.
    */
-  RelationMetadata getParent();
+  CqlIdentifier getParent();
 
   CqlIdentifier getName();
 

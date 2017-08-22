@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.metadata.schema;
+package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.google.common.collect.Iterators;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -34,6 +36,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(MockitoJUnitRunner.class)
 public abstract class SchemaQueriesTest {
+
+  protected static final CqlIdentifier KS_ID = CqlIdentifier.fromInternal("ks");
+  protected static final CqlIdentifier KS1_ID = CqlIdentifier.fromInternal("ks1");
+  protected static final CqlIdentifier KS2_ID = CqlIdentifier.fromInternal("ks2");
+  protected static final CqlIdentifier FOO_ID = CqlIdentifier.fromInternal("foo");
+
   @Mock protected Node node;
   @Mock protected DriverConfigProfile config;
   @Mock protected DriverChannel driverChannel;
@@ -52,8 +60,8 @@ public abstract class SchemaQueriesTest {
     Mockito.when(driverChannel.eventLoop()).thenReturn(channel.eventLoop());
   }
 
-  protected static AdminResult.Row mockRow(String... values) {
-    AdminResult.Row row = Mockito.mock(AdminResult.Row.class);
+  protected static AdminRow mockRow(String... values) {
+    AdminRow row = Mockito.mock(AdminRow.class);
     assertThat(values.length % 2).as("Expecting an even number of parameters").isZero();
     for (int i = 0; i < values.length / 2; i++) {
       Mockito.when(row.getString(values[i * 2])).thenReturn(values[i * 2 + 1]);
@@ -61,11 +69,11 @@ public abstract class SchemaQueriesTest {
     return row;
   }
 
-  protected static AdminResult mockResult(AdminResult.Row... rows) {
+  protected static AdminResult mockResult(AdminRow... rows) {
     return mockResult(null, rows);
   }
 
-  protected static AdminResult mockResult(AdminResult next, AdminResult.Row... rows) {
+  protected static AdminResult mockResult(AdminResult next, AdminRow... rows) {
     AdminResult result = Mockito.mock(AdminResult.class);
     if (next == null) {
       Mockito.when(result.hasNextPage()).thenReturn(false);

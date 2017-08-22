@@ -36,7 +36,7 @@ class InitContactPointsRefresh extends MetadataRefresh {
   }
 
   @Override
-  void compute() {
+  public void compute() {
     assert oldMetadata == DefaultMetadata.EMPTY;
     LOG.debug("[{}] Initializing node metadata with contact points {}", logPrefix, contactPoints);
 
