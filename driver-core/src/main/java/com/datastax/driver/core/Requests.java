@@ -226,7 +226,8 @@ class Requests {
         PAGING_STATE,
         SERIAL_CONSISTENCY,
         DEFAULT_TIMESTAMP,
-        VALUE_NAMES;
+        VALUE_NAMES,
+        KEYSPACE;
 
         static EnumSet<QueryFlag> deserialize(int flags) {
             EnumSet<QueryFlag> set = EnumSet.noneOf(QueryFlag.class);
@@ -264,7 +265,7 @@ class Requests {
                 false,
                 -1,
                 null,
-                ConsistencyLevel.SERIAL, Long.MIN_VALUE);
+                ConsistencyLevel.SERIAL, Long.MIN_VALUE, null);
 
         private final EnumSet<QueryFlag> flags = EnumSet.noneOf(QueryFlag.class);
         private final Message.Request.Type requestType;
@@ -276,6 +277,7 @@ class Requests {
         final ByteBuffer pagingState;
         final ConsistencyLevel serialConsistency;
         final long defaultTimestamp;
+        final String keyspace;
 
         QueryProtocolOptions(Message.Request.Type requestType,
                              ConsistencyLevel consistency,
@@ -285,7 +287,8 @@ class Requests {
                              int pageSize,
                              ByteBuffer pagingState,
                              ConsistencyLevel serialConsistency,
-                             long defaultTimestamp) {
+                             long defaultTimestamp,
+                             String keyspace) {
 
             Preconditions.checkArgument(positionalValues.isEmpty() || namedValues.isEmpty());
 
@@ -298,6 +301,7 @@ class Requests {
             this.pagingState = pagingState;
             this.serialConsistency = serialConsistency;
             this.defaultTimestamp = defaultTimestamp;
+            this.keyspace = keyspace;
 
             // Populate flags
             if (!positionalValues.isEmpty())
@@ -316,10 +320,12 @@ class Requests {
                 flags.add(QueryFlag.SERIAL_CONSISTENCY);
             if (defaultTimestamp != Long.MIN_VALUE)
                 flags.add(QueryFlag.DEFAULT_TIMESTAMP);
+            if (keyspace != null)
+                flags.add(QueryFlag.KEYSPACE);
         }
 
         QueryProtocolOptions copy(ConsistencyLevel newConsistencyLevel) {
-            return new QueryProtocolOptions(requestType, newConsistencyLevel, positionalValues, namedValues, skipMetadata, pageSize, pagingState, serialConsistency, defaultTimestamp);
+            return new QueryProtocolOptions(requestType, newConsistencyLevel, positionalValues, namedValues, skipMetadata, pageSize, pagingState, serialConsistency, defaultTimestamp, keyspace);
         }
 
         void encode(ByteBuf dest, ProtocolVersion version) {
@@ -353,6 +359,8 @@ class Requests {
                         CBUtil.writeConsistencyLevel(serialConsistency, dest);
                     if (version.compareTo(ProtocolVersion.V3) >= 0 && flags.contains(QueryFlag.DEFAULT_TIMESTAMP))
                         dest.writeLong(defaultTimestamp);
+                    if (version.compareTo(ProtocolVersion.V5) >= 0 && flags.contains(QueryFlag.KEYSPACE))
+                        CBUtil.writeString(keyspace, dest);
                     break;
                 default:
                     throw version.unsupported();
@@ -389,6 +397,8 @@ class Requests {
                         size += CBUtil.sizeOfConsistencyLevel(serialConsistency);
                     if (version == ProtocolVersion.V3 && flags.contains(QueryFlag.DEFAULT_TIMESTAMP))
                         size += 8;
+                    if (version.compareTo(ProtocolVersion.V5) >= 0 && flags.contains(QueryFlag.KEYSPACE))
+                        size += CBUtil.sizeOfString(keyspace);
                     return size;
                 default:
                     throw version.unsupported();
@@ -497,20 +507,24 @@ class Requests {
         final ConsistencyLevel consistency;
         final ConsistencyLevel serialConsistency;
         final long defaultTimestamp;
+        final String keyspace;
 
-        BatchProtocolOptions(ConsistencyLevel consistency, ConsistencyLevel serialConsistency, long defaultTimestamp) {
+        BatchProtocolOptions(ConsistencyLevel consistency, ConsistencyLevel serialConsistency, long defaultTimestamp, String keyspace) {
             this.consistency = consistency;
             this.serialConsistency = serialConsistency;
             this.defaultTimestamp = defaultTimestamp;
+            this.keyspace = keyspace;
 
             if (serialConsistency != ConsistencyLevel.SERIAL)
                 flags.add(QueryFlag.SERIAL_CONSISTENCY);
             if (defaultTimestamp != Long.MIN_VALUE)
                 flags.add(QueryFlag.DEFAULT_TIMESTAMP);
+            if (keyspace != null)
+                flags.add(QueryFlag.KEYSPACE);
         }
 
         BatchProtocolOptions copy(ConsistencyLevel newConsistencyLevel) {
-            return new BatchProtocolOptions(newConsistencyLevel, serialConsistency, defaultTimestamp);
+            return new BatchProtocolOptions(newConsistencyLevel, serialConsistency, defaultTimestamp, keyspace);
         }
 
         void encode(ByteBuf dest, ProtocolVersion version) {
@@ -527,6 +541,8 @@ class Requests {
                         CBUtil.writeConsistencyLevel(serialConsistency, dest);
                     if (flags.contains(QueryFlag.DEFAULT_TIMESTAMP))
                         dest.writeLong(defaultTimestamp);
+                    if (version.compareTo(ProtocolVersion.V5) >= 0 && flags.contains(QueryFlag.KEYSPACE))
+                        CBUtil.writeString(keyspace, dest);
                     break;
                 default:
                     throw version.unsupported();
@@ -547,6 +563,8 @@ class Requests {
                         size += CBUtil.sizeOfConsistencyLevel(serialConsistency);
                     if (flags.contains(QueryFlag.DEFAULT_TIMESTAMP))
                         size += 8;
+                    if (version.compareTo(ProtocolVersion.V5) >= 0 && flags.contains(QueryFlag.KEYSPACE))
+                        size += CBUtil.sizeOfString(keyspace);
                     return size;
                 default:
                     throw version.unsupported();
@@ -569,27 +587,38 @@ class Requests {
                 CBUtil.writeLongString(msg.query, dest);
 
                 if (version.compareTo(ProtocolVersion.V5) >= 0) {
-                    // Write empty flags for now, to communicate that no keyspace is being set.
-                    dest.writeInt(0);
+                    QueryFlag.serialize(msg.flags, dest, version);
+                    if (msg.flags.contains(QueryFlag.KEYSPACE))
+                        CBUtil.writeString(msg.keyspace, dest);
                 }
             }
 
             @Override
             public int encodedSize(Prepare msg, ProtocolVersion version) {
-                return CBUtil.sizeOfLongString(msg.query);
+                int size = CBUtil.sizeOfLongString(msg.query);
+
+                if (version.compareTo(ProtocolVersion.V5) >= 0 && msg.flags.contains(QueryFlag.KEYSPACE))
+                    size += CBUtil.sizeOfString(msg.keyspace);
+                return size;
             }
         };
 
+        private final EnumSet<QueryFlag> flags = EnumSet.noneOf(QueryFlag.class);
         private final String query;
+        private final String keyspace;
 
-        Prepare(String query) {
+        Prepare(String query, String keyspace) {
             super(Message.Request.Type.PREPARE);
             this.query = query;
+            this.keyspace = keyspace;
+
+            if (keyspace != null)
+                flags.add(QueryFlag.KEYSPACE);
         }
 
         @Override
         protected Request copyInternal() {
-            return new Prepare(query);
+            return new Prepare(query, keyspace);
         }
 
         @Override

@@ -149,12 +149,12 @@ class SessionManager extends AbstractSession {
     }
 
     @Override
-    protected ListenableFuture<PreparedStatement> prepareAsync(String query, Map<String, ByteBuffer> customPayload) {
-        Requests.Prepare request = new Requests.Prepare(query);
+    protected ListenableFuture<PreparedStatement> prepareAsync(String query, String keyspace, Map<String, ByteBuffer> customPayload) {
+        Requests.Prepare request = new Requests.Prepare(query, keyspace);
         request.setCustomPayload(customPayload);
         Connection.Future future = new Connection.Future(request);
         execute(future, Statement.DEFAULT);
-        return toPreparedStatement(query, future);
+        return toPreparedStatement(query, keyspace, future);
     }
 
     @Override
@@ -192,7 +192,7 @@ class SessionManager extends AbstractSession {
         return new State(this);
     }
 
-    private ListenableFuture<PreparedStatement> toPreparedStatement(final String query, final Connection.Future future) {
+    private ListenableFuture<PreparedStatement> toPreparedStatement(final String query, final String keyspace, final Connection.Future future) {
         return GuavaCompatibility.INSTANCE.transformAsync(future, new AsyncFunction<Response, PreparedStatement>() {
             @Override
             public ListenableFuture<PreparedStatement> apply(Response response) {
@@ -202,7 +202,7 @@ class SessionManager extends AbstractSession {
                         switch (rm.kind) {
                             case PREPARED:
                                 Responses.Result.Prepared pmsg = (Responses.Result.Prepared) rm;
-                                PreparedStatement stmt = DefaultPreparedStatement.fromMessage(pmsg, cluster, query, poolsState.keyspace);
+                                PreparedStatement stmt = DefaultPreparedStatement.fromMessage(pmsg, cluster, query, keyspace, poolsState.keyspace);
                                 stmt = cluster.manager.addPrepared(stmt);
                                 if (cluster.getConfiguration().getQueryOptions().isPrepareOnAllHosts()) {
                                     // All Sessions are connected to the same nodes so it's enough to prepare only the nodes of this session.
@@ -570,7 +570,7 @@ class SessionManager extends AbstractSession {
             String qString = rs.getQueryString(codecRegistry);
 
             Requests.QueryProtocolOptions options = new Requests.QueryProtocolOptions(Message.Request.Type.QUERY, consistency, positionalValues, namedValues,
-                    false, fetchSize, usedPagingState, serialConsistency, defaultTimestamp);
+                    false, fetchSize, usedPagingState, serialConsistency, defaultTimestamp, statement.getKeyspace());
             request = new Requests.Query(qString, options, statement.isTracing());
         } else if (statement instanceof BoundStatement) {
             BoundStatement bs = (BoundStatement) statement;
@@ -582,7 +582,7 @@ class SessionManager extends AbstractSession {
                 bs.ensureAllSet();
             boolean skipMetadata = protocolVersion != ProtocolVersion.V1 && bs.statement.getPreparedId().resultSetMetadata != null;
             Requests.QueryProtocolOptions options = new Requests.QueryProtocolOptions(Message.Request.Type.EXECUTE, consistency, Arrays.asList(bs.wrapper.values), Collections.<String, ByteBuffer>emptyMap(),
-                    skipMetadata, fetchSize, usedPagingState, serialConsistency, defaultTimestamp);
+                    skipMetadata, fetchSize, usedPagingState, serialConsistency, defaultTimestamp, null);
             request = new Requests.Execute(bs.statement.getPreparedId().id, options, statement.isTracing());
         } else {
             assert statement instanceof BatchStatement : statement;
@@ -595,7 +595,7 @@ class SessionManager extends AbstractSession {
             if (protocolVersion.compareTo(ProtocolVersion.V4) < 0)
                 bs.ensureAllSet();
             BatchStatement.IdAndValues idAndVals = bs.getIdAndValues(protocolVersion, codecRegistry);
-            Requests.BatchProtocolOptions options = new Requests.BatchProtocolOptions(consistency, serialConsistency, defaultTimestamp);
+            Requests.BatchProtocolOptions options = new Requests.BatchProtocolOptions(consistency, serialConsistency, defaultTimestamp, bs.getKeyspace());
             request = new Requests.Batch(bs.batchType, idAndVals.ids, idAndVals.values, options, statement.isTracing());
         }
 
@@ -623,6 +623,7 @@ class SessionManager extends AbstractSession {
 
     private ListenableFuture<PreparedStatement> prepare(final PreparedStatement statement, InetSocketAddress toExclude) {
         final String query = statement.getQueryString();
+        final String keyspace = statement.getKeyspace();
         List<ListenableFuture<Response>> futures = Lists.newArrayListWithExpectedSize(pools.size());
         for (final Map.Entry<Host, HostConnectionPool> entry : pools.entrySet()) {
             if (entry.getKey().getSocketAddress().equals(toExclude))
@@ -637,7 +638,7 @@ class SessionManager extends AbstractSession {
                         new AsyncFunction<Connection, Response>() {
                             @Override
                             public ListenableFuture<Response> apply(final Connection c) throws Exception {
-                                Connection.Future responseFuture = c.write(new Requests.Prepare(query));
+                                Connection.Future responseFuture = c.write(new Requests.Prepare(query, keyspace));
                                 Futures.addCallback(responseFuture, new FutureCallback<Response>() {
                                     @Override
                                     public void onSuccess(Response result) {
