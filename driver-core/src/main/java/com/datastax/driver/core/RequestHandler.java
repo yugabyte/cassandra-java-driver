@@ -688,7 +688,7 @@ class RequestHandler {
 
                 @Override
                 public Message.Request request() {
-                    Requests.Prepare request = new Requests.Prepare(toPrepare.getQueryString(), toPrepare.getKeyspace());
+                    Requests.Prepare request = new Requests.Prepare(toPrepare.getQueryString(), toPrepare.getQueryKeyspace());
                     // propagate the original custom payload in the prepare request
                     request.setCustomPayload(statement.getOutgoingPayload());
                     return request;

@@ -29,7 +29,6 @@ public class DefaultPreparedStatement implements PreparedStatement {
     final PreparedId preparedId;
 
     final String query;
-    final String keyspace;
     final String queryKeyspace;
     final Map<String, ByteBuffer> incomingPayload;
     final Cluster cluster;
@@ -43,16 +42,15 @@ public class DefaultPreparedStatement implements PreparedStatement {
     volatile ImmutableMap<String, ByteBuffer> outgoingPayload;
     volatile Boolean idempotent;
 
-    private DefaultPreparedStatement(PreparedId id, String query, String keyspace, String queryKeyspace, Map<String, ByteBuffer> incomingPayload, Cluster cluster) {
+    private DefaultPreparedStatement(PreparedId id, String query, String queryKeyspace, Map<String, ByteBuffer> incomingPayload, Cluster cluster) {
         this.preparedId = id;
         this.query = query;
-        this.keyspace = keyspace;
         this.queryKeyspace = queryKeyspace;
         this.incomingPayload = incomingPayload;
         this.cluster = cluster;
     }
 
-    static DefaultPreparedStatement fromMessage(Responses.Result.Prepared msg, Cluster cluster, String query, String keyspace, String queryKeyspace) {
+    static DefaultPreparedStatement fromMessage(Responses.Result.Prepared msg, Cluster cluster, String query, String queryKeyspace) {
         assert msg.metadata.columns != null;
 
         ColumnDefinitions defs = msg.metadata.columns;
@@ -60,7 +58,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
         ProtocolVersion protocolVersion = cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
 
         if (defs.size() == 0) {
-            return new DefaultPreparedStatement(new PreparedId(msg.statementId, defs, msg.resultMetadata.columns, null, protocolVersion), query, keyspace, queryKeyspace, msg.getCustomPayload(), cluster);
+            return new DefaultPreparedStatement(new PreparedId(msg.statementId, defs, msg.resultMetadata.columns, null, protocolVersion), query, queryKeyspace, msg.getCustomPayload(), cluster);
         }
 
         int[] pkIndices = (protocolVersion.compareTo(V4) >= 0)
@@ -69,7 +67,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
         PreparedId prepId = new PreparedId(msg.statementId, defs, msg.resultMetadata.columns, pkIndices, protocolVersion);
 
-        return new DefaultPreparedStatement(prepId, query, keyspace, queryKeyspace, msg.getCustomPayload(), cluster);
+        return new DefaultPreparedStatement(prepId, query, queryKeyspace, msg.getCustomPayload(), cluster);
     }
 
     private static int[] computePkIndices(Metadata clusterMetadata, ColumnDefinitions boundColumns) {
@@ -253,10 +251,5 @@ public class DefaultPreparedStatement implements PreparedStatement {
     @Override
     public Boolean isIdempotent() {
         return this.idempotent;
-    }
-
-    @Override
-    public String getKeyspace() {
-        return keyspace;
     }
 }
