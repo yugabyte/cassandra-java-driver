@@ -11,6 +11,7 @@
 - [documentation] JAVA-1607: Add FAQ entry for netty-transport-native-epoll.
 - [bug] JAVA-1630: Fix Metadata.addIfAbsent.
 - [improvement] JAVA-1619: Update QueryBuilder methods to support Iterable input.
+- [new feature] JAVA-1603: Send keyspace option per-query
 
 
 ### 3.3.0
