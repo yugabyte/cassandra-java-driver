@@ -23,32 +23,32 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class DefaultKeyspaceMetadata implements KeyspaceMetadata {
 
   private final CqlIdentifier name;
   private final boolean durableWrites;
-  private final Map<String, String> replicationOptions;
+  private final Map<String, String> replication;
   private final Map<CqlIdentifier, UserDefinedType> types;
-  private final ImmutableMap<CqlIdentifier, TableMetadata> tables;
-  private final ImmutableMap<CqlIdentifier, ViewMetadata> views;
-  private final ImmutableMap<FunctionSignature, FunctionMetadata> functions;
-  private final ImmutableMap<FunctionSignature, AggregateMetadata> aggregates;
+  private final Map<CqlIdentifier, TableMetadata> tables;
+  private final Map<CqlIdentifier, ViewMetadata> views;
+  private final Map<FunctionSignature, FunctionMetadata> functions;
+  private final Map<FunctionSignature, AggregateMetadata> aggregates;
 
   public DefaultKeyspaceMetadata(
       CqlIdentifier name,
       boolean durableWrites,
-      Map<String, String> replicationOptions,
+      Map<String, String> replication,
       Map<CqlIdentifier, UserDefinedType> types,
-      ImmutableMap<CqlIdentifier, TableMetadata> tables,
-      ImmutableMap<CqlIdentifier, ViewMetadata> views,
-      ImmutableMap<FunctionSignature, FunctionMetadata> functions,
-      ImmutableMap<FunctionSignature, AggregateMetadata> aggregates) {
+      Map<CqlIdentifier, TableMetadata> tables,
+      Map<CqlIdentifier, ViewMetadata> views,
+      Map<FunctionSignature, FunctionMetadata> functions,
+      Map<FunctionSignature, AggregateMetadata> aggregates) {
     this.name = name;
     this.durableWrites = durableWrites;
-    this.replicationOptions = replicationOptions;
+    this.replication = replication;
     this.types = types;
     this.tables = tables;
     this.views = views;
@@ -68,7 +68,7 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata {
 
   @Override
   public Map<String, String> getReplication() {
-    return replicationOptions;
+    return replication;
   }
 
   @Override
@@ -77,22 +77,47 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata {
   }
 
   @Override
-  public ImmutableMap<CqlIdentifier, TableMetadata> getTables() {
+  public Map<CqlIdentifier, TableMetadata> getTables() {
     return tables;
   }
 
   @Override
-  public ImmutableMap<CqlIdentifier, ViewMetadata> getViews() {
+  public Map<CqlIdentifier, ViewMetadata> getViews() {
     return views;
   }
 
   @Override
-  public ImmutableMap<FunctionSignature, FunctionMetadata> getFunctions() {
+  public Map<FunctionSignature, FunctionMetadata> getFunctions() {
     return functions;
   }
 
   @Override
-  public ImmutableMap<FunctionSignature, AggregateMetadata> getAggregates() {
+  public Map<FunctionSignature, AggregateMetadata> getAggregates() {
     return aggregates;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof KeyspaceMetadata) {
+      KeyspaceMetadata that = (KeyspaceMetadata) other;
+      return Objects.equals(this.name, that.getName())
+          && this.durableWrites == that.isDurableWrites()
+          && Objects.equals(this.replication, that.getReplication())
+          && Objects.equals(this.types, that.getUserDefinedTypes())
+          && Objects.equals(this.tables, that.getTables())
+          && Objects.equals(this.views, that.getViews())
+          && Objects.equals(this.functions, that.getFunctions())
+          && Objects.equals(this.aggregates, that.getAggregates());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        name, durableWrites, replication, types, tables, views, functions, aggregates);
   }
 }

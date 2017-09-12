@@ -77,7 +77,7 @@ public class SchemaParserFunctionTest extends SchemaParserTest {
     FunctionRefresh refresh = (FunctionRefresh) parse(ID_ROW_3_0);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    FunctionMetadata function = refresh.function;
+    FunctionMetadata function = refresh.newElement;
     assertThat(function.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(function.getSignature().getName().asInternal()).isEqualTo("id");
     assertThat(function.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -99,7 +99,7 @@ public class SchemaParserFunctionTest extends SchemaParserTest {
     FunctionRefresh refresh = (FunctionRefresh) parse(ID_ROW_2_2);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    FunctionMetadata function = refresh.function;
+    FunctionMetadata function = refresh.newElement;
     assertThat(function.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(function.getSignature().getName().asInternal()).isEqualTo("id");
     assertThat(function.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);

@@ -23,7 +23,7 @@ import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.KeyspaceRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SingleKeyspaceRefresh;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
 import com.google.common.collect.ImmutableList;
 import java.util.function.Consumer;
@@ -52,25 +52,25 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
 
   @Test
   public void should_parse_modern_keyspace_row() {
-    KeyspaceRefresh refresh =
-        (KeyspaceRefresh)
+    SingleKeyspaceRefresh refresh =
+        (SingleKeyspaceRefresh)
             parse(rows -> rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks"))));
 
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    KeyspaceMetadata keyspace = refresh.keyspace;
+    KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
   }
 
   @Test
   public void should_parse_legacy_keyspace_row() {
-    KeyspaceRefresh refresh =
-        (KeyspaceRefresh)
+    SingleKeyspaceRefresh refresh =
+        (SingleKeyspaceRefresh)
             parse(rows -> rows.withKeyspaces(ImmutableList.of(mockLegacyKeyspaceRow("ks"))));
 
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    KeyspaceMetadata keyspace = refresh.keyspace;
+    KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
   }
 
@@ -79,8 +79,8 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
     // Needed to parse the aggregate
     Mockito.when(context.codecRegistry()).thenReturn(new DefaultCodecRegistry("test"));
 
-    KeyspaceRefresh refresh =
-        (KeyspaceRefresh)
+    SingleKeyspaceRefresh refresh =
+        (SingleKeyspaceRefresh)
             parse(
                 rows ->
                     rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks")))
@@ -99,7 +99,7 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
 
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    KeyspaceMetadata keyspace = refresh.keyspace;
+    KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
 
     assertThat(keyspace.getUserDefinedTypes())

@@ -130,9 +130,10 @@ public class MetadataManager implements AsyncAutoCloseable {
       String object,
       List<String> arguments) {
 
-    //TODO check if metadata disabled in config
-    //TODO debounce
-    //TODO create an event to force (even if disabled in config)
+    // TODO check if metadata disabled in config
+    // TODO debounce
+    // TODO create an event to force (even if disabled in config)
+    // TODO join current update if already in progress?
 
     if (type == SchemaChangeType.DROPPED) {
       // TODO no need to query, create a refresh and apply it directly

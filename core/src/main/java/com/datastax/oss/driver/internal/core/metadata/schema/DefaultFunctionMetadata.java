@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 
 public class DefaultFunctionMetadata implements FunctionMetadata {
 
@@ -87,5 +88,29 @@ public class DefaultFunctionMetadata implements FunctionMetadata {
   @Override
   public DataType getReturnType() {
     return returnType;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof FunctionMetadata) {
+      FunctionMetadata that = (FunctionMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.signature, that.getSignature())
+          && Objects.equals(this.parameterNames, that.getParameterNames())
+          && Objects.equals(this.body, that.getBody())
+          && this.calledOnNullInput == that.isCalledOnNullInput()
+          && Objects.equals(this.language, that.getLanguage())
+          && Objects.equals(this.returnType, that.getReturnType());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        keyspace, signature, parameterNames, body, calledOnNullInput, language, returnType);
   }
 }

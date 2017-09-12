@@ -18,6 +18,7 @@ package com.datastax.oss.driver.internal.core.metadata.schema;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
+import java.util.Objects;
 
 public class DefaultColumnMetadata implements ColumnMetadata {
   private final CqlIdentifier keyspace;
@@ -62,5 +63,26 @@ public class DefaultColumnMetadata implements ColumnMetadata {
   @Override
   public boolean isStatic() {
     return isStatic;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof ColumnMetadata) {
+      ColumnMetadata that = (ColumnMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.parent, that.getParent())
+          && Objects.equals(this.name, that.getName())
+          && Objects.equals(this.dataType, that.getType())
+          && this.isStatic == that.isStatic();
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(keyspace, parent, name, dataType, isStatic);
   }
 }

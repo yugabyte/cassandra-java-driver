@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class DefaultViewMetadata implements ViewMetadata {
@@ -109,5 +110,41 @@ public class DefaultViewMetadata implements ViewMetadata {
   @Override
   public Map<CqlIdentifier, Object> getOptions() {
     return options;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof ViewMetadata) {
+      ViewMetadata that = (ViewMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.name, that.getName())
+          && Objects.equals(this.baseTable, that.getBaseTable())
+          && this.includesAllColumns == that.includesAllColumns()
+          && Objects.equals(this.whereClause, that.getWhereClause())
+          && Objects.equals(this.id, that.getId())
+          && Objects.equals(this.partitionKey, that.getPartitionKey())
+          && Objects.equals(this.clusteringColumns, that.getClusteringColumns())
+          && Objects.equals(this.columns, that.getColumns())
+          && Objects.equals(this.options, that.getOptions());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        keyspace,
+        name,
+        baseTable,
+        includesAllColumns,
+        whereClause,
+        id,
+        partitionKey,
+        clusteringColumns,
+        columns,
+        options);
   }
 }

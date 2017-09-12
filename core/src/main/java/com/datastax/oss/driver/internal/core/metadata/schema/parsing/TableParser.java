@@ -70,9 +70,7 @@ class TableParser extends RelationParser {
       return null;
     }
     DefaultTableMetadata table = parseTable(tableRow, keyspaceId, keyspace.getUserDefinedTypes());
-    return (table == null)
-        ? null
-        : new TableRefresh(currentMetadata, rows.changeType, table, logPrefix);
+    return TableRefresh.createdOrUpdated(currentMetadata, rows.changeType, table, logPrefix);
   }
 
   /**

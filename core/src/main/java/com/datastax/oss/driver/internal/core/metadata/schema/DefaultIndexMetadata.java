@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexKind;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
 import java.util.Map;
+import java.util.Objects;
 
 public class DefaultIndexMetadata implements IndexMetadata {
 
@@ -71,5 +72,27 @@ public class DefaultIndexMetadata implements IndexMetadata {
 
   public Map<String, String> getOptions() {
     return options;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof IndexMetadata) {
+      IndexMetadata that = (IndexMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.table, that.getTable())
+          && Objects.equals(this.name, that.getName())
+          && Objects.equals(this.kind, that.getKind())
+          && Objects.equals(this.target, that.getTarget())
+          && Objects.equals(this.options, that.getOptions());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(keyspace, table, name, kind, target, options);
   }
 }

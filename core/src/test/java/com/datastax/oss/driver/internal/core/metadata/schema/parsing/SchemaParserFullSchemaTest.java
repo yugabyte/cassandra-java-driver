@@ -15,7 +15,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.Assertions;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
@@ -24,9 +23,10 @@ import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FullSchemaRefresh;
 import com.google.common.collect.ImmutableList;
-import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.Test;
+
 import static com.datastax.oss.driver.Assertions.assertThat;
 
 public class SchemaParserFullSchemaTest extends SchemaParserTest {
@@ -47,9 +47,10 @@ public class SchemaParserFullSchemaTest extends SchemaParserTest {
                                 mockTypeRow(
                                     "ks2", "t2", ImmutableList.of("i"), ImmutableList.of("int")))));
 
-    List<KeyspaceMetadata> keyspaces = refresh.schema;
-    KeyspaceMetadata ks1 = keyspaces.get(0);
-    KeyspaceMetadata ks2 = keyspaces.get(1);
+    Map<CqlIdentifier, KeyspaceMetadata> keyspaces = refresh.newKeyspaces;
+    assertThat(keyspaces).hasSize(2);
+    KeyspaceMetadata ks1 = keyspaces.get(CqlIdentifier.fromInternal("ks1"));
+    KeyspaceMetadata ks2 = keyspaces.get(CqlIdentifier.fromInternal("ks2"));
 
     assertThat(ks1.getName().asInternal()).isEqualTo("ks1");
     assertThat(ks1.getUserDefinedTypes()).hasSize(1).containsKey(CqlIdentifier.fromInternal("t1"));

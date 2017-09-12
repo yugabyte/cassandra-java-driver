@@ -81,7 +81,7 @@ public class SchemaParserTypeTest extends SchemaParserTest {
     TypeRefresh refresh = (TypeRefresh) parse(PERSON_ROW_3_0);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    UserDefinedType type = refresh.type;
+    UserDefinedType type = refresh.newElement;
     assertThat(type.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(type.getName().asInternal()).isEqualTo("person");
     assertThat(type.getFieldNames())
@@ -108,7 +108,7 @@ public class SchemaParserTypeTest extends SchemaParserTest {
     TypeRefresh refresh = (TypeRefresh) parse(PERSON_ROW_2_2);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    UserDefinedType type = refresh.type;
+    UserDefinedType type = refresh.newElement;
     assertThat(type.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(type.getName().asInternal()).isEqualTo("person");
     assertThat(type.getFieldNames())

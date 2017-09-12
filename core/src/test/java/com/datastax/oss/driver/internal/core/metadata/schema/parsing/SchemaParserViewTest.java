@@ -71,7 +71,7 @@ public class SchemaParserViewTest extends SchemaParserTest {
     ViewRefresh refresh = (ViewRefresh) parse(VIEW_ROW_3_0, COLUMN_ROWS_3_0);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    ViewMetadata view = refresh.view;
+    ViewMetadata view = refresh.newElement;
 
     assertThat(view.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(view.getName().asInternal()).isEqualTo("alltimehigh");

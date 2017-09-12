@@ -15,11 +15,12 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FullSchemaRefresh;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 class FullSchemaParser extends SchemaElementParser {
 
@@ -31,9 +32,10 @@ class FullSchemaParser extends SchemaElementParser {
   }
 
   MetadataRefresh parse() {
-    ImmutableList.Builder<KeyspaceMetadata> keyspacesBuilder = ImmutableList.builder();
+    ImmutableMap.Builder<CqlIdentifier, KeyspaceMetadata> keyspacesBuilder = ImmutableMap.builder();
     for (AdminRow row : rows.keyspaces) {
-      keyspacesBuilder.add(keyspaceParser.parseKeyspace(row));
+      KeyspaceMetadata keyspace = keyspaceParser.parseKeyspace(row);
+      keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
     return new FullSchemaRefresh(currentMetadata, keyspacesBuilder.build(), logPrefix);
   }

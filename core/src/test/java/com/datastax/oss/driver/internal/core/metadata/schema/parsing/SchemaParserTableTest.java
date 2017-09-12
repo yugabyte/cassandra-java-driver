@@ -108,7 +108,7 @@ public class SchemaParserTableTest extends SchemaParserTest {
     TableRefresh refresh = (TableRefresh) parseLegacy(TABLE_ROW_2_2, COLUMN_ROWS_2_2);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    TableMetadata table = refresh.table;
+    TableMetadata table = refresh.newElement;
 
     checkTable(table);
 
@@ -126,7 +126,7 @@ public class SchemaParserTableTest extends SchemaParserTest {
         (TableRefresh) parseModern(TABLE_ROW_3_0, COLUMN_ROWS_3_0, INDEX_ROWS_3_0);
     assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
 
-    TableMetadata table = refresh.table;
+    TableMetadata table = refresh.newElement;
 
     checkTable(table);
 

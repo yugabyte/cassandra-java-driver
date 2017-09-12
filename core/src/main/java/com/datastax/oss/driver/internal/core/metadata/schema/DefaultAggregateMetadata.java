@@ -20,6 +20,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.AggregateMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,5 +102,35 @@ public class DefaultAggregateMetadata implements AggregateMetadata {
               keyspace.asInternal(), signature.getName().asInternal()));
       return initCond.toString();
     }
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof AggregateMetadata) {
+      AggregateMetadata that = (AggregateMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.signature, that.getSignature())
+          && Objects.equals(this.finalFuncSignature, that.getFinalFuncSignature())
+          && Objects.equals(this.initCond, that.getInitCond())
+          && Objects.equals(this.returnType, that.getReturnType())
+          && Objects.equals(this.stateFuncSignature, that.getStateFuncSignature())
+          && Objects.equals(this.stateType, that.getStateType());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        keyspace,
+        signature,
+        finalFuncSignature,
+        initCond,
+        returnType,
+        stateFuncSignature,
+        stateType);
   }
 }

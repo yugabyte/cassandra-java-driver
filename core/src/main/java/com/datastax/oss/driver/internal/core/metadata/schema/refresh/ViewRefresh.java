@@ -15,26 +15,91 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.google.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.internal.core.metadata.schema.events.ViewChangeEvent;
+import com.google.common.base.Preconditions;
+import java.util.Map;
 
-public class ViewRefresh extends MetadataRefresh {
+public class ViewRefresh extends SingleElementSchemaRefresh<CqlIdentifier, ViewMetadata> {
 
-  @VisibleForTesting public final SchemaChangeType changeType;
-  @VisibleForTesting public final ViewMetadata view;
+  public static ViewRefresh dropped(
+      DefaultMetadata current, String keyspaceName, String droppedViewName, String logPrefix) {
+    return new ViewRefresh(
+        current,
+        SchemaChangeType.DROPPED,
+        null,
+        CqlIdentifier.fromInternal(keyspaceName),
+        CqlIdentifier.fromInternal(droppedViewName),
+        logPrefix);
+  }
 
-  public ViewRefresh(
-      DefaultMetadata current, SchemaChangeType changeType, ViewMetadata view, String logPrefix) {
-    super(current, logPrefix);
-    this.changeType = changeType;
-    this.view = view;
+  public static ViewRefresh createdOrUpdated(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      ViewMetadata newView,
+      String logPrefix) {
+    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
+    return (newView == null)
+        ? null
+        : new ViewRefresh(current, changeType, newView, null, null, logPrefix);
+  }
+
+  private ViewRefresh(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      ViewMetadata newView,
+      CqlIdentifier droppedViewKeyspace,
+      CqlIdentifier droppedViewId,
+      String logPrefix) {
+    super(current, changeType, "view", newView, droppedViewKeyspace, droppedViewId, logPrefix);
   }
 
   @Override
-  public void compute() {
-    throw new UnsupportedOperationException("TODO");
+  protected CqlIdentifier extractKeyspace(ViewMetadata view) {
+    return view.getKeyspace();
+  }
+
+  @Override
+  protected CqlIdentifier extractKey(ViewMetadata view) {
+    return view.getName();
+  }
+
+  @Override
+  protected Map<CqlIdentifier, ViewMetadata> extractElements(KeyspaceMetadata keyspace) {
+    return keyspace.getViews();
+  }
+
+  @Override
+  protected KeyspaceMetadata replace(
+      KeyspaceMetadata keyspace, Map<CqlIdentifier, ViewMetadata> newViews) {
+    return new DefaultKeyspaceMetadata(
+        keyspace.getName(),
+        keyspace.isDurableWrites(),
+        keyspace.getReplication(),
+        keyspace.getUserDefinedTypes(),
+        keyspace.getTables(),
+        newViews,
+        keyspace.getFunctions(),
+        keyspace.getAggregates());
+  }
+
+  @Override
+  protected Object newDroppedEvent(ViewMetadata oldView) {
+    return ViewChangeEvent.dropped(oldView);
+  }
+
+  @Override
+  protected Object newCreatedEvent(ViewMetadata newView) {
+    return ViewChangeEvent.created(newView);
+  }
+
+  @Override
+  protected Object newUpdatedEvent(ViewMetadata oldView, ViewMetadata newView) {
+    return ViewChangeEvent.updated(oldView, newView);
   }
 }

@@ -15,29 +15,91 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.google.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
+import com.google.common.base.Preconditions;
+import java.util.Map;
 
-public class TypeRefresh extends MetadataRefresh {
+public class TypeRefresh extends SingleElementSchemaRefresh<CqlIdentifier, UserDefinedType> {
 
-  @VisibleForTesting public final SchemaChangeType changeType;
-  @VisibleForTesting public final UserDefinedType type;
+  public static TypeRefresh dropped(
+      DefaultMetadata current, String keyspaceName, String droppedTypeName, String logPrefix) {
+    return new TypeRefresh(
+        current,
+        SchemaChangeType.DROPPED,
+        null,
+        CqlIdentifier.fromInternal(keyspaceName),
+        CqlIdentifier.fromInternal(droppedTypeName),
+        logPrefix);
+  }
 
-  public TypeRefresh(
+  public static TypeRefresh createdOrUpdated(
       DefaultMetadata current,
       SchemaChangeType changeType,
-      UserDefinedType type,
+      UserDefinedType newType,
       String logPrefix) {
-    super(current, logPrefix);
-    this.changeType = changeType;
-    this.type = type;
+    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
+    return (newType == null)
+        ? null
+        : new TypeRefresh(current, changeType, newType, null, null, logPrefix);
+  }
+
+  private TypeRefresh(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      UserDefinedType newType,
+      CqlIdentifier droppedTypeKeyspace,
+      CqlIdentifier droppedTypeId,
+      String logPrefix) {
+    super(current, changeType, "type", newType, droppedTypeKeyspace, droppedTypeId, logPrefix);
   }
 
   @Override
-  public void compute() {
-    throw new UnsupportedOperationException("TODO");
+  protected CqlIdentifier extractKeyspace(UserDefinedType type) {
+    return type.getKeyspace();
+  }
+
+  @Override
+  protected CqlIdentifier extractKey(UserDefinedType type) {
+    return type.getName();
+  }
+
+  @Override
+  protected Map<CqlIdentifier, UserDefinedType> extractElements(KeyspaceMetadata keyspace) {
+    return keyspace.getUserDefinedTypes();
+  }
+
+  @Override
+  protected KeyspaceMetadata replace(
+      KeyspaceMetadata keyspace, Map<CqlIdentifier, UserDefinedType> newTypes) {
+    return new DefaultKeyspaceMetadata(
+        keyspace.getName(),
+        keyspace.isDurableWrites(),
+        keyspace.getReplication(),
+        newTypes,
+        keyspace.getTables(),
+        keyspace.getViews(),
+        keyspace.getFunctions(),
+        keyspace.getAggregates());
+  }
+
+  @Override
+  protected Object newDroppedEvent(UserDefinedType oldType) {
+    return TypeChangeEvent.dropped(oldType);
+  }
+
+  @Override
+  protected Object newCreatedEvent(UserDefinedType newType) {
+    return TypeChangeEvent.created(newType);
+  }
+
+  @Override
+  protected Object newUpdatedEvent(UserDefinedType oldType, UserDefinedType newType) {
+    return TypeChangeEvent.updated(oldType, newType);
   }
 }

@@ -26,7 +26,7 @@ import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.KeyspaceRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SingleKeyspaceRefresh;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -58,9 +58,8 @@ class KeyspaceParser extends SchemaElementParser {
     AdminRow keyspaceRow = rows.keyspaces.get(0);
 
     KeyspaceMetadata keyspace = parseKeyspace(keyspaceRow);
-    return (keyspace == null)
-        ? null
-        : new KeyspaceRefresh(currentMetadata, rows.changeType, keyspace, logPrefix);
+    return SingleKeyspaceRefresh.createdOrUpdated(
+        currentMetadata, rows.changeType, keyspace, logPrefix);
   }
 
   // Note that the server only issues KEYSPACE UPDATED events when an ALTER KEYSPACE command has

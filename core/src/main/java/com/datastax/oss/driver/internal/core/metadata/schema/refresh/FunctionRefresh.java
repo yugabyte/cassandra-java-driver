@@ -15,29 +15,107 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.google.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.internal.core.metadata.schema.events.FunctionChangeEvent;
+import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
 
-public class FunctionRefresh extends MetadataRefresh {
+public class FunctionRefresh
+    extends SingleElementSchemaRefresh<FunctionSignature, FunctionMetadata> {
 
-  @VisibleForTesting public final SchemaChangeType changeType;
-  @VisibleForTesting public final FunctionMetadata function;
+  public static FunctionRefresh dropped(
+      DefaultMetadata current,
+      String keyspaceName,
+      String droppedFunctionName,
+      List<String> droppedFunctionArguments,
+      InternalDriverContext context) {
+    return new FunctionRefresh(
+        current,
+        SchemaChangeType.DROPPED,
+        null,
+        CqlIdentifier.fromInternal(keyspaceName),
+        buildSignature(
+            keyspaceName, droppedFunctionName, droppedFunctionArguments, current, context),
+        context.clusterName());
+  }
 
-  public FunctionRefresh(
+  public static FunctionRefresh createdOrUpdated(
       DefaultMetadata current,
       SchemaChangeType changeType,
-      FunctionMetadata function,
+      FunctionMetadata newFunction,
       String logPrefix) {
-    super(current, logPrefix);
-    this.changeType = changeType;
-    this.function = function;
+    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
+    return (newFunction == null)
+        ? null
+        : new FunctionRefresh(current, changeType, newFunction, null, null, logPrefix);
+  }
+
+  private FunctionRefresh(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      FunctionMetadata newFunction,
+      CqlIdentifier droppedFunctionKeyspace,
+      FunctionSignature droppedFunctionId,
+      String logPrefix) {
+    super(
+        current,
+        changeType,
+        "function",
+        newFunction,
+        droppedFunctionKeyspace,
+        droppedFunctionId,
+        logPrefix);
   }
 
   @Override
-  public void compute() {
-    throw new UnsupportedOperationException("TODO");
+  protected CqlIdentifier extractKeyspace(FunctionMetadata function) {
+    return function.getKeyspace();
+  }
+
+  @Override
+  protected FunctionSignature extractKey(FunctionMetadata function) {
+    return function.getSignature();
+  }
+
+  @Override
+  protected Map<FunctionSignature, FunctionMetadata> extractElements(KeyspaceMetadata keyspace) {
+    return keyspace.getFunctions();
+  }
+
+  @Override
+  protected KeyspaceMetadata replace(
+      KeyspaceMetadata keyspace, Map<FunctionSignature, FunctionMetadata> newFunctions) {
+    return new DefaultKeyspaceMetadata(
+        keyspace.getName(),
+        keyspace.isDurableWrites(),
+        keyspace.getReplication(),
+        keyspace.getUserDefinedTypes(),
+        keyspace.getTables(),
+        keyspace.getViews(),
+        newFunctions,
+        keyspace.getAggregates());
+  }
+
+  @Override
+  protected Object newDroppedEvent(FunctionMetadata oldFunction) {
+    return FunctionChangeEvent.dropped(oldFunction);
+  }
+
+  @Override
+  protected Object newCreatedEvent(FunctionMetadata newFunction) {
+    return FunctionChangeEvent.created(newFunction);
+  }
+
+  @Override
+  protected Object newUpdatedEvent(FunctionMetadata oldFunction, FunctionMetadata newFunction) {
+    return FunctionChangeEvent.updated(oldFunction, newFunction);
   }
 }

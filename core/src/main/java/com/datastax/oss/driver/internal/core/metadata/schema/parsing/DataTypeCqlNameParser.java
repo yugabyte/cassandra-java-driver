@@ -35,7 +35,7 @@ import java.util.Map;
  *
  * <p>In these versions, data types appear as string literals, like "ascii" or "tuple<int,int>".
  */
-class DataTypeCqlNameParser implements DataTypeParser {
+public class DataTypeCqlNameParser implements DataTypeParser {
 
   @Override
   public DataType parse(

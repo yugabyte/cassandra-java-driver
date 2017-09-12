@@ -97,6 +97,6 @@ class FunctionParser extends SchemaSingleRowElementParser<FunctionMetadata> {
 
   @Override
   MetadataRefresh newRefresh(FunctionMetadata function) {
-    return new FunctionRefresh(currentMetadata, rows.changeType, function, logPrefix);
+    return FunctionRefresh.createdOrUpdated(currentMetadata, rows.changeType, function, logPrefix);
   }
 }

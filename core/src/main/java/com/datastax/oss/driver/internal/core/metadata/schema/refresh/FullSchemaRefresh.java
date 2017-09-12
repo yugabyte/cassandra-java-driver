@@ -15,24 +15,37 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
 import com.google.common.annotations.VisibleForTesting;
-import java.util.List;
+import com.google.common.collect.Sets;
+import java.util.Map;
 
-public class FullSchemaRefresh extends MetadataRefresh {
+public class FullSchemaRefresh extends KeyspaceRefresh {
 
-  @VisibleForTesting public final List<KeyspaceMetadata> schema;
+  @VisibleForTesting public final Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces;
 
   public FullSchemaRefresh(
-      DefaultMetadata current, List<KeyspaceMetadata> schema, String logPrefix) {
+      DefaultMetadata current,
+      Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
+      String logPrefix) {
     super(current, logPrefix);
-    this.schema = schema;
+    this.newKeyspaces = newKeyspaces;
   }
 
   @Override
   public void compute() {
-    throw new UnsupportedOperationException("TODO");
+    newMetadata = oldMetadata.withKeyspaces(this.newKeyspaces);
+
+    Map<CqlIdentifier, KeyspaceMetadata> oldKeyspaces = oldMetadata.getKeyspaces();
+    for (CqlIdentifier removedKey : Sets.difference(oldKeyspaces.keySet(), newKeyspaces.keySet())) {
+      events.add(KeyspaceChangeEvent.dropped(oldKeyspaces.get(removedKey)));
+    }
+    for (Map.Entry<CqlIdentifier, KeyspaceMetadata> entry : newKeyspaces.entrySet()) {
+      CqlIdentifier key = entry.getKey();
+      computeEvents(oldKeyspaces.get(key), entry.getValue());
+    }
   }
 }

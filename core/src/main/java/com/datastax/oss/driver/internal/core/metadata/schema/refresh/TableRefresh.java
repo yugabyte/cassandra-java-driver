@@ -15,26 +15,91 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.google.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.internal.core.metadata.schema.events.TableChangeEvent;
+import com.google.common.base.Preconditions;
+import java.util.Map;
 
-public class TableRefresh extends MetadataRefresh {
+public class TableRefresh extends SingleElementSchemaRefresh<CqlIdentifier, TableMetadata> {
 
-  @VisibleForTesting public final SchemaChangeType changeType;
-  @VisibleForTesting public final TableMetadata table;
+  public static TableRefresh dropped(
+      DefaultMetadata current, String keyspaceName, String droppedTableName, String logPrefix) {
+    return new TableRefresh(
+        current,
+        SchemaChangeType.DROPPED,
+        null,
+        CqlIdentifier.fromInternal(keyspaceName),
+        CqlIdentifier.fromInternal(droppedTableName),
+        logPrefix);
+  }
 
-  public TableRefresh(
-      DefaultMetadata current, SchemaChangeType changeType, TableMetadata table, String logPrefix) {
-    super(current, logPrefix);
-    this.table = table;
-    this.changeType = changeType;
+  public static TableRefresh createdOrUpdated(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      TableMetadata newTable,
+      String logPrefix) {
+    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
+    return (newTable == null)
+        ? null
+        : new TableRefresh(current, changeType, newTable, null, null, logPrefix);
+  }
+
+  private TableRefresh(
+      DefaultMetadata current,
+      SchemaChangeType changeType,
+      TableMetadata newTable,
+      CqlIdentifier droppedTableKeyspace,
+      CqlIdentifier droppedTableId,
+      String logPrefix) {
+    super(current, changeType, "table", newTable, droppedTableKeyspace, droppedTableId, logPrefix);
   }
 
   @Override
-  public void compute() {
-    throw new UnsupportedOperationException("TODO");
+  protected CqlIdentifier extractKeyspace(TableMetadata table) {
+    return table.getKeyspace();
+  }
+
+  @Override
+  protected CqlIdentifier extractKey(TableMetadata table) {
+    return table.getName();
+  }
+
+  @Override
+  protected Map<CqlIdentifier, TableMetadata> extractElements(KeyspaceMetadata keyspace) {
+    return keyspace.getTables();
+  }
+
+  @Override
+  protected KeyspaceMetadata replace(
+      KeyspaceMetadata keyspace, Map<CqlIdentifier, TableMetadata> newTables) {
+    return new DefaultKeyspaceMetadata(
+        keyspace.getName(),
+        keyspace.isDurableWrites(),
+        keyspace.getReplication(),
+        keyspace.getUserDefinedTypes(),
+        newTables,
+        keyspace.getViews(),
+        keyspace.getFunctions(),
+        keyspace.getAggregates());
+  }
+
+  @Override
+  protected Object newDroppedEvent(TableMetadata oldTable) {
+    return TableChangeEvent.dropped(oldTable);
+  }
+
+  @Override
+  protected Object newCreatedEvent(TableMetadata newTable) {
+    return TableChangeEvent.created(newTable);
+  }
+
+  @Override
+  protected Object newUpdatedEvent(TableMetadata oldTable, TableMetadata newTable) {
+    return TableChangeEvent.updated(oldTable, newTable);
   }
 }

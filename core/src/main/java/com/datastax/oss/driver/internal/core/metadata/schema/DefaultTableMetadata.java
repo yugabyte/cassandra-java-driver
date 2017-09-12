@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class DefaultTableMetadata implements TableMetadata {
@@ -100,5 +101,30 @@ public class DefaultTableMetadata implements TableMetadata {
   @Override
   public Map<CqlIdentifier, IndexMetadata> getIndexes() {
     return indexes;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (other == this) {
+      return true;
+    } else if (other instanceof TableMetadata) {
+      TableMetadata that = (TableMetadata) other;
+      return Objects.equals(this.keyspace, that.getKeyspace())
+          && Objects.equals(this.name, that.getName())
+          && Objects.equals(this.id, that.getId())
+          && this.compactStorage == that.isCompactStorage()
+          && Objects.equals(this.partitionKey, that.getPartitionKey())
+          && Objects.equals(this.clusteringColumns, that.getClusteringColumns())
+          && Objects.equals(this.columns, that.getColumns())
+          && Objects.equals(this.indexes, that.getIndexes());
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        keyspace, name, id, compactStorage, partitionKey, clusteringColumns, columns, indexes);
   }
 }
