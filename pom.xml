@@ -394,6 +394,7 @@
                     </includes>
                     <excludes>
                         <exclude>**/src/main/config/ide/**</exclude>
+                        <exclude>**/com/yugabyte/**</exclude>
                     </excludes>
                     <mapping>
                         <java>SLASHSTAR_STYLE</java>

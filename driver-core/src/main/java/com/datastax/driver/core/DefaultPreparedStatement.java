@@ -149,6 +149,11 @@ public class DefaultPreparedStatement implements PreparedStatement {
     }
 
     @Override
+    public int[] getRoutingKeyIndexes() {
+        return preparedId.routingKeyIndexes;
+    }
+
+    @Override
     public PreparedStatement setConsistencyLevel(ConsistencyLevel consistency) {
         this.consistency = consistency;
         return this;
