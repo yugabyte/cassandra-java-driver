@@ -21,8 +21,8 @@ import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
-class Cassandra2SchemaQueries extends SchemaQueries {
-  Cassandra2SchemaQueries(
+class Cassandra22SchemaQueries extends SchemaQueries {
+  Cassandra22SchemaQueries(
       DriverChannel channel,
       CompletionStage<Metadata> refreshFuture,
       DriverConfigProfile config,
@@ -61,12 +61,12 @@ class Cassandra2SchemaQueries extends SchemaQueries {
   }
 
   @Override
-  protected String selectFunctionsQuery() {
-    return "SELECT * FROM system.schema_functions";
+  protected Optional<String> selectFunctionsQuery() {
+    return Optional.of("SELECT * FROM system.schema_functions");
   }
 
   @Override
-  protected String selectAggregatesQuery() {
-    return "SELECT * FROM system.schema_aggregates";
+  protected Optional<String> selectAggregatesQuery() {
+    return Optional.of("SELECT * FROM system.schema_aggregates");
   }
 }

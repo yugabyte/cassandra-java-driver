@@ -77,9 +77,13 @@ public abstract class SchemaQueries {
     DriverConfigProfile config = context.config().getDefaultProfile();
     LOG.debug(
         "[{}] Sending schema queries to {} with version {}", logPrefix, node, cassandraVersion);
-    return (cassandraVersion.compareTo(CassandraVersion.V3_0_0) < 0)
-        ? new Cassandra2SchemaQueries(channel, refreshFuture, config, logPrefix)
-        : new Cassandra3SchemaQueries(channel, refreshFuture, config, logPrefix);
+    if (cassandraVersion.compareTo(CassandraVersion.V2_2_0) < 0) {
+      return new Cassandra21SchemaQueries(channel, refreshFuture, config, logPrefix);
+    } else if (cassandraVersion.compareTo(CassandraVersion.V3_0_0) < 0) {
+      return new Cassandra22SchemaQueries(channel, refreshFuture, config, logPrefix);
+    } else {
+      return new Cassandra3SchemaQueries(channel, refreshFuture, config, logPrefix);
+    }
   }
 
   private final DriverChannel channel;
@@ -150,9 +154,9 @@ public abstract class SchemaQueries {
 
   protected abstract String selectTypesQuery();
 
-  protected abstract String selectFunctionsQuery();
+  protected abstract Optional<String> selectFunctionsQuery();
 
-  protected abstract String selectAggregatesQuery();
+  protected abstract Optional<String> selectAggregatesQuery();
 
   public CompletionStage<SchemaRows> execute() {
     RunOrSchedule.on(adminExecutor, this::executeOnAdminExecutor);
@@ -172,8 +176,10 @@ public abstract class SchemaQueries {
         .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withIndexes));
     selectViewsQuery()
         .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withViews));
-    query(selectFunctionsQuery() + whereClause, schemaRowsBuilder::withFunctions);
-    query(selectAggregatesQuery() + whereClause, schemaRowsBuilder::withAggregates);
+    selectFunctionsQuery()
+        .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withFunctions));
+    selectAggregatesQuery()
+        .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withAggregates));
   }
 
   private void query(

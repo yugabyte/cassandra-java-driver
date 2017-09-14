@@ -30,7 +30,7 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 
 // Note: we don't repeat the other tests in Cassandra3SchemaQueriesTest because the logic is
 // shared, this class just validates the query strings.
-public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
+public class Cassandra22SchemaQueriesTest extends SchemaQueriesTest {
 
   @Test
   public void should_query() {
@@ -120,11 +120,14 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
               assertThat(rows.aggregates.get(KS2_ID)).hasSize(1);
               assertThat(rows.aggregates.get(KS2_ID).iterator().next().getString("aggregate_name"))
                   .isEqualTo("add");
+
+              // No views in this version
+              assertThat(rows.views.keySet()).isEmpty();
             });
   }
 
   /** Extends the class under test to mock the query execution logic. */
-  static class SchemaQueriesWithMockedChannel extends Cassandra2SchemaQueries {
+  static class SchemaQueriesWithMockedChannel extends Cassandra22SchemaQueries {
 
     final Queue<Call> calls = new LinkedBlockingDeque<>();
 

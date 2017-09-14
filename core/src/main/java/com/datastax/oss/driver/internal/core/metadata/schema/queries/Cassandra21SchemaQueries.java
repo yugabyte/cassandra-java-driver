@@ -21,52 +21,52 @@ import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
-class Cassandra3SchemaQueries extends SchemaQueries {
-  Cassandra3SchemaQueries(
+class Cassandra21SchemaQueries extends SchemaQueries {
+  Cassandra21SchemaQueries(
       DriverChannel channel,
       CompletionStage<Metadata> refreshFuture,
       DriverConfigProfile config,
       String logPrefix) {
-    super(channel, true, refreshFuture, config, logPrefix);
+    super(channel, false, refreshFuture, config, logPrefix);
   }
 
   @Override
   protected String selectKeyspacesQuery() {
-    return "SELECT * FROM system_schema.keyspaces";
+    return "SELECT * FROM system.schema_keyspaces";
   }
 
   @Override
   protected String selectTablesQuery() {
-    return "SELECT * FROM system_schema.tables";
+    return "SELECT * FROM system.schema_columnfamilies";
   }
 
   @Override
   protected Optional<String> selectViewsQuery() {
-    return Optional.of("SELECT * FROM system_schema.views");
+    return Optional.empty();
   }
 
   @Override
   protected Optional<String> selectIndexesQuery() {
-    return Optional.of("SELECT * FROM system_schema.indexes");
+    return Optional.empty();
   }
 
   @Override
   protected String selectColumnsQuery() {
-    return "SELECT * FROM system_schema.columns";
+    return "SELECT * FROM system.schema_columns";
   }
 
   @Override
   protected String selectTypesQuery() {
-    return "SELECT * FROM system_schema.types";
+    return "SELECT * FROM system.schema_usertypes";
   }
 
   @Override
   protected Optional<String> selectFunctionsQuery() {
-    return Optional.of("SELECT * FROM system_schema.functions");
+    return Optional.empty();
   }
 
   @Override
   protected Optional<String> selectAggregatesQuery() {
-    return Optional.of("SELECT * FROM system_schema.aggregates");
+    return Optional.empty();
   }
 }
