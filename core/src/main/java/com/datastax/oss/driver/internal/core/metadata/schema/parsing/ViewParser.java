@@ -18,15 +18,14 @@ package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultColumnMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultViewMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.ViewRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -42,34 +41,10 @@ class ViewParser extends RelationParser {
 
   private static final Logger LOG = LoggerFactory.getLogger(ViewParser.class);
 
-  ViewParser(SchemaParser parent) {
-    super(parent);
+  ViewParser(SchemaRows rows, DataTypeParser dataTypeParser, InternalDriverContext context) {
+    super(rows, dataTypeParser, context);
   }
 
-  /** Called when the whole refresh is a single view. */
-  SchemaRefresh parse() {
-    Map.Entry<CqlIdentifier, AdminRow> viewEntry = rows.views.entries().iterator().next();
-    CqlIdentifier keyspaceId = viewEntry.getKey();
-    AdminRow viewRow = viewEntry.getValue();
-
-    KeyspaceMetadata keyspace = currentMetadata.getKeyspaces().get(keyspaceId);
-    if (keyspace == null) {
-      LOG.warn(
-          "[{}] Processing {} refresh for {}.{} but that keyspace is unknown, skipping",
-          logPrefix,
-          rows.request.scope,
-          keyspaceId,
-          viewRow.getString("view_name"));
-      return null;
-    }
-    ViewMetadata view = parseView(viewRow, keyspaceId, keyspace.getUserDefinedTypes());
-    return (view == null) ? null : new ViewRefresh(currentMetadata, rows.request, view, logPrefix);
-  }
-
-  /**
-   * Called by {@link #parse()}, or directly if this row is part of a full schema or keyspace
-   * refresh.
-   */
   ViewMetadata parseView(
       AdminRow viewRow, CqlIdentifier keyspaceId, Map<CqlIdentifier, UserDefinedType> userTypes) {
     // Cassandra 3.0 (no views in earlier versions):
@@ -128,7 +103,7 @@ class ViewParser extends RelationParser {
         ImmutableMap.builder();
 
     for (RawColumn raw : rawColumns) {
-      DataType dataType = dataTypeParser.parse(raw.dataType, keyspaceId, userTypes, context);
+      DataType dataType = dataTypeParser.parse(keyspaceId, raw.dataType, userTypes, context);
       ColumnMetadata column =
           new DefaultColumnMetadata(
               keyspaceId, viewId, raw.name, dataType, raw.kind == RawColumn.Kind.STATIC);
@@ -158,18 +133,16 @@ class ViewParser extends RelationParser {
       options = Collections.emptyMap();
     }
 
-    DefaultViewMetadata view =
-        new DefaultViewMetadata(
-            keyspaceId,
-            viewId,
-            baseTableId,
-            includesAllColumns,
-            whereClause,
-            uuid,
-            partitionKeyBuilder.build(),
-            clusteringColumnsBuilder.build(),
-            allColumnsBuilder.build(),
-            options);
-    return view;
+    return new DefaultViewMetadata(
+        keyspaceId,
+        viewId,
+        baseTableId,
+        includesAllColumns,
+        whereClause,
+        uuid,
+        partitionKeyBuilder.build(),
+        clusteringColumnsBuilder.build(),
+        allColumnsBuilder.build(),
+        options);
   }
 }

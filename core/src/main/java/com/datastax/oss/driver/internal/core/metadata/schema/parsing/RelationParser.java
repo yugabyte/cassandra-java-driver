@@ -20,16 +20,27 @@ import com.datastax.oss.driver.api.core.metadata.schema.RelationMetadata;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.google.common.collect.ImmutableMap;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
 // Shared code for table and view parsing
-public abstract class RelationParser extends SchemaElementParser {
+public abstract class RelationParser {
 
-  RelationParser(SchemaParser parent) {
-    super(parent);
+  protected final SchemaRows rows;
+  protected final DataTypeParser dataTypeParser;
+  protected final InternalDriverContext context;
+  protected final String logPrefix;
+
+  protected RelationParser(
+      SchemaRows rows, DataTypeParser dataTypeParser, InternalDriverContext context) {
+    this.rows = rows;
+    this.dataTypeParser = dataTypeParser;
+    this.context = context;
+    this.logPrefix = context.clusterName();
   }
 
   protected Map<CqlIdentifier, Object> parseOptions(AdminRow row) {

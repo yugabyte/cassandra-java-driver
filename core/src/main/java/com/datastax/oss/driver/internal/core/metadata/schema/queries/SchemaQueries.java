@@ -18,20 +18,18 @@ package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
-import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
-import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -50,9 +48,11 @@ import org.slf4j.LoggerFactory;
 public abstract class SchemaQueries {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaQueries.class);
-  private static final TypeCodec<List<String>> LIST_OF_TEXT = TypeCodecs.listOf(TypeCodecs.TEXT);
 
-  public static SchemaQueries newInstance(InternalDriverContext context, String logPrefix) {
+  public static SchemaQueries newInstance(
+      CompletionStage<Metadata> refreshFuture, InternalDriverContext context) {
+    String logPrefix = context.clusterName();
+
     DriverChannel channel = context.controlConnection().channel();
     if (channel == null || channel.closeFuture().isDone()) {
       throw new IllegalStateException("Control channel not available, aborting schema refresh");
@@ -78,30 +78,64 @@ public abstract class SchemaQueries {
     LOG.debug(
         "[{}] Sending schema queries to {} with version {}", logPrefix, node, cassandraVersion);
     return (cassandraVersion.compareTo(CassandraVersion.V3_0_0) < 0)
-        ? new Cassandra2SchemaQueries(channel, node, config, logPrefix)
-        : new Cassandra3SchemaQueries(channel, node, config, logPrefix);
+        ? new Cassandra2SchemaQueries(channel, refreshFuture, config, logPrefix)
+        : new Cassandra3SchemaQueries(channel, refreshFuture, config, logPrefix);
   }
 
   private final DriverChannel channel;
   private final EventExecutor adminExecutor;
-  private final Node node;
+  private final boolean isCassandraV3;
   private final String logPrefix;
   private final Duration timeout;
   private final int pageSize;
+  private final String whereClause;
+  // The future we return from execute, completes when all the queries are done.
   private final CompletableFuture<SchemaRows> schemaRowsFuture = new CompletableFuture<>();
+  // A future that completes later, when the whole refresh is done. We just store it here to pass it
+  // down to the next step.
+  public final CompletionStage<Metadata> refreshFuture;
 
   // All non-final fields are accessed exclusively on adminExecutor
   private SchemaRows.Builder schemaRowsBuilder;
   private int pendingQueries;
 
   protected SchemaQueries(
-      DriverChannel channel, Node node, DriverConfigProfile config, String logPrefix) {
+      DriverChannel channel,
+      boolean isCassandraV3,
+      CompletionStage<Metadata> refreshFuture,
+      DriverConfigProfile config,
+      String logPrefix) {
     this.channel = channel;
     this.adminExecutor = channel.eventLoop();
-    this.node = node;
+    this.isCassandraV3 = isCassandraV3;
+    this.refreshFuture = refreshFuture;
     this.logPrefix = logPrefix;
     this.timeout = config.getDuration(CoreDriverOption.METADATA_SCHEMA_REQUEST_TIMEOUT);
     this.pageSize = config.getInt(CoreDriverOption.METADATA_SCHEMA_REQUEST_PAGE_SIZE);
+
+    List<String> refreshedKeyspaces =
+        config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            ? config.getStringList(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            : Collections.emptyList();
+    this.whereClause = buildWhereClause(refreshedKeyspaces);
+  }
+
+  private static String buildWhereClause(List<String> refreshedKeyspaces) {
+    if (refreshedKeyspaces.isEmpty()) {
+      return "";
+    } else {
+      StringBuilder builder = new StringBuilder(" WHERE keyspace_name in (");
+      boolean first = true;
+      for (String keyspace : refreshedKeyspaces) {
+        if (first) {
+          first = false;
+        } else {
+          builder.append(",");
+        }
+        builder.append('\'').append(keyspace).append('\'');
+      }
+      return builder.append(")").toString();
+    }
   }
 
   protected abstract String selectKeyspacesQuery();
@@ -120,59 +154,26 @@ public abstract class SchemaQueries {
 
   protected abstract String selectAggregatesQuery();
 
-  /** {@code table_name} or {@code columnfamily_name}, depending on the server version */
-  protected abstract String tableNameColumn();
-
-  protected abstract String signatureColumn();
-
-  public CompletionStage<SchemaRows> execute(SchemaRefreshRequest request) {
-    RunOrSchedule.on(adminExecutor, () -> executeOnAdminExecutor(request));
+  public CompletionStage<SchemaRows> execute() {
+    RunOrSchedule.on(adminExecutor, this::executeOnAdminExecutor);
     return schemaRowsFuture;
   }
 
-  private void executeOnAdminExecutor(SchemaRefreshRequest request) {
+  private void executeOnAdminExecutor() {
     assert adminExecutor.inEventLoop();
 
-    schemaRowsBuilder = new SchemaRows.Builder(node, request, tableNameColumn(), logPrefix);
+    schemaRowsBuilder = new SchemaRows.Builder(isCassandraV3, refreshFuture, logPrefix);
 
-    String whereClause =
-        buildWhereClause(request.scope, request.keyspace, request.object, request.arguments);
-
-    boolean isFullOrKeyspace =
-        request.scope == SchemaChangeScope.FULL_SCHEMA
-            || request.scope == SchemaChangeScope.KEYSPACE;
-    if (isFullOrKeyspace) {
-      query(selectKeyspacesQuery() + whereClause, schemaRowsBuilder::withKeyspaces);
-    }
-    if (isFullOrKeyspace || request.scope == SchemaChangeScope.TYPE) {
-      query(selectTypesQuery() + whereClause, schemaRowsBuilder::withTypes);
-    }
-    if (isFullOrKeyspace || request.scope == SchemaChangeScope.TABLE) {
-      query(selectTablesQuery() + whereClause, schemaRowsBuilder::withTables);
-      query(selectColumnsQuery() + whereClause, schemaRowsBuilder::withColumns);
-      selectIndexesQuery()
-          .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withIndexes));
-      selectViewsQuery()
-          .ifPresent(
-              select -> {
-                // Individual view notifications are sent with the TABLE type, we need to translate
-                // to VIEW to generate the appropriate WHERE clause.
-                SchemaChangeScope whereClauseKind =
-                    (request.scope == SchemaChangeScope.TABLE
-                        ? SchemaChangeScope.VIEW
-                        : request.scope);
-                String viewWhereClause =
-                    buildWhereClause(
-                        whereClauseKind, request.keyspace, request.object, request.arguments);
-                query(select + viewWhereClause, schemaRowsBuilder::withViews);
-              });
-    }
-    if (isFullOrKeyspace || request.scope == SchemaChangeScope.FUNCTION) {
-      query(selectFunctionsQuery() + whereClause, schemaRowsBuilder::withFunctions);
-    }
-    if (isFullOrKeyspace || request.scope == SchemaChangeScope.AGGREGATE) {
-      query(selectAggregatesQuery() + whereClause, schemaRowsBuilder::withAggregates);
-    }
+    query(selectKeyspacesQuery() + whereClause, schemaRowsBuilder::withKeyspaces);
+    query(selectTypesQuery() + whereClause, schemaRowsBuilder::withTypes);
+    query(selectTablesQuery() + whereClause, schemaRowsBuilder::withTables);
+    query(selectColumnsQuery() + whereClause, schemaRowsBuilder::withColumns);
+    selectIndexesQuery()
+        .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withIndexes));
+    selectViewsQuery()
+        .ifPresent(select -> query(select + whereClause, schemaRowsBuilder::withViews));
+    query(selectFunctionsQuery() + whereClause, schemaRowsBuilder::withFunctions);
+    query(selectAggregatesQuery() + whereClause, schemaRowsBuilder::withAggregates);
   }
 
   private void query(
@@ -216,33 +217,6 @@ public abstract class SchemaQueries {
           schemaRowsFuture.complete(schemaRowsBuilder.build());
         }
       }
-    }
-  }
-
-  private String buildWhereClause(
-      SchemaChangeScope kind, String keyspace, String object, List<String> arguments) {
-    if (kind == SchemaChangeScope.FULL_SCHEMA) {
-      return "";
-    } else {
-      String whereClause = String.format(" WHERE keyspace_name = '%s'", keyspace);
-      if (kind == SchemaChangeScope.TABLE) {
-        whereClause += String.format(" AND %s = '%s'", tableNameColumn(), object);
-      } else if (kind == SchemaChangeScope.VIEW) {
-        whereClause += String.format(" AND view_name = '%s'", object);
-      } else if (kind == SchemaChangeScope.TYPE) {
-        whereClause += String.format(" AND type_name = '%s'", object);
-      } else if (kind == SchemaChangeScope.FUNCTION) {
-        whereClause +=
-            String.format(
-                " AND function_name = '%s' AND %s = %s",
-                object, signatureColumn(), LIST_OF_TEXT.format(arguments));
-      } else if (kind == SchemaChangeScope.AGGREGATE) {
-        whereClause +=
-            String.format(
-                " AND aggregate_name = '%s' AND %s = %s",
-                object, signatureColumn(), LIST_OF_TEXT.format(arguments));
-      }
-      return whereClause;
     }
   }
 }

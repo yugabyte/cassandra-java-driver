@@ -20,65 +20,38 @@ import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SingleKeyspaceRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
 import com.google.common.collect.ImmutableList;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserKeyspaceTest extends SchemaParserTestBase {
-
-  public static final SchemaRefreshRequest REQUEST =
-      new SchemaRefreshRequest(
-          SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null);
-
-  @Test(expected = IllegalArgumentException.class)
-  public void should_skip_when_no_rows() {
-    assertThat(parse(REQUEST, rows -> {})).isNull();
-  }
-
-  @Test(expected = IllegalArgumentException.class)
-  public void should_skip_when_too_many_rows() {
-    assertThat(
-            parse(
-                REQUEST,
-                rows ->
-                    rows.withKeyspaces(
-                        ImmutableList.of(
-                            mockModernKeyspaceRow("ks1"), mockModernKeyspaceRow("ks2")))))
-        .isNull();
-  }
+public class SchemaParserTest extends SchemaParserTestBase {
 
   @Test
   public void should_parse_modern_keyspace_row() {
-    SingleKeyspaceRefresh refresh =
-        (SingleKeyspaceRefresh)
-            parse(
-                REQUEST, rows -> rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks"))));
+    SchemaRefresh refresh =
+        (SchemaRefresh)
+            parse(rows -> rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks"))));
 
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    KeyspaceMetadata keyspace = refresh.newKeyspace;
+    assertThat(refresh.newKeyspaces).hasSize(1);
+    KeyspaceMetadata keyspace = refresh.newKeyspaces.values().iterator().next();
     checkKeyspace(keyspace);
   }
 
   @Test
   public void should_parse_legacy_keyspace_row() {
-    SingleKeyspaceRefresh refresh =
-        (SingleKeyspaceRefresh)
-            parse(
-                REQUEST, rows -> rows.withKeyspaces(ImmutableList.of(mockLegacyKeyspaceRow("ks"))));
+    SchemaRefresh refresh =
+        (SchemaRefresh)
+            parse(rows -> rows.withKeyspaces(ImmutableList.of(mockLegacyKeyspaceRow("ks"))));
 
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    KeyspaceMetadata keyspace = refresh.newKeyspace;
+    assertThat(refresh.newKeyspaces).hasSize(1);
+    KeyspaceMetadata keyspace = refresh.newKeyspaces.values().iterator().next();
     checkKeyspace(keyspace);
   }
 
@@ -87,28 +60,26 @@ public class SchemaParserKeyspaceTest extends SchemaParserTestBase {
     // Needed to parse the aggregate
     Mockito.when(context.codecRegistry()).thenReturn(new DefaultCodecRegistry("test"));
 
-    SingleKeyspaceRefresh refresh =
-        (SingleKeyspaceRefresh)
+    SchemaRefresh refresh =
+        (SchemaRefresh)
             parse(
-                REQUEST,
                 rows ->
                     rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks")))
                         .withTypes(
                             ImmutableList.of(
                                 mockTypeRow(
                                     "ks", "t", ImmutableList.of("i"), ImmutableList.of("int"))))
-                        .withTables(ImmutableList.of(SchemaParserTableTest.TABLE_ROW_3_0))
-                        .withColumns(SchemaParserTableTest.COLUMN_ROWS_3_0)
-                        .withIndexes(SchemaParserTableTest.INDEX_ROWS_3_0)
-                        .withViews(ImmutableList.of(SchemaParserViewTest.VIEW_ROW_3_0))
-                        .withColumns(SchemaParserViewTest.COLUMN_ROWS_3_0)
-                        .withFunctions(ImmutableList.of(SchemaParserFunctionTest.ID_ROW_3_0))
+                        .withTables(ImmutableList.of(TableParserTest.TABLE_ROW_3_0))
+                        .withColumns(TableParserTest.COLUMN_ROWS_3_0)
+                        .withIndexes(TableParserTest.INDEX_ROWS_3_0)
+                        .withViews(ImmutableList.of(ViewParserTest.VIEW_ROW_3_0))
+                        .withColumns(ViewParserTest.COLUMN_ROWS_3_0)
+                        .withFunctions(ImmutableList.of(FunctionParserTest.ID_ROW_3_0))
                         .withAggregates(
-                            ImmutableList.of(SchemaParserAggregateTest.SUM_AND_TO_STRING_ROW_3_0)));
+                            ImmutableList.of(AggregateParserTest.SUM_AND_TO_STRING_ROW_3_0)));
 
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    KeyspaceMetadata keyspace = refresh.newKeyspace;
+    assertThat(refresh.newKeyspaces).hasSize(1);
+    KeyspaceMetadata keyspace = refresh.newKeyspaces.values().iterator().next();
     checkKeyspace(keyspace);
 
     assertThat(keyspace.getUserDefinedTypes())
@@ -127,7 +98,7 @@ public class SchemaParserKeyspaceTest extends SchemaParserTestBase {
             new FunctionSignature(CqlIdentifier.fromInternal("sum_and_to_string"), DataTypes.INT));
   }
 
-  // Common assertions, the keyspace has the same info in all of our examples
+  // Common assertions, the keyspace has the same info in all of our single keyspace examples
   private void checkKeyspace(KeyspaceMetadata keyspace) {
     assertThat(keyspace.getName().asInternal()).isEqualTo("ks");
     assertThat(keyspace.isDurableWrites()).isTrue();
@@ -137,11 +108,37 @@ public class SchemaParserKeyspaceTest extends SchemaParserTestBase {
         .containsEntry("replication_factor", "1");
   }
 
-  private MetadataRefresh parse(
-      SchemaRefreshRequest request, Consumer<SchemaRows.Builder> builderConfig) {
-    SchemaRows.Builder builder = new SchemaRows.Builder(node, request, "table_name", "test");
+  @Test
+  public void should_parse_multiple_keyspaces() {
+    SchemaRefresh refresh =
+        (SchemaRefresh)
+            parse(
+                rows ->
+                    rows.withKeyspaces(
+                            ImmutableList.of(
+                                mockModernKeyspaceRow("ks1"), mockModernKeyspaceRow("ks2")))
+                        .withTypes(
+                            ImmutableList.of(
+                                mockTypeRow(
+                                    "ks1", "t1", ImmutableList.of("i"), ImmutableList.of("int")),
+                                mockTypeRow(
+                                    "ks2", "t2", ImmutableList.of("i"), ImmutableList.of("int")))));
+
+    Map<CqlIdentifier, KeyspaceMetadata> keyspaces = refresh.newKeyspaces;
+    assertThat(keyspaces).hasSize(2);
+    KeyspaceMetadata ks1 = keyspaces.get(CqlIdentifier.fromInternal("ks1"));
+    KeyspaceMetadata ks2 = keyspaces.get(CqlIdentifier.fromInternal("ks2"));
+
+    assertThat(ks1.getName().asInternal()).isEqualTo("ks1");
+    assertThat(ks1.getUserDefinedTypes()).hasSize(1).containsKey(CqlIdentifier.fromInternal("t1"));
+    assertThat(ks2.getName().asInternal()).isEqualTo("ks2");
+    assertThat(ks2.getUserDefinedTypes()).hasSize(1).containsKey(CqlIdentifier.fromInternal("t2"));
+  }
+
+  private MetadataRefresh parse(Consumer<SchemaRows.Builder> builderConfig) {
+    SchemaRows.Builder builder = new SchemaRows.Builder(true, null, "test");
     builderConfig.accept(builder);
     SchemaRows rows = builder.build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
+    return new SchemaParser(currentMetadata, rows, context).parse();
   }
 }

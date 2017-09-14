@@ -15,37 +15,9 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema;
 
-import com.datastax.oss.protocol.internal.ProtocolConstants;
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
-
 public enum SchemaChangeType {
-  CREATED(ProtocolConstants.SchemaChangeType.CREATED),
-  UPDATED(ProtocolConstants.SchemaChangeType.UPDATED),
-  DROPPED(ProtocolConstants.SchemaChangeType.DROPPED),
+  CREATED,
+  UPDATED,
+  DROPPED,
   ;
-
-  private final String protocolString;
-
-  SchemaChangeType(String protocolString) {
-    this.protocolString = protocolString;
-  }
-
-  private static final Map<String, SchemaChangeType> BY_PROTOCOL_STRING;
-
-  static {
-    ImmutableMap.Builder<String, SchemaChangeType> builder = ImmutableMap.builder();
-    for (SchemaChangeType type : values()) {
-      builder.put(type.protocolString, type);
-    }
-    BY_PROTOCOL_STRING = builder.build();
-  }
-
-  public static SchemaChangeType fromProtocolString(String protocolString) {
-    SchemaChangeType type = BY_PROTOCOL_STRING.get(protocolString);
-    if (type == null) {
-      throw new IllegalArgumentException("Unsupported schema change type: " + protocolString);
-    }
-    return type;
-  }
 }

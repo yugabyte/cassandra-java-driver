@@ -17,26 +17,18 @@ package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.ViewRefresh;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Iterator;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserViewTest extends SchemaParserTestBase {
+public class ViewParserTest extends SchemaParserTestBase {
 
   static final AdminRow VIEW_ROW_3_0 =
       mockViewRow("ks", "alltimehigh", "scores", false, "game IS NOT NULL");
@@ -49,34 +41,20 @@ public class SchemaParserViewTest extends SchemaParserTestBase {
           mockModernColumnRow("ks", "alltimehigh", "month", "clustering", "int", "asc", 3),
           mockModernColumnRow("ks", "alltimehigh", "day", "clustering", "int", "asc", 4));
 
-  private static final SchemaRefreshRequest REQUEST =
-      new SchemaRefreshRequest(
-          SchemaChangeType.UPDATED, SchemaChangeScope.VIEW, "ks", "alltimehigh", null);
-
-  @Test
-  public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList(), REQUEST)).isNull();
-  }
-
   @Test
   public void should_skip_when_no_column_rows() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
+    SchemaRows rows = rows(VIEW_ROW_3_0, Collections.emptyList());
+    ViewParser parser = new ViewParser(rows, new DataTypeClassNameParser(), context);
+    ViewMetadata view = parser.parseView(VIEW_ROW_3_0, KEYSPACE_ID, Collections.emptyMap());
 
-    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList(), REQUEST)).isNull();
+    assertThat(view).isNull();
   }
 
   @Test
   public void should_parse_view() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
-
-    ViewRefresh refresh = (ViewRefresh) parse(VIEW_ROW_3_0, COLUMN_ROWS_3_0, REQUEST);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    ViewMetadata view = refresh.newElement;
+    SchemaRows rows = rows(VIEW_ROW_3_0, COLUMN_ROWS_3_0);
+    ViewParser parser = new ViewParser(rows, new DataTypeCqlNameParser(), context);
+    ViewMetadata view = parser.parseView(VIEW_ROW_3_0, KEYSPACE_ID, Collections.emptyMap());
 
     assertThat(view.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(view.getName().asInternal()).isEqualTo("alltimehigh");
@@ -106,13 +84,10 @@ public class SchemaParserViewTest extends SchemaParserTestBase {
             CqlIdentifier.fromInternal("day"));
   }
 
-  private MetadataRefresh parse(
-      AdminRow viewRow, Iterable<AdminRow> columnRows, SchemaRefreshRequest request) {
-    SchemaRows rows =
-        new SchemaRows.Builder(node, request, "table_name", "test")
-            .withViews(ImmutableList.of(viewRow))
-            .withColumns(columnRows)
-            .build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
+  private SchemaRows rows(AdminRow viewRow, Iterable<AdminRow> columnRows) {
+    return new SchemaRows.Builder(true, null, "test")
+        .withViews(ImmutableList.of(viewRow))
+        .withColumns(columnRows)
+        .build();
   }
 }

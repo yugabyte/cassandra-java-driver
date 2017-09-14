@@ -22,48 +22,101 @@ import com.datastax.oss.driver.api.core.type.MapType;
 import com.datastax.oss.driver.api.core.type.SetType;
 import com.datastax.oss.driver.api.core.type.TupleType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
-import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import java.util.Map;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TypeListParserTest extends SchemaParserTestBase {
-  private static final CqlIdentifier KEYSPACE_ID = CqlIdentifier.fromInternal("ks");
+public class UserDefinedTypeListParserTest extends SchemaParserTestBase {
 
-  private TypeListParser parser;
+  private static final AdminRow PERSON_ROW_2_2 =
+      mockTypeRow(
+          "ks",
+          "person",
+          ImmutableList.of("first_name", "last_name", "address"),
+          ImmutableList.of(
+              "org.apache.cassandra.db.marshal.UTF8Type",
+              "org.apache.cassandra.db.marshal.UTF8Type",
+              "org.apache.cassandra.db.marshal.UserType("
+                  + "ks,61646472657373," // address
+                  + "737472656574:org.apache.cassandra.db.marshal.UTF8Type," // street
+                  + "7a6970636f6465:org.apache.cassandra.db.marshal.Int32Type)")); // zipcode
 
-  @Before
-  public void setup() {
-    super.setup();
-    SchemaRows rows =
-        new SchemaRows.Builder(
-                node,
-                new SchemaRefreshRequest(
-                    SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null),
-                "table_name",
-                "test")
-            .build();
-    SchemaParser parent = new SchemaParser(rows, currentMetadata, context, "test");
+  private static final AdminRow PERSON_ROW_3_0 =
+      mockTypeRow(
+          "ks",
+          "person",
+          ImmutableList.of("first_name", "last_name", "address"),
+          ImmutableList.of("text", "text", "address"));
 
-    parser = new TypeListParser(parent, KEYSPACE_ID);
+  private static final AdminRow ADDRESS_ROW_3_0 =
+      mockTypeRow(
+          "ks", "address", ImmutableList.of("street", "zipcode"), ImmutableList.of("text", "int"));
+
+  @Test
+  public void should_parse_modern_table() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
+    Map<CqlIdentifier, UserDefinedType> types =
+        parser.parse(KEYSPACE_ID, PERSON_ROW_3_0, ADDRESS_ROW_3_0);
+
+    assertThat(types).hasSize(2);
+    UserDefinedType personType = types.get(CqlIdentifier.fromInternal("person"));
+    UserDefinedType addressType = types.get(CqlIdentifier.fromInternal("address"));
+
+    assertThat(personType.getKeyspace().asInternal()).isEqualTo("ks");
+    assertThat(personType.getName().asInternal()).isEqualTo("person");
+    assertThat(personType.getFieldNames())
+        .containsExactly(
+            CqlIdentifier.fromInternal("first_name"),
+            CqlIdentifier.fromInternal("last_name"),
+            CqlIdentifier.fromInternal("address"));
+    assertThat(personType.getFieldTypes().get(0)).isEqualTo(DataTypes.TEXT);
+    assertThat(personType.getFieldTypes().get(1)).isEqualTo(DataTypes.TEXT);
+    assertThat(personType.getFieldTypes().get(2)).isSameAs(addressType);
+  }
+
+  @Test
+  public void should_parse_legacy_table() {
+    UserDefinedTypeParser parser =
+        new UserDefinedTypeParser(new DataTypeClassNameParser(), context);
+    // no need to add a column for the address type, because in 2.2 UDTs are always fully redefined
+    // in column and field types (instead of referencing an existing type)
+    Map<CqlIdentifier, UserDefinedType> types = parser.parse(KEYSPACE_ID, PERSON_ROW_2_2);
+
+    assertThat(types).hasSize(1);
+    UserDefinedType personType = types.get(CqlIdentifier.fromInternal("person"));
+
+    assertThat(personType.getKeyspace().asInternal()).isEqualTo("ks");
+    assertThat(personType.getName().asInternal()).isEqualTo("person");
+    assertThat(personType.getFieldNames())
+        .containsExactly(
+            CqlIdentifier.fromInternal("first_name"),
+            CqlIdentifier.fromInternal("last_name"),
+            CqlIdentifier.fromInternal("address"));
+    assertThat(personType.getFieldTypes().get(0)).isEqualTo(DataTypes.TEXT);
+    assertThat(personType.getFieldTypes().get(1)).isEqualTo(DataTypes.TEXT);
+    UserDefinedType addressType = ((UserDefinedType) personType.getFieldTypes().get(2));
+    assertThat(addressType.getKeyspace().asInternal()).isEqualTo("ks");
+    assertThat(addressType.getName().asInternal()).isEqualTo("address");
+    assertThat(addressType.getFieldNames())
+        .containsExactly(
+            CqlIdentifier.fromInternal("street"), CqlIdentifier.fromInternal("zipcode"));
   }
 
   @Test
   public void should_parse_empty_list() {
-    assertThat(parser.parse(Collections.emptyList())).isEmpty();
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
+    assertThat(parser.parse(KEYSPACE_ID /* no types*/)).isEmpty();
   }
 
   @Test
   public void should_parse_singleton_list() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
-        parser.parse(mockTypeRow("ks", "t", ImmutableList.of("i"), ImmutableList.of("int")));
+        parser.parse(
+            KEYSPACE_ID, mockTypeRow("ks", "t", ImmutableList.of("i"), ImmutableList.of("int")));
 
     assertThat(types).hasSize(1);
     UserDefinedType type = types.get(CqlIdentifier.fromInternal("t"));
@@ -74,22 +127,11 @@ public class TypeListParserTest extends SchemaParserTestBase {
   }
 
   @Test
-  public void should_resolve_direct_dependency() {
-    Map<CqlIdentifier, UserDefinedType> types =
-        parser.parse(
-            mockTypeRow("ks", "a", ImmutableList.of("b"), ImmutableList.of("b")),
-            mockTypeRow("ks", "b", ImmutableList.of("i"), ImmutableList.of("int")));
-
-    assertThat(types).hasSize(2);
-    UserDefinedType aType = types.get(CqlIdentifier.fromInternal("a"));
-    UserDefinedType bType = types.get(CqlIdentifier.fromInternal("b"));
-    assertThat(aType.getFieldTypes().get(0)).isEqualTo(bType);
-  }
-
-  @Test
   public void should_resolve_list_dependency() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
         parser.parse(
+            KEYSPACE_ID,
             mockTypeRow(
                 "ks", "a", ImmutableList.of("bs"), ImmutableList.of("frozen<list<frozen<b>>>")),
             mockTypeRow("ks", "b", ImmutableList.of("i"), ImmutableList.of("int")));
@@ -102,8 +144,10 @@ public class TypeListParserTest extends SchemaParserTestBase {
 
   @Test
   public void should_resolve_set_dependency() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
         parser.parse(
+            KEYSPACE_ID,
             mockTypeRow(
                 "ks", "a", ImmutableList.of("bs"), ImmutableList.of("frozen<set<frozen<b>>>")),
             mockTypeRow("ks", "b", ImmutableList.of("i"), ImmutableList.of("int")));
@@ -116,8 +160,10 @@ public class TypeListParserTest extends SchemaParserTestBase {
 
   @Test
   public void should_resolve_map_dependency() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
         parser.parse(
+            KEYSPACE_ID,
             mockTypeRow(
                 "ks",
                 "a1",
@@ -140,8 +186,10 @@ public class TypeListParserTest extends SchemaParserTestBase {
 
   @Test
   public void should_resolve_tuple_dependency() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
         parser.parse(
+            KEYSPACE_ID,
             mockTypeRow(
                 "ks",
                 "a",
@@ -158,8 +206,10 @@ public class TypeListParserTest extends SchemaParserTestBase {
 
   @Test
   public void should_resolve_nested_dependency() {
+    UserDefinedTypeParser parser = new UserDefinedTypeParser(new DataTypeCqlNameParser(), context);
     Map<CqlIdentifier, UserDefinedType> types =
         parser.parse(
+            KEYSPACE_ID,
             mockTypeRow(
                 "ks",
                 "a",

@@ -16,10 +16,8 @@
 package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
-import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
@@ -28,6 +26,7 @@ import com.google.common.collect.Multimap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,13 +36,8 @@ import org.slf4j.LoggerFactory;
  */
 public class SchemaRows {
 
-  /** The node we got the data from */
-  public final Node node;
-
-  public final SchemaRefreshRequest request;
-  /** @see SchemaQueries#tableNameColumn() */
-  public final String tableNameColumn;
-
+  public final boolean isCassandraV3;
+  public final CompletionStage<Metadata> refreshFuture;
   public final List<AdminRow> keyspaces;
   public final Multimap<CqlIdentifier, AdminRow> tables;
   public final Multimap<CqlIdentifier, AdminRow> views;
@@ -54,9 +48,8 @@ public class SchemaRows {
   public final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> indexes;
 
   private SchemaRows(
-      Node node,
-      SchemaRefreshRequest request,
-      String tableNameColumn,
+      boolean isCassandraV3,
+      CompletionStage<Metadata> refreshFuture,
       List<AdminRow> keyspaces,
       Multimap<CqlIdentifier, AdminRow> tables,
       Multimap<CqlIdentifier, AdminRow> views,
@@ -65,9 +58,8 @@ public class SchemaRows {
       Multimap<CqlIdentifier, AdminRow> types,
       Multimap<CqlIdentifier, AdminRow> functions,
       Multimap<CqlIdentifier, AdminRow> aggregates) {
-    this.node = node;
-    this.request = request;
-    this.tableNameColumn = tableNameColumn;
+    this.isCassandraV3 = isCassandraV3;
+    this.refreshFuture = refreshFuture;
     this.keyspaces = keyspaces;
     this.tables = tables;
     this.views = views;
@@ -81,8 +73,8 @@ public class SchemaRows {
   public static class Builder {
     private static final Logger LOG = LoggerFactory.getLogger(Builder.class);
 
-    private final Node node;
-    private final SchemaRefreshRequest request;
+    private final boolean isCassandraV3;
+    private final CompletionStage<Metadata> refreshFuture;
     private final String tableNameColumn;
     private final String logPrefix;
     private final ImmutableList.Builder<AdminRow> keyspacesBuilder = ImmutableList.builder();
@@ -102,11 +94,11 @@ public class SchemaRows {
         indexesBuilders = new LinkedHashMap<>();
 
     public Builder(
-        Node node, SchemaRefreshRequest request, String tableNameColumn, String logPrefix) {
-      this.node = node;
-      this.request = request;
-      this.tableNameColumn = tableNameColumn;
+        boolean isCassandraV3, CompletionStage<Metadata> refreshFuture, String logPrefix) {
+      this.isCassandraV3 = isCassandraV3;
+      this.refreshFuture = refreshFuture;
       this.logPrefix = logPrefix;
+      this.tableNameColumn = isCassandraV3 ? "table_name" : "columnfamily_name";
     }
 
     public Builder withKeyspaces(Iterable<AdminRow> rows) {
@@ -191,30 +183,12 @@ public class SchemaRows {
     }
 
     public SchemaRows build() {
-      ImmutableMultimap<CqlIdentifier, AdminRow> tables = tablesBuilder.build();
-      ImmutableMultimap<CqlIdentifier, AdminRow> views = viewsBuilder.build();
-
-      // Single view notifications are issued with the TABLE scope, now that we have the rows we can
-      // check which it actually is.
-      SchemaRefreshRequest adjustedRequest = request;
-      if (request.scope == SchemaChangeScope.TABLE) {
-        if (tables.size() + views.size() != 1) {
-          throw new IllegalStateException(
-              String.format(
-                  "Processing TABLE or VIEW refresh, expected exactly one row but found %d table(s) and %d view(s)",
-                  tables.size(), views.size()));
-        }
-        if (tables.isEmpty()) {
-          adjustedRequest = request.copy(SchemaChangeScope.VIEW);
-        }
-      }
       return new SchemaRows(
-          node,
-          adjustedRequest,
-          tableNameColumn,
+          isCassandraV3,
+          refreshFuture,
           keyspacesBuilder.build(),
-          tables,
-          views,
+          tablesBuilder.build(),
+          viewsBuilder.build(),
           build(columnsBuilders),
           build(indexesBuilders),
           typesBuilder.build(),

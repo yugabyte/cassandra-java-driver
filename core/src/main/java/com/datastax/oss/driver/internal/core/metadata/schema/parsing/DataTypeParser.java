@@ -20,6 +20,9 @@ import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.ShallowUserDefinedType;
+import com.google.common.collect.ImmutableList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /** Parses data types from their string representation in schema tables. */
@@ -35,8 +38,24 @@ interface DataTypeParser {
    *     resolved in a second pass.
    */
   DataType parse(
-      String toParse,
       CqlIdentifier keyspaceId,
+      String toParse,
       Map<CqlIdentifier, UserDefinedType> userTypes,
       InternalDriverContext context);
+
+  default List<DataType> parse(
+      CqlIdentifier keyspaceId,
+      List<String> typeStrings,
+      Map<CqlIdentifier, UserDefinedType> userTypes,
+      InternalDriverContext context) {
+    if (typeStrings.isEmpty()) {
+      return Collections.emptyList();
+    } else {
+      ImmutableList.Builder<DataType> builder = ImmutableList.builder();
+      for (String typeString : typeStrings) {
+        builder.add(parse(keyspaceId, typeString, userTypes, context));
+      }
+      return builder.build();
+    }
+  }
 }

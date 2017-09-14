@@ -15,27 +15,17 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
-import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FunctionRefresh;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.Arrays;
+import java.util.Collections;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserFunctionTest extends SchemaParserTestBase {
+public class FunctionParserTest extends SchemaParserTestBase {
 
   private static final AdminRow ID_ROW_2_2 =
       mockFunctionRow(
@@ -59,34 +49,12 @@ public class SchemaParserFunctionTest extends SchemaParserTestBase {
           "java",
           "int");
 
-  private static final SchemaRefreshRequest REQUEST =
-      new SchemaRefreshRequest(
-          SchemaChangeType.UPDATED,
-          SchemaChangeScope.FUNCTION,
-          "ks",
-          "id",
-          ImmutableList.of("int"));
-
-  @Test
-  public void should_skip_when_no_rows() {
-    assertThat(parse(REQUEST /*no rows*/)).isNull();
-  }
-
-  @Test
-  public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(REQUEST, ID_ROW_3_0)).isNull();
-  }
-
   @Test
   public void should_parse_modern_table() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
+    FunctionParser parser = new FunctionParser(new DataTypeCqlNameParser(), context);
+    FunctionMetadata function =
+        parser.parseFunction(ID_ROW_3_0, KEYSPACE_ID, Collections.emptyMap());
 
-    FunctionRefresh refresh = (FunctionRefresh) parse(REQUEST, ID_ROW_3_0);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    FunctionMetadata function = refresh.newElement;
     assertThat(function.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(function.getSignature().getName().asInternal()).isEqualTo("id");
     assertThat(function.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -99,16 +67,10 @@ public class SchemaParserFunctionTest extends SchemaParserTestBase {
 
   @Test
   public void should_parse_legacy_table() {
-    Mockito.when(node.getCassandraVersion()).thenReturn(CassandraVersion.V2_2_0);
+    FunctionParser parser = new FunctionParser(new DataTypeClassNameParser(), context);
+    FunctionMetadata function =
+        parser.parseFunction(ID_ROW_2_2, KEYSPACE_ID, Collections.emptyMap());
 
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
-
-    FunctionRefresh refresh = (FunctionRefresh) parse(REQUEST, ID_ROW_2_2);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    FunctionMetadata function = refresh.newElement;
     assertThat(function.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(function.getSignature().getName().asInternal()).isEqualTo("id");
     assertThat(function.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -117,13 +79,5 @@ public class SchemaParserFunctionTest extends SchemaParserTestBase {
     assertThat(function.isCalledOnNullInput()).isFalse();
     assertThat(function.getLanguage()).isEqualTo("java");
     assertThat(function.getReturnType()).isEqualTo(DataTypes.INT);
-  }
-
-  private MetadataRefresh parse(SchemaRefreshRequest request, AdminRow... functionRows) {
-    SchemaRows rows =
-        new SchemaRows.Builder(node, request, "table_name", "test")
-            .withFunctions(Arrays.asList(functionRows))
-            .build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
   }
 }

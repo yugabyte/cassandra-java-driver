@@ -21,24 +21,30 @@ import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultFunctionMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FunctionRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class FunctionParser extends SchemaSingleRowElementParser<FunctionMetadata> {
+class FunctionParser {
 
   private static final Logger LOG = LoggerFactory.getLogger(FunctionParser.class);
 
-  FunctionParser(SchemaParser parent) {
-    super(parent, parent.rows.functions);
+  private final DataTypeParser dataTypeParser;
+  private final InternalDriverContext context;
+  private final String logPrefix;
+
+  FunctionParser(DataTypeParser dataTypeParser, InternalDriverContext context) {
+    this.dataTypeParser = dataTypeParser;
+    this.context = context;
+    this.logPrefix = context.clusterName();
   }
 
-  @Override
-  FunctionMetadata parseRow(
+  FunctionMetadata parseFunction(
       AdminRow row,
       CqlIdentifier keyspaceId,
       Map<CqlIdentifier, UserDefinedType> userDefinedTypes) {
@@ -69,7 +75,9 @@ class FunctionParser extends SchemaSingleRowElementParser<FunctionMetadata> {
     //     PRIMARY KEY (keyspace_name, function_name, argument_types)
     // ) WITH CLUSTERING ORDER BY (function_name ASC, argument_types ASC)
     String simpleName = row.getString("function_name");
-    List<CqlIdentifier> argumentNames = toCqlIdentifiers(row.getListOfString("argument_names"));
+    List<CqlIdentifier> argumentNames =
+        ImmutableList.copyOf(
+            Lists.transform(row.getListOfString("argument_names"), CqlIdentifier::fromInternal));
     List<String> argumentTypes = row.getListOfString("argument_types");
     if (argumentNames.size() != argumentTypes.size()) {
       LOG.warn(
@@ -85,18 +93,14 @@ class FunctionParser extends SchemaSingleRowElementParser<FunctionMetadata> {
     FunctionSignature signature =
         new FunctionSignature(
             CqlIdentifier.fromInternal(simpleName),
-            parseDataTypes(argumentTypes, keyspaceId, userDefinedTypes));
+            dataTypeParser.parse(keyspaceId, argumentTypes, userDefinedTypes, context));
     String body = row.getString("body");
     Boolean calledOnNullInput = row.getBoolean("called_on_null_input");
     String language = row.getString("language");
-    DataType returnType = parseDataType(row.getString("return_type"), keyspaceId, userDefinedTypes);
+    DataType returnType =
+        dataTypeParser.parse(keyspaceId, row.getString("return_type"), userDefinedTypes, context);
 
     return new DefaultFunctionMetadata(
         keyspaceId, signature, argumentNames, body, calledOnNullInput, language, returnType);
-  }
-
-  @Override
-  SchemaRefresh newRefresh(FunctionMetadata function) {
-    return new FunctionRefresh(currentMetadata, rows.request, function, logPrefix);
   }
 }

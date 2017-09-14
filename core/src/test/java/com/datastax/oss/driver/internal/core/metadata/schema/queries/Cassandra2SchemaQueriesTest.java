@@ -15,267 +15,32 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
+import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
-import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
-import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
-import com.google.common.collect.ImmutableList;
-import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.LinkedBlockingDeque;
-import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
+// Note: we don't repeat the other tests in Cassandra3SchemaQueriesTest because the logic is
+// shared, this class just validates the query strings.
 public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
 
-  private SchemaQueriesWithMockedChannel queries;
-
-  @Before
-  public void setup() {
-    super.setup();
-    queries = new SchemaQueriesWithMockedChannel(driverChannel, node, config, "test");
-  }
-
   @Test
-  public void should_query_type() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null));
+  public void should_query() {
+    Mockito.when(config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES))
+        .thenReturn(false);
 
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_usertypes "
-                + "WHERE keyspace_name = 'ks' AND type_name = 'type'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "type_name", "type")));
+    SchemaQueriesWithMockedChannel queries =
+        new SchemaQueriesWithMockedChannel(driverChannel, null, config, "test");
 
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.request.type).isEqualTo(SchemaChangeType.UPDATED);
-              assertThat(rows.types.keySet()).containsOnly(KS_ID);
-              assertThat(rows.types.get(KS_ID)).hasSize(1);
-              assertThat(rows.types.get(KS_ID).iterator().next().getString("type_name"))
-                  .isEqualTo("type");
-            });
-  }
-
-  @Test
-  public void should_query_function() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED,
-                SchemaChangeScope.FUNCTION,
-                "ks",
-                "add",
-                ImmutableList.of("int", "int")));
-
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_functions "
-                + "WHERE keyspace_name = 'ks' AND function_name = 'add' "
-                + "AND signature = ['int','int']");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "function_name", "add")));
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.functions.keySet()).containsOnly(KS_ID);
-              assertThat(rows.functions.get(KS_ID)).hasSize(1);
-              assertThat(rows.functions.get(KS_ID).iterator().next().getString("function_name"))
-                  .isEqualTo("add");
-            });
-  }
-
-  @Test
-  public void should_query_aggregate() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED,
-                SchemaChangeScope.AGGREGATE,
-                "ks",
-                "add",
-                ImmutableList.of("int", "int")));
-
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_aggregates "
-                + "WHERE keyspace_name = 'ks' AND aggregate_name = 'add' "
-                + "AND signature = ['int','int']");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "aggregate_name", "add")));
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.aggregates.keySet()).containsOnly(KS_ID);
-              assertThat(rows.aggregates.get(KS_ID)).hasSize(1);
-              assertThat(rows.aggregates.get(KS_ID).iterator().next().getString("aggregate_name"))
-                  .isEqualTo("add");
-            });
-  }
-
-  @Test
-  public void should_query_table() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null));
-
-    // Table
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_columnfamilies "
-                + "WHERE keyspace_name = 'ks' AND columnfamily_name = 'foo'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "columnfamily_name", "foo")));
-
-    // Columns
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_columns "
-                + "WHERE keyspace_name = 'ks' AND columnfamily_name = 'foo'");
-    call.result.complete(
-        mockResult(mockRow("keyspace_name", "ks", "columnfamily_name", "foo", "column_name", "k")));
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
-              assertThat(rows.tables.get(KS_ID)).hasSize(1);
-              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
-                  .isEqualTo("foo");
-
-              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
-              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
-              assertThat(
-                      rows.columns
-                          .get(KS_ID)
-                          .get(FOO_ID)
-                          .iterator()
-                          .next()
-                          .getString("column_name"))
-                  .isEqualTo("k");
-            });
-  }
-
-  @Test
-  public void should_query_keyspace() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null));
-
-    // Keyspace
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_keyspaces WHERE keyspace_name = 'ks'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks")));
-
-    // Types
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_usertypes WHERE keyspace_name = 'ks'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "type_name", "type")));
-
-    // Tables
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = 'ks'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "columnfamily_name", "foo")));
-
-    // Columns
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_columns WHERE keyspace_name = 'ks'");
-    call.result.complete(
-        mockResult(mockRow("keyspace_name", "ks", "columnfamily_name", "foo", "column_name", "k")));
-
-    // Functions
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_functions WHERE keyspace_name = 'ks'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "function_name", "add")));
-
-    // Aggregates
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo("SELECT * FROM system.schema_aggregates WHERE keyspace_name = 'ks'");
-    call.result.complete(mockResult(mockRow("keyspace_name", "ks", "aggregate_name", "add")));
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              // Keyspace
-              assertThat(rows.keyspaces).hasSize(1);
-              assertThat(rows.keyspaces.get(0).getString("keyspace_name")).isEqualTo("ks");
-
-              // Types
-              assertThat(rows.types.keySet()).containsOnly(KS_ID);
-              assertThat(rows.types.get(KS_ID)).hasSize(1);
-              assertThat(rows.types.get(KS_ID).iterator().next().getString("type_name"))
-                  .isEqualTo("type");
-
-              // Tables
-              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
-              assertThat(rows.tables.get(KS_ID)).hasSize(1);
-              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
-                  .isEqualTo("foo");
-
-              // Rows
-              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
-              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
-              assertThat(
-                      rows.columns
-                          .get(KS_ID)
-                          .get(FOO_ID)
-                          .iterator()
-                          .next()
-                          .getString("column_name"))
-                  .isEqualTo("k");
-
-              // Functions
-              assertThat(rows.functions.keySet()).containsOnly(KS_ID);
-              assertThat(rows.functions.get(KS_ID)).hasSize(1);
-              assertThat(rows.functions.get(KS_ID).iterator().next().getString("function_name"))
-                  .isEqualTo("add");
-
-              // Aggregates
-              assertThat(rows.aggregates.keySet()).containsOnly(KS_ID);
-              assertThat(rows.aggregates.get(KS_ID)).hasSize(1);
-              assertThat(rows.aggregates.get(KS_ID).iterator().next().getString("aggregate_name"))
-                  .isEqualTo("add");
-            });
-  }
-
-  @Test
-  public void should_query_full_schema() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, null, null, null));
+    CompletionStage<SchemaRows> result = queries.execute();
 
     // Keyspace
     Call call = queries.calls.poll();
@@ -358,103 +123,17 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
             });
   }
 
-  @Test
-  public void should_query_with_paging() {
-    // We're cheating a bit to simplify the test: in real life a type query would always return at
-    // most one row, queries can only be paged for full schema, keyspace or table (via its columns).
-    // But those scenarios require more queries to mock, so use type instead (the underlying logic
-    // is shared).
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null));
-
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_usertypes "
-                + "WHERE keyspace_name = 'ks' AND type_name = 'type'");
-    AdminResult page2 = mockResult(mockRow("keyspace_name", "ks", "type_name", "type2"));
-    AdminResult page1 = mockResult(page2, mockRow("keyspace_name", "ks", "type_name", "type1"));
-    call.result.complete(page1);
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.types.keySet()).containsOnly(KS_ID);
-              assertThat(rows.types.get(KS_ID)).hasSize(2);
-              Iterator<AdminRow> iterator = rows.types.get(KS_ID).iterator();
-              assertThat(iterator.next().getString("type_name")).isEqualTo("type1");
-              assertThat(iterator.next().getString("type_name")).isEqualTo("type2");
-            });
-  }
-
-  @Test
-  public void should_ignore_malformed_rows() {
-    CompletionStage<SchemaRows> result =
-        queries.execute(
-            new SchemaRefreshRequest(
-                SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null));
-
-    // Table
-    Call call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_columnfamilies "
-                + "WHERE keyspace_name = 'ks' AND columnfamily_name = 'foo'");
-    call.result.complete(
-        mockResult(
-            mockRow("keyspace_name", "ks", "columnfamily_name", "foo"),
-            // Missing keyspace name:
-            mockRow("columnfamily_name", "foo")));
-
-    // Columns
-    call = queries.calls.poll();
-    assertThat(call.query)
-        .isEqualTo(
-            "SELECT * FROM system.schema_columns "
-                + "WHERE keyspace_name = 'ks' AND columnfamily_name = 'foo'");
-    call.result.complete(
-        mockResult(
-            mockRow("keyspace_name", "ks", "columnfamily_name", "foo", "column_name", "k"),
-            // Missing keyspace name:
-            mockRow("columnfamily_name", "foo", "column_name", "k"),
-            // Missing column family name:
-            mockRow("keyspace_name", "ks", "column_name", "k")));
-
-    channel.runPendingTasks();
-
-    assertThat(result)
-        .isSuccess(
-            rows -> {
-              assertThat(rows.tables.keySet()).containsOnly(KS_ID);
-              assertThat(rows.tables.get(KS_ID)).hasSize(1);
-              assertThat(rows.tables.get(KS_ID).iterator().next().getString("columnfamily_name"))
-                  .isEqualTo("foo");
-
-              assertThat(rows.columns.keySet()).containsOnly(KS_ID);
-              assertThat(rows.columns.get(KS_ID).keySet()).containsOnly(FOO_ID);
-              assertThat(
-                      rows.columns
-                          .get(KS_ID)
-                          .get(FOO_ID)
-                          .iterator()
-                          .next()
-                          .getString("column_name"))
-                  .isEqualTo("k");
-            });
-  }
-
   /** Extends the class under test to mock the query execution logic. */
   static class SchemaQueriesWithMockedChannel extends Cassandra2SchemaQueries {
 
     final Queue<Call> calls = new LinkedBlockingDeque<>();
 
     SchemaQueriesWithMockedChannel(
-        DriverChannel channel, Node node, DriverConfigProfile config, String logPrefix) {
-      super(channel, node, config, logPrefix);
+        DriverChannel channel,
+        CompletionStage<Metadata> refreshFuture,
+        DriverConfigProfile config,
+        String logPrefix) {
+      super(channel, refreshFuture, config, logPrefix);
     }
 
     @Override

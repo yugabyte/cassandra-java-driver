@@ -22,22 +22,23 @@ import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultAggregateMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.AggregateRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-class AggregateParser extends SchemaSingleRowElementParser<AggregateMetadata> {
+class AggregateParser {
+  private final DataTypeParser dataTypeParser;
+  private final InternalDriverContext context;
 
-  AggregateParser(SchemaParser parent) {
-    super(parent, parent.rows.aggregates);
+  AggregateParser(DataTypeParser dataTypeParser, InternalDriverContext context) {
+    this.dataTypeParser = dataTypeParser;
+    this.context = context;
   }
 
-  @Override
-  AggregateMetadata parseRow(
+  AggregateMetadata parseAggregate(
       AdminRow row,
       CqlIdentifier keyspaceId,
       Map<CqlIdentifier, UserDefinedType> userDefinedTypes) {
@@ -72,9 +73,10 @@ class AggregateParser extends SchemaSingleRowElementParser<AggregateMetadata> {
     FunctionSignature signature =
         new FunctionSignature(
             CqlIdentifier.fromInternal(simpleName),
-            parseDataTypes(argumentTypes, keyspaceId, userDefinedTypes));
+            dataTypeParser.parse(keyspaceId, argumentTypes, userDefinedTypes, context));
 
-    DataType stateType = parseDataType(row.getString("state_type"), keyspaceId, userDefinedTypes);
+    DataType stateType =
+        dataTypeParser.parse(keyspaceId, row.getString("state_type"), userDefinedTypes, context);
     TypeCodec<Object> stateTypeCodec = context.codecRegistry().codecFor(stateType);
 
     String stateFuncSimpleName = row.getString("state_func");
@@ -92,7 +94,8 @@ class AggregateParser extends SchemaSingleRowElementParser<AggregateMetadata> {
             ? null
             : new FunctionSignature(CqlIdentifier.fromInternal(finalFuncSimpleName), stateType);
 
-    DataType returnType = parseDataType(row.getString("return_type"), keyspaceId, userDefinedTypes);
+    DataType returnType =
+        dataTypeParser.parse(keyspaceId, row.getString("return_type"), userDefinedTypes, context);
 
     Object initCond;
     if (row.isString("initcond")) { // Cassandra 3
@@ -114,10 +117,5 @@ class AggregateParser extends SchemaSingleRowElementParser<AggregateMetadata> {
         stateFuncSignature,
         stateType,
         stateTypeCodec);
-  }
-
-  @Override
-  SchemaRefresh newRefresh(AggregateMetadata aggregate) {
-    return new AggregateRefresh(currentMetadata, rows.request, aggregate, logPrefix);
   }
 }

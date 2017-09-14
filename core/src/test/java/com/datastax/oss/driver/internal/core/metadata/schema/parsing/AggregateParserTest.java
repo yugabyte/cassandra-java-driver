@@ -15,32 +15,22 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.api.core.CassandraVersion;
-import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.metadata.schema.AggregateMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
-import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.AggregateRefresh;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.Arrays;
+import java.util.Collections;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserAggregateTest extends SchemaParserTestBase {
+public class AggregateParserTest extends SchemaParserTestBase {
 
   private static final AdminRow SUM_AND_TO_STRING_ROW_2_2 =
       mockAggregateRow(
@@ -64,41 +54,18 @@ public class SchemaParserAggregateTest extends SchemaParserTestBase {
           "text",
           "0");
 
-  private static final SchemaRefreshRequest REQUEST =
-      new SchemaRefreshRequest(
-          SchemaChangeType.UPDATED,
-          SchemaChangeScope.AGGREGATE,
-          "ks",
-          "sum_and_to_string",
-          ImmutableList.of("int"));
-
   @Before
   public void setup() {
-    super.setup();
     Mockito.when(context.codecRegistry()).thenReturn(new DefaultCodecRegistry("test"));
     Mockito.when(context.protocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
   }
 
   @Test
-  public void should_skip_when_no_rows() {
-    assertThat(parse(REQUEST /*no rows*/)).isNull();
-  }
-
-  @Test
-  public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(REQUEST, SUM_AND_TO_STRING_ROW_3_0)).isNull();
-  }
-
-  @Test
   public void should_parse_modern_table() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
+    AggregateParser parser = new AggregateParser(new DataTypeCqlNameParser(), context);
+    AggregateMetadata aggregate =
+        parser.parseAggregate(SUM_AND_TO_STRING_ROW_3_0, KEYSPACE_ID, Collections.emptyMap());
 
-    AggregateRefresh refresh = (AggregateRefresh) parse(REQUEST, SUM_AND_TO_STRING_ROW_3_0);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    AggregateMetadata aggregate = refresh.newElement;
     assertThat(aggregate.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(aggregate.getSignature().getName().asInternal()).isEqualTo("sum_and_to_string");
     assertThat(aggregate.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -119,16 +86,10 @@ public class SchemaParserAggregateTest extends SchemaParserTestBase {
 
   @Test
   public void should_parse_legacy_table() {
-    Mockito.when(node.getCassandraVersion()).thenReturn(CassandraVersion.V2_2_0);
+    AggregateParser parser = new AggregateParser(new DataTypeClassNameParser(), context);
+    AggregateMetadata aggregate =
+        parser.parseAggregate(SUM_AND_TO_STRING_ROW_2_2, KEYSPACE_ID, Collections.emptyMap());
 
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
-
-    AggregateRefresh refresh = (AggregateRefresh) parse(REQUEST, SUM_AND_TO_STRING_ROW_2_2);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    AggregateMetadata aggregate = refresh.newElement;
     assertThat(aggregate.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(aggregate.getSignature().getName().asInternal()).isEqualTo("sum_and_to_string");
     assertThat(aggregate.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -145,13 +106,5 @@ public class SchemaParserAggregateTest extends SchemaParserTestBase {
     assertThat(aggregate.getReturnType()).isEqualTo(DataTypes.TEXT);
 
     assertThat(aggregate.getInitCond()).isInstanceOf(Integer.class).isEqualTo(0);
-  }
-
-  private MetadataRefresh parse(SchemaRefreshRequest request, AdminRow... aggregateRows) {
-    SchemaRows rows =
-        new SchemaRows.Builder(node, request, "table_name", "test")
-            .withAggregates(Arrays.asList(aggregateRows))
-            .build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
   }
 }

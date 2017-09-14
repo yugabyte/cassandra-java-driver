@@ -15,66 +15,148 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.api.core.CassandraVersion;
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.metadata.schema.AggregateMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
+import com.datastax.oss.driver.api.core.type.UserDefinedType;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 
 /**
  * The main entry point for system schema rows parsing.
  *
- * <p>The code for each type of row is split into {@link SchemaElementParser} subclasses; the only
- * reason for that is to keep this class reasonably short. Schema refreshes are not on the hot path
- * so creating a few extra objects shouldn't matter.
+ * <p>
+ *
+ * <p>For modularity, the code for each element row is split into separate classes (schema stuff is
+ * not on the hot path, so creating a few extra objects doesn't matter).
  */
 public class SchemaParser {
 
-  final SchemaRows rows;
-  final DefaultMetadata currentMetadata;
-  final InternalDriverContext context;
-  final String logPrefix;
-  final DataTypeParser dataTypeParser;
+  private final DefaultMetadata currentMetadata;
+  private final SchemaRows rows;
+  private final UserDefinedTypeParser userDefinedTypeParser;
+  private final TableParser tableParser;
+  private final ViewParser viewParser;
+  private final FunctionParser functionParser;
+  private final AggregateParser aggregateParser;
+  private final String logPrefix;
 
   public SchemaParser(
-      SchemaRows rows,
-      DefaultMetadata currentMetadata,
-      InternalDriverContext context,
-      String logPrefix) {
+      DefaultMetadata currentMetadata, SchemaRows rows, InternalDriverContext context) {
     this.rows = rows;
     this.currentMetadata = currentMetadata;
-    this.context = context;
-    this.logPrefix = logPrefix;
+    this.logPrefix = context.clusterName();
 
-    CassandraVersion version = rows.node.getCassandraVersion().nextStable();
-    this.dataTypeParser =
-        version.compareTo(CassandraVersion.V3_0_0) < 0
-            ? new DataTypeClassNameParser()
-            : new DataTypeCqlNameParser();
+    DataTypeParser dataTypeParser =
+        rows.isCassandraV3 ? new DataTypeCqlNameParser() : new DataTypeClassNameParser();
+
+    this.userDefinedTypeParser = new UserDefinedTypeParser(dataTypeParser, context);
+    this.tableParser = new TableParser(rows, dataTypeParser, context);
+    this.viewParser = new ViewParser(rows, dataTypeParser, context);
+    this.functionParser = new FunctionParser(dataTypeParser, context);
+    this.aggregateParser = new AggregateParser(dataTypeParser, context);
   }
 
-  /**
-   * @return the refresh, or {@code null} if it could not be computed (most likely due to malformed
-   *     system rows).
-   */
   public SchemaRefresh parse() {
-    switch (rows.request.scope) {
-      case FULL_SCHEMA:
-        return new FullSchemaParser(this).parse();
-      case KEYSPACE:
-        return new KeyspaceParser(this).parse();
-      case TABLE:
-        return new TableParser(this).parse();
-      case VIEW:
-        return new ViewParser(this).parse();
-      case TYPE:
-        return new UserDefinedTypeParser(this).parse();
-      case FUNCTION:
-        return new FunctionParser(this).parse();
-      case AGGREGATE:
-        return new AggregateParser(this).parse();
-      default:
-        throw new AssertionError("Unsupported schema refresh kind " + rows.request.scope);
+    ImmutableMap.Builder<CqlIdentifier, KeyspaceMetadata> keyspacesBuilder = ImmutableMap.builder();
+    for (AdminRow row : rows.keyspaces) {
+      KeyspaceMetadata keyspace = parseKeyspace(row);
+      keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
+    return new SchemaRefresh(
+        currentMetadata, rows.refreshFuture, keyspacesBuilder.build(), logPrefix);
+  }
+
+  private KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {
+
+    // Cassandra <= 2.2
+    // CREATE TABLE system.schema_keyspaces (
+    //     keyspace_name text PRIMARY KEY,
+    //     durable_writes boolean,
+    //     strategy_class text,
+    //     strategy_options text
+    // )
+    //
+    // Cassandra >= 3.0:
+    // CREATE TABLE system_schema.keyspaces (
+    //     keyspace_name text PRIMARY KEY,
+    //     durable_writes boolean,
+    //     replication frozen<map<text, text>>
+    // )
+    CqlIdentifier keyspaceId = CqlIdentifier.fromInternal(keyspaceRow.getString("keyspace_name"));
+    boolean durableWrites =
+        MoreObjects.firstNonNull(keyspaceRow.getBoolean("durable_writes"), false);
+
+    Map<String, String> replicationOptions;
+    if (keyspaceRow.contains("strategy_class")) {
+      String strategyClass = keyspaceRow.getString("strategy_class");
+      Map<String, String> strategyOptions =
+          SimpleJsonParser.parseStringMap(keyspaceRow.getString("strategy_options"));
+      replicationOptions =
+          ImmutableMap.<String, String>builder()
+              .putAll(strategyOptions)
+              .put("class", strategyClass)
+              .build();
+    } else {
+      replicationOptions = keyspaceRow.getMapOfStringToString("replication");
+    }
+
+    Map<CqlIdentifier, UserDefinedType> types =
+        userDefinedTypeParser.parse(rows.types.get(keyspaceId), keyspaceId);
+
+    ImmutableMap.Builder<CqlIdentifier, TableMetadata> tablesBuilder = ImmutableMap.builder();
+    for (AdminRow tableRow : rows.tables.get(keyspaceId)) {
+      TableMetadata table = tableParser.parseTable(tableRow, keyspaceId, types);
+      if (table != null) {
+        tablesBuilder.put(table.getName(), table);
+      }
+    }
+
+    ImmutableMap.Builder<CqlIdentifier, ViewMetadata> viewsBuilder = ImmutableMap.builder();
+    for (AdminRow viewRow : rows.views.get(keyspaceId)) {
+      ViewMetadata view = viewParser.parseView(viewRow, keyspaceId, types);
+      if (view != null) {
+        viewsBuilder.put(view.getName(), view);
+      }
+    }
+
+    ImmutableMap.Builder<FunctionSignature, FunctionMetadata> functionsBuilder =
+        ImmutableMap.builder();
+    for (AdminRow functionRow : rows.functions.get(keyspaceId)) {
+      FunctionMetadata function = functionParser.parseFunction(functionRow, keyspaceId, types);
+      if (function != null) {
+        functionsBuilder.put(function.getSignature(), function);
+      }
+    }
+
+    ImmutableMap.Builder<FunctionSignature, AggregateMetadata> aggregatesBuilder =
+        ImmutableMap.builder();
+    for (AdminRow aggregateRow : rows.aggregates.get(keyspaceId)) {
+      AggregateMetadata aggregate = aggregateParser.parseAggregate(aggregateRow, keyspaceId, types);
+      if (aggregate != null) {
+        aggregatesBuilder.put(aggregate.getSignature(), aggregate);
+      }
+    }
+
+    return new DefaultKeyspaceMetadata(
+        keyspaceId,
+        durableWrites,
+        replicationOptions,
+        types,
+        tablesBuilder.build(),
+        viewsBuilder.build(),
+        functionsBuilder.build(),
+        aggregatesBuilder.build());
   }
 }

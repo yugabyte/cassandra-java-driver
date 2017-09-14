@@ -15,8 +15,7 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.api.core.CassandraVersion;
-import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
@@ -24,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -35,14 +33,9 @@ import static org.assertj.core.api.Assertions.fail;
 @RunWith(MockitoJUnitRunner.Silent.class)
 public abstract class SchemaParserTestBase {
 
+  protected static final CqlIdentifier KEYSPACE_ID = CqlIdentifier.fromInternal("ks");
   @Mock protected DefaultMetadata currentMetadata;
   @Mock protected InternalDriverContext context;
-  @Mock protected Node node;
-
-  @Before
-  public void setup() {
-    Mockito.when(node.getCassandraVersion()).thenReturn(CassandraVersion.V3_0_0);
-  }
 
   protected static AdminRow mockFunctionRow(
       String keyspace,
@@ -296,8 +289,4 @@ public abstract class SchemaParserTestBase {
 
     return row;
   }
-
-  //  strategy_class                              | strategy_options
-  //---------------------------------------------+----------------------------
-  //  org.apache.cassandra.locator.SimpleStrategy | {"replication_factor":"1"}
 }

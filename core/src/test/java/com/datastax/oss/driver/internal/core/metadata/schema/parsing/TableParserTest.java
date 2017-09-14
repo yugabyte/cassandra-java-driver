@@ -15,33 +15,25 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexKind;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TableRefresh;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserTableTest extends SchemaParserTestBase {
+public class TableParserTest extends SchemaParserTestBase {
 
   private static final AdminRow TABLE_ROW_2_2 =
       mockLegacyTableRow(
@@ -86,34 +78,20 @@ public class SchemaParserTableTest extends SchemaParserTestBase {
       ImmutableList.of(
           mockIndexRow("ks", "foo", "foo_v_idx", "COMPOSITES", ImmutableMap.of("target", "v")));
 
-  private static final SchemaRefreshRequest REQUEST =
-      new SchemaRefreshRequest(
-          SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
-
-  @Test
-  public void should_skip_when_keyspace_unknown() {
-    assertThat(parseLegacy(REQUEST, TABLE_ROW_2_2, Collections.emptyList())).isNull();
-  }
-
   @Test
   public void should_skip_when_no_column_rows() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
+    SchemaRows rows = legacyRows(TABLE_ROW_2_2, Collections.emptyList());
+    TableParser parser = new TableParser(rows, new DataTypeClassNameParser(), context);
+    TableMetadata table = parser.parseTable(TABLE_ROW_2_2, KEYSPACE_ID, Collections.emptyMap());
 
-    assertThat(parseLegacy(REQUEST, TABLE_ROW_2_2, Collections.emptyList())).isNull();
+    assertThat(table).isNull();
   }
 
   @Test
   public void should_parse_legacy_tables() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
-
-    TableRefresh refresh = (TableRefresh) parseLegacy(REQUEST, TABLE_ROW_2_2, COLUMN_ROWS_2_2);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    TableMetadata table = refresh.newElement;
+    SchemaRows rows = legacyRows(TABLE_ROW_2_2, COLUMN_ROWS_2_2);
+    TableParser parser = new TableParser(rows, new DataTypeClassNameParser(), context);
+    TableMetadata table = parser.parseTable(TABLE_ROW_2_2, KEYSPACE_ID, Collections.emptyMap());
 
     checkTable(table);
 
@@ -123,15 +101,9 @@ public class SchemaParserTableTest extends SchemaParserTestBase {
 
   @Test
   public void should_parse_modern_tables() {
-    KeyspaceMetadata ks = Mockito.mock(KeyspaceMetadata.class);
-    Mockito.when(currentMetadata.getKeyspaces())
-        .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
-
-    TableRefresh refresh =
-        (TableRefresh) parseModern(REQUEST, TABLE_ROW_3_0, COLUMN_ROWS_3_0, INDEX_ROWS_3_0);
-    assertThat(refresh.request).isEqualTo(REQUEST);
-
-    TableMetadata table = refresh.newElement;
+    SchemaRows rows = modernRows(TABLE_ROW_3_0, COLUMN_ROWS_3_0, INDEX_ROWS_3_0);
+    TableParser parser = new TableParser(rows, new DataTypeCqlNameParser(), context);
+    TableMetadata table = parser.parseTable(TABLE_ROW_3_0, KEYSPACE_ID, Collections.emptyMap());
 
     checkTable(table);
 
@@ -190,28 +162,27 @@ public class SchemaParserTableTest extends SchemaParserTestBase {
         .containsEntry("mock_option", "1");
   }
 
-  private MetadataRefresh parseLegacy(
-      SchemaRefreshRequest request, AdminRow tableRow, Iterable<AdminRow> columnRows) {
-    Mockito.when(node.getCassandraVersion()).thenReturn(CassandraVersion.V2_2_0);
-    SchemaRows rows =
-        new SchemaRows.Builder(node, request, "columnfamily_name", "test")
-            .withTables(ImmutableList.of(tableRow))
-            .withColumns(columnRows)
-            .build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
+  private SchemaRows legacyRows(AdminRow tableRow, Iterable<AdminRow> columnRows) {
+    return rows(tableRow, columnRows, null, false);
   }
 
-  private MetadataRefresh parseModern(
-      SchemaRefreshRequest request,
+  private SchemaRows modernRows(
+      AdminRow tableRow, Iterable<AdminRow> columnRows, Iterable<AdminRow> indexesRows) {
+    return rows(tableRow, columnRows, indexesRows, true);
+  }
+
+  private SchemaRows rows(
       AdminRow tableRow,
       Iterable<AdminRow> columnRows,
-      Iterable<AdminRow> indexesRows) {
-    SchemaRows rows =
-        new SchemaRows.Builder(node, request, "table_name", "test")
+      Iterable<AdminRow> indexesRows,
+      boolean isCassandraV3) {
+    SchemaRows.Builder builder =
+        new SchemaRows.Builder(isCassandraV3, null, "test")
             .withTables(ImmutableList.of(tableRow))
-            .withColumns(columnRows)
-            .withIndexes(indexesRows)
-            .build();
-    return new SchemaParser(rows, currentMetadata, context, "test").parse();
+            .withColumns(columnRows);
+    if (indexesRows != null) {
+      builder.withIndexes(indexesRows);
+    }
+    return builder.build();
   }
 }

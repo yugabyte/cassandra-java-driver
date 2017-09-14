@@ -54,8 +54,8 @@ class DataTypeClassNameParser implements DataTypeParser {
 
   @Override
   public DataType parse(
-      String toParse,
       CqlIdentifier keyspaceId,
+      String toParse,
       Map<CqlIdentifier, UserDefinedType> userTypes,
       InternalDriverContext context) {
     boolean frozen = false;
@@ -72,20 +72,20 @@ class DataTypeClassNameParser implements DataTypeParser {
 
     if (next.startsWith("org.apache.cassandra.db.marshal.ListType")) {
       DataType elementType =
-          parse(parser.getTypeParameters().get(0), keyspaceId, userTypes, context);
+          parse(keyspaceId, parser.getTypeParameters().get(0), userTypes, context);
       return DataTypes.listOf(elementType, frozen);
     }
 
     if (next.startsWith("org.apache.cassandra.db.marshal.SetType")) {
       DataType elementType =
-          parse(parser.getTypeParameters().get(0), keyspaceId, userTypes, context);
+          parse(keyspaceId, parser.getTypeParameters().get(0), userTypes, context);
       return DataTypes.setOf(elementType, frozen);
     }
 
     if (next.startsWith("org.apache.cassandra.db.marshal.MapType")) {
       List<String> parameters = parser.getTypeParameters();
-      DataType keyType = parse(parameters.get(0), keyspaceId, userTypes, context);
-      DataType valueType = parse(parameters.get(1), keyspaceId, userTypes, context);
+      DataType keyType = parse(keyspaceId, parameters.get(0), userTypes, context);
+      DataType valueType = parse(keyspaceId, parameters.get(1), userTypes, context);
       return DataTypes.mapOf(keyType, valueType, frozen);
     }
 
@@ -114,7 +114,7 @@ class DataTypeClassNameParser implements DataTypeParser {
         parser.skipBlankAndComma();
         for (Map.Entry<String, String> entry : nameAndTypeParameters.entrySet()) {
           CqlIdentifier fieldName = CqlIdentifier.fromInternal(entry.getKey());
-          DataType fieldType = parse(entry.getValue(), keyspaceId, userTypes, context);
+          DataType fieldType = parse(keyspaceId, entry.getValue(), userTypes, context);
           builder.withField(fieldName, fieldType);
         }
         // create a frozen UserType since C* 2.x UDTs are always frozen.
@@ -126,7 +126,7 @@ class DataTypeClassNameParser implements DataTypeParser {
       List<String> rawTypes = parser.getTypeParameters();
       ImmutableList.Builder<DataType> componentTypesBuilder = ImmutableList.builder();
       for (String rawType : rawTypes) {
-        componentTypesBuilder.add(parse(rawType, keyspaceId, userTypes, context));
+        componentTypesBuilder.add(parse(keyspaceId, rawType, userTypes, context));
       }
       return new DefaultTupleType(componentTypesBuilder.build(), context);
     }

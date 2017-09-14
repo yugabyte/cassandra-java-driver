@@ -36,7 +36,7 @@ class DataTypeClassNameCompositeParser extends DataTypeClassNameParser {
 
     String next = parser.parseNextName();
     if (!isComposite(next)) {
-      return new ParseResult(parse(className, keyspaceId, userTypes, context), isReversed(next));
+      return new ParseResult(parse(keyspaceId, className, userTypes, context), isReversed(next));
     }
 
     List<String> subClassNames = parser.getTypeParameters();
@@ -49,14 +49,14 @@ class DataTypeClassNameCompositeParser extends DataTypeClassNameParser {
       collectionParser.parseNextName(); // skips columnToCollectionType
       Map<String, String> params = collectionParser.getCollectionsParameters();
       for (Map.Entry<String, String> entry : params.entrySet()) {
-        collections.put(entry.getKey(), parse(entry.getValue(), keyspaceId, userTypes, context));
+        collections.put(entry.getKey(), parse(keyspaceId, entry.getValue(), userTypes, context));
       }
     }
 
     List<DataType> types = new ArrayList<>(count);
     List<Boolean> reversed = new ArrayList<>(count);
     for (int i = 0; i < count; i++) {
-      types.add(parse(subClassNames.get(i), keyspaceId, userTypes, context));
+      types.add(parse(keyspaceId, subClassNames.get(i), userTypes, context));
       reversed.add(isReversed(subClassNames.get(i)));
     }
 

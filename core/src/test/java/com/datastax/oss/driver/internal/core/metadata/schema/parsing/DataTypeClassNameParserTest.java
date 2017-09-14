@@ -22,7 +22,6 @@ import com.datastax.oss.driver.api.core.type.SetType;
 import com.datastax.oss.driver.api.core.type.TupleType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.schema.parsing.DataTypeClassNameParser;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.Before;
@@ -175,6 +174,6 @@ public class DataTypeClassNameParserTest {
   }
 
   private DataType parse(String toParse, Map<CqlIdentifier, UserDefinedType> existingTypes) {
-    return parser.parse(toParse, KEYSPACE_ID, existingTypes, context);
+    return parser.parse(KEYSPACE_ID, toParse, existingTypes, context);
   }
 }

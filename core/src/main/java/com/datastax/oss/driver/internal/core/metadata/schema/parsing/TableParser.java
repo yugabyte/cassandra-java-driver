@@ -20,18 +20,18 @@ import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexKind;
 import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.ListType;
 import com.datastax.oss.driver.api.core.type.MapType;
 import com.datastax.oss.driver.api.core.type.SetType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultColumnMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultIndexMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultTableMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TableRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
@@ -49,37 +49,11 @@ class TableParser extends RelationParser {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableParser.class);
 
-  TableParser(SchemaParser parent) {
-    super(parent);
+  TableParser(SchemaRows rows, DataTypeParser dataTypeParser, InternalDriverContext context) {
+    super(rows, dataTypeParser, context);
   }
 
-  /** Called when the whole refresh is a single table. */
-  SchemaRefresh parse() {
-    Map.Entry<CqlIdentifier, AdminRow> tableEntry = rows.tables.entries().iterator().next();
-    CqlIdentifier keyspaceId = tableEntry.getKey();
-    AdminRow tableRow = tableEntry.getValue();
-
-    KeyspaceMetadata keyspace = currentMetadata.getKeyspaces().get(keyspaceId);
-    if (keyspace == null) {
-      LOG.warn(
-          "[{}] Processing {} refresh for {}.{} but that keyspace is unknown, skipping",
-          logPrefix,
-          rows.request.scope,
-          keyspaceId,
-          tableRow.getString(rows.tableNameColumn));
-      return null;
-    }
-    DefaultTableMetadata table = parseTable(tableRow, keyspaceId, keyspace.getUserDefinedTypes());
-    return (table == null)
-        ? null
-        : new TableRefresh(currentMetadata, rows.request, table, logPrefix);
-  }
-
-  /**
-   * Called by {@link #parse()}, or directly if this row is part of a full schema or keyspace
-   * refresh.
-   */
-  DefaultTableMetadata parseTable(
+  TableMetadata parseTable(
       AdminRow tableRow, CqlIdentifier keyspaceId, Map<CqlIdentifier, UserDefinedType> userTypes) {
     // Cassandra <= 2.2:
     // CREATE TABLE system.schema_columnfamilies (
@@ -140,7 +114,9 @@ class TableParser extends RelationParser {
     //     speculative_retry text,
     //     PRIMARY KEY (keyspace_name, table_name)
     // ) WITH CLUSTERING ORDER BY (table_name ASC)
-    CqlIdentifier tableId = CqlIdentifier.fromInternal(tableRow.getString(rows.tableNameColumn));
+    CqlIdentifier tableId =
+        CqlIdentifier.fromInternal(
+            tableRow.getString(rows.isCassandraV3 ? "table_name" : "columnfamily_name"));
 
     UUID uuid = (tableRow.contains("id")) ? tableRow.getUuid("id") : tableRow.getUuid("cf_id");
 
@@ -190,7 +166,7 @@ class TableParser extends RelationParser {
     ImmutableMap.Builder<CqlIdentifier, IndexMetadata> indexesBuilder = ImmutableMap.builder();
 
     for (RawColumn raw : rawColumns) {
-      DataType dataType = dataTypeParser.parse(raw.dataType, keyspaceId, userTypes, context);
+      DataType dataType = dataTypeParser.parse(keyspaceId, raw.dataType, userTypes, context);
       ColumnMetadata column =
           new DefaultColumnMetadata(
               keyspaceId, tableId, raw.name, dataType, raw.kind == RawColumn.Kind.STATIC);
@@ -232,18 +208,16 @@ class TableParser extends RelationParser {
       indexesBuilder.put(index.getName(), index);
     }
 
-    DefaultTableMetadata table =
-        new DefaultTableMetadata(
-            keyspaceId,
-            tableId,
-            uuid,
-            isCompactStorage,
-            partitionKeyBuilder.build(),
-            clusteringColumnsBuilder.build(),
-            allColumnsBuilder.build(),
-            options,
-            indexesBuilder.build());
-    return table;
+    return new DefaultTableMetadata(
+        keyspaceId,
+        tableId,
+        uuid,
+        isCompactStorage,
+        partitionKeyBuilder.build(),
+        clusteringColumnsBuilder.build(),
+        allColumnsBuilder.build(),
+        options,
+        indexesBuilder.build());
   }
 
   // Upon migration from thrift to CQL, we internally create a pair of surrogate clustering/regular

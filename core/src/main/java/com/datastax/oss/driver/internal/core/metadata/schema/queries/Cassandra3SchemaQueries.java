@@ -16,14 +16,18 @@
 package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
-import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 class Cassandra3SchemaQueries extends SchemaQueries {
   Cassandra3SchemaQueries(
-      DriverChannel channel, Node node, DriverConfigProfile config, String logPrefix) {
-    super(channel, node, config, logPrefix);
+      DriverChannel channel,
+      CompletionStage<Metadata> refreshFuture,
+      DriverConfigProfile config,
+      String logPrefix) {
+    super(channel, true, refreshFuture, config, logPrefix);
   }
 
   @Override
@@ -64,15 +68,5 @@ class Cassandra3SchemaQueries extends SchemaQueries {
   @Override
   protected String selectAggregatesQuery() {
     return "SELECT * FROM system_schema.aggregates";
-  }
-
-  @Override
-  protected String tableNameColumn() {
-    return "table_name";
-  }
-
-  @Override
-  protected String signatureColumn() {
-    return "argument_types";
   }
 }

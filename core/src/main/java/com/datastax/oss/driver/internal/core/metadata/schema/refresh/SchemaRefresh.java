@@ -15,32 +15,55 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.AggregateChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.FunctionChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TableChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.ViewChangeEvent;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-public abstract class SchemaRefresh extends MetadataRefresh {
+public class SchemaRefresh extends MetadataRefresh {
 
-  public final SchemaRefreshRequest request;
+  public final CompletionStage<Metadata> refreshFuture;
+  @VisibleForTesting public final Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces;
 
-  protected SchemaRefresh(DefaultMetadata current, SchemaRefreshRequest request, String logPrefix) {
+  public SchemaRefresh(
+      DefaultMetadata current,
+      CompletionStage<Metadata> refreshFuture,
+      Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
+      String logPrefix) {
     super(current, logPrefix);
-    this.request = request;
+    this.refreshFuture = refreshFuture;
+    this.newKeyspaces = newKeyspaces;
   }
 
-  protected static boolean shallowEquals(KeyspaceMetadata keyspace1, KeyspaceMetadata keyspace2) {
+  @Override
+  public void compute() {
+    newMetadata = oldMetadata.withKeyspaces(this.newKeyspaces);
+
+    Map<CqlIdentifier, KeyspaceMetadata> oldKeyspaces = oldMetadata.getKeyspaces();
+    for (CqlIdentifier removedKey : Sets.difference(oldKeyspaces.keySet(), newKeyspaces.keySet())) {
+      events.add(KeyspaceChangeEvent.dropped(oldKeyspaces.get(removedKey)));
+    }
+    for (Map.Entry<CqlIdentifier, KeyspaceMetadata> entry : newKeyspaces.entrySet()) {
+      CqlIdentifier key = entry.getKey();
+      computeEvents(oldKeyspaces.get(key), entry.getValue());
+    }
+  }
+
+  private static boolean shallowEquals(KeyspaceMetadata keyspace1, KeyspaceMetadata keyspace2) {
     return Objects.equals(keyspace1.getName(), keyspace2.getName())
         && keyspace1.isDurableWrites() == keyspace2.isDurableWrites()
         && Objects.equals(keyspace1.getReplication(), keyspace2.getReplication());
@@ -54,7 +77,7 @@ public abstract class SchemaRefresh extends MetadataRefresh {
    * initiated by coalesced child element refreshes. We need to traverse all children to check what
    * has exactly changed.
    */
-  protected void computeEvents(KeyspaceMetadata oldKeyspace, KeyspaceMetadata newKeyspace) {
+  private void computeEvents(KeyspaceMetadata oldKeyspace, KeyspaceMetadata newKeyspace) {
     if (oldKeyspace == null) {
       events.add(KeyspaceChangeEvent.created(newKeyspace));
     } else {

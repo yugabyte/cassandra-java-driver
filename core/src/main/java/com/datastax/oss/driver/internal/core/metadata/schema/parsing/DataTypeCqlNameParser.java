@@ -39,8 +39,8 @@ public class DataTypeCqlNameParser implements DataTypeParser {
 
   @Override
   public DataType parse(
-      String toParse,
       CqlIdentifier keyspaceId,
+      String toParse,
       Map<CqlIdentifier, UserDefinedType> userTypes,
       InternalDriverContext context) {
     // Top-level is never frozen, it is only set recursively when we encounter the frozen<> keyword
