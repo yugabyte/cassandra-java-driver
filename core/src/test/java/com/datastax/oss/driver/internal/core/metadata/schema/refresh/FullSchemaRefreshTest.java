@@ -29,7 +29,7 @@ import org.junit.Test;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
+public class FullSchemaRefreshTest extends SchemaRefreshTestBase {
 
   @Test
   public void should_detect_dropped_keyspace() {

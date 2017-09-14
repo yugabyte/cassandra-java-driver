@@ -29,10 +29,10 @@ import org.junit.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class SingleKeyspaceRefreshTest extends KeyspaceRefreshTestBase {
+public class SingleKeyspaceRefreshTest extends SchemaRefreshTestBase {
 
   @Test
-  public void should_detect_dropped_keyspace() {
+  public void should_remove_dropped_keyspace() {
     SingleKeyspaceRefresh refresh =
         new SingleKeyspaceRefresh(
             oldMetadata,
@@ -60,7 +60,7 @@ public class SingleKeyspaceRefreshTest extends KeyspaceRefreshTestBase {
   }
 
   @Test
-  public void should_detect_created_keyspace() {
+  public void should_add_created_keyspace() {
     DefaultKeyspaceMetadata ks2 = newKeyspace("ks2", true);
     SingleKeyspaceRefresh refresh =
         new SingleKeyspaceRefresh(
@@ -75,7 +75,7 @@ public class SingleKeyspaceRefreshTest extends KeyspaceRefreshTestBase {
   }
 
   @Test
-  public void should_detect_top_level_update_in_keyspace() {
+  public void should_modify_keyspace() {
     // Change only one top-level option (durable writes)
     DefaultKeyspaceMetadata newKs1 = newKeyspace("ks1", false, OLD_T1, OLD_T2);
     SingleKeyspaceRefresh refresh =
@@ -91,7 +91,7 @@ public class SingleKeyspaceRefreshTest extends KeyspaceRefreshTestBase {
   }
 
   @Test
-  public void should_detect_updated_children_in_keyspace() {
+  public void should_modify_updated_children_in_keyspace() {
     // Drop one type, modify the other and add a third one
     UserDefinedType newT2 =
         new UserDefinedTypeBuilder(
@@ -122,7 +122,7 @@ public class SingleKeyspaceRefreshTest extends KeyspaceRefreshTestBase {
   }
 
   @Test
-  public void should_detect_top_level_change_and_children_changes() {
+  public void should_modify_keyspace_and_children() {
     // Drop one type, modify the other and add a third one
     UserDefinedType newT2 =
         new UserDefinedTypeBuilder(

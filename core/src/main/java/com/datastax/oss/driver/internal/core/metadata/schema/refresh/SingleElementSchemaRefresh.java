@@ -74,13 +74,13 @@ abstract class SingleElementSchemaRefresh<K, T> extends SchemaRefresh {
         T oldElement = findElementToDrop(oldElements);
         if (oldElement == null) {
           LOG.warn(
-              "[{}] [{}] Got a {} {} event for {}.{}, "
+              "[{}] Got a {} {} event for {}.{}, "
                   + "but this element is unknown in our metadata, ignoring",
               logPrefix,
               request.type,
               request.scope,
               request.keyspace,
-              request.object);
+              request.object + (request.arguments == null ? "" : request.arguments));
           newMetadata = oldMetadata;
         } else {
           Map<K, T> newElements =

@@ -24,7 +24,7 @@ import com.datastax.oss.driver.internal.core.type.UserDefinedTypeBuilder;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 
-abstract class KeyspaceRefreshTestBase {
+abstract class SchemaRefreshTestBase {
   protected static final UserDefinedType OLD_T1 =
       new UserDefinedTypeBuilder(
               CqlIdentifier.fromInternal("ks1"), CqlIdentifier.fromInternal("t1"))
