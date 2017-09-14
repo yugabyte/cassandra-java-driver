@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.LinkedBlockingDeque;
 import org.junit.Test;
@@ -113,7 +114,7 @@ public class Cassandra21SchemaQueriesTest extends SchemaQueriesTest {
 
     SchemaQueriesWithMockedChannel(
         DriverChannel channel,
-        CompletionStage<Metadata> refreshFuture,
+        CompletableFuture<Metadata> refreshFuture,
         DriverConfigProfile config,
         String logPrefix) {
       super(channel, refreshFuture, config, logPrefix);

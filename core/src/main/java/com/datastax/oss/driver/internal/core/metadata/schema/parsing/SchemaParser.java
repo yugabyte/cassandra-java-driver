@@ -68,7 +68,7 @@ public class SchemaParser {
       KeyspaceMetadata keyspace = parseKeyspace(row);
       keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
-    return new SchemaRefresh(rows.refreshFuture, keyspacesBuilder.build(), logPrefix);
+    return new SchemaRefresh(keyspacesBuilder.build(), logPrefix);
   }
 
   private KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {

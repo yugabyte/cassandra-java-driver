@@ -103,7 +103,7 @@ public class Debouncer<T, R> {
     }
   }
 
-  private void flushNow() {
+  public void flushNow() {
     assert adminExecutor.inEventLoop();
     LOG.debug("Flushing now");
     cancelNextFlush();

@@ -19,12 +19,12 @@ import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import java.util.Optional;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 
 class Cassandra22SchemaQueries extends SchemaQueries {
   Cassandra22SchemaQueries(
       DriverChannel channel,
-      CompletionStage<Metadata> refreshFuture,
+      CompletableFuture<Metadata> refreshFuture,
       DriverConfigProfile config,
       String logPrefix) {
     super(channel, false, refreshFuture, config, logPrefix);

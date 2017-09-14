@@ -149,7 +149,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           processStatusChange(event);
           break;
         case ProtocolConstants.EventType.SCHEMA_CHANGE:
-          context.metadataManager().refreshSchema();
+          context.metadataManager().refreshSchema(false);
           break;
         default:
           LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
@@ -356,7 +356,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                   try {
                     // This does nothing if the LBP is initialized already
                     context.loadBalancingPolicyWrapper().init();
-                    context.metadataManager().refreshSchema();
+                    context.metadataManager().refreshSchema(true);
                     // TODO avoid refreshing the token map twice
                   } catch (Throwable t) {
                     LOG.warn("[{}] Unexpected error on control connection reconnect", logPrefix, t);

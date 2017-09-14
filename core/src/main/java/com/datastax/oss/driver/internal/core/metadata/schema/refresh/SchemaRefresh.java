@@ -16,7 +16,6 @@
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
-import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
@@ -31,21 +30,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public class SchemaRefresh extends MetadataRefresh {
 
-  public final CompletionStage<Metadata> refreshFuture;
   @VisibleForTesting public final Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces;
 
-  public SchemaRefresh(
-      CompletionStage<Metadata> refreshFuture,
-      Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
-      String logPrefix) {
+  public SchemaRefresh(Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces, String logPrefix) {
     super(logPrefix);
-    this.refreshFuture = refreshFuture;
     this.newKeyspaces = newKeyspaces;
   }
 

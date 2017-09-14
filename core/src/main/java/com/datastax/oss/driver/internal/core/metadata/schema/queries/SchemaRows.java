@@ -26,6 +26,7 @@ import com.google.common.collect.Multimap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class SchemaRows {
 
   public final boolean isCassandraV3;
-  public final CompletionStage<Metadata> refreshFuture;
+  public final CompletableFuture<Metadata> refreshFuture;
   public final List<AdminRow> keyspaces;
   public final Multimap<CqlIdentifier, AdminRow> tables;
   public final Multimap<CqlIdentifier, AdminRow> views;
@@ -49,7 +50,7 @@ public class SchemaRows {
 
   private SchemaRows(
       boolean isCassandraV3,
-      CompletionStage<Metadata> refreshFuture,
+      CompletableFuture<Metadata> refreshFuture,
       List<AdminRow> keyspaces,
       Multimap<CqlIdentifier, AdminRow> tables,
       Multimap<CqlIdentifier, AdminRow> views,
@@ -74,7 +75,7 @@ public class SchemaRows {
     private static final Logger LOG = LoggerFactory.getLogger(Builder.class);
 
     private final boolean isCassandraV3;
-    private final CompletionStage<Metadata> refreshFuture;
+    private final CompletableFuture<Metadata> refreshFuture;
     private final String tableNameColumn;
     private final String logPrefix;
     private final ImmutableList.Builder<AdminRow> keyspacesBuilder = ImmutableList.builder();
@@ -94,7 +95,7 @@ public class SchemaRows {
         indexesBuilders = new LinkedHashMap<>();
 
     public Builder(
-        boolean isCassandraV3, CompletionStage<Metadata> refreshFuture, String logPrefix) {
+        boolean isCassandraV3, CompletableFuture<Metadata> refreshFuture, String logPrefix) {
       this.isCassandraV3 = isCassandraV3;
       this.refreshFuture = refreshFuture;
       this.logPrefix = logPrefix;

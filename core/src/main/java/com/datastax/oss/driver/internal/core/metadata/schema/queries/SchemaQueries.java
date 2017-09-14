@@ -50,7 +50,7 @@ public abstract class SchemaQueries {
   private static final Logger LOG = LoggerFactory.getLogger(SchemaQueries.class);
 
   public static SchemaQueries newInstance(
-      CompletionStage<Metadata> refreshFuture, InternalDriverContext context) {
+      CompletableFuture<Metadata> refreshFuture, InternalDriverContext context) {
     String logPrefix = context.clusterName();
 
     DriverChannel channel = context.controlConnection().channel();
@@ -97,7 +97,7 @@ public abstract class SchemaQueries {
   private final CompletableFuture<SchemaRows> schemaRowsFuture = new CompletableFuture<>();
   // A future that completes later, when the whole refresh is done. We just store it here to pass it
   // down to the next step.
-  public final CompletionStage<Metadata> refreshFuture;
+  public final CompletableFuture<Metadata> refreshFuture;
 
   // All non-final fields are accessed exclusively on adminExecutor
   private SchemaRows.Builder schemaRowsBuilder;
@@ -106,7 +106,7 @@ public abstract class SchemaQueries {
   protected SchemaQueries(
       DriverChannel channel,
       boolean isCassandraV3,
-      CompletionStage<Metadata> refreshFuture,
+      CompletableFuture<Metadata> refreshFuture,
       DriverConfigProfile config,
       String logPrefix) {
     this.channel = channel;

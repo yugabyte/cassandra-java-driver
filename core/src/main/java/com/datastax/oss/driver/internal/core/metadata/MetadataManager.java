@@ -16,6 +16,8 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
+import com.datastax.oss.driver.api.core.config.CoreDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
@@ -23,10 +25,14 @@ import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueries;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
+import com.datastax.oss.driver.internal.core.util.concurrent.Debouncer;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -49,7 +55,7 @@ public class MetadataManager implements AsyncAutoCloseable {
     this.context = context;
     this.logPrefix = context.clusterName();
     this.adminExecutor = context.nettyOptions().adminEventExecutorGroup().next();
-    this.singleThreaded = new SingleThreaded();
+    this.singleThreaded = new SingleThreaded(context.config().getDefaultProfile());
     this.controlConnection = context.controlConnection();
     this.metadata = DefaultMetadata.EMPTY;
   }
@@ -120,37 +126,12 @@ public class MetadataManager implements AsyncAutoCloseable {
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.removeNode(address));
   }
 
-  public CompletionStage<Metadata> refreshSchema() {
-
+  public CompletionStage<Metadata> refreshSchema(boolean forceFlush) {
     // TODO check if metadata disabled in config
-    // TODO debounce
-    // TODO create an event to force (even if disabled in config)
-    // TODO join current update if already in progress?
-
-    CompletionStage<Metadata> refreshFuture = new CompletableFuture<>();
-    maybeInitControlConnection()
-        // 1. Query system tables
-        .thenCompose(v -> SchemaQueries.newInstance(refreshFuture, context).execute())
-        // 2. Parse the rows into metadata objects, put them in a MetadataRefresh
-        // 3. Apply the MetadataRefresh
-        .thenApplyAsync(singleThreaded::refreshSchema, adminExecutor)
-        .whenComplete(
-            (v, error) -> {
-              if (error != null) {
-                LOG.warn(
-                    "[{}] Unexpected error while refreshing schema, skipping", logPrefix, error);
-              }
-              singleThreaded.firstSchemaRefreshFuture.complete(null);
-            });
-    return refreshFuture;
-  }
-
-  // The control connection may or may not have been initialized already by TopologyMonitor.
-  private CompletionStage<Void> maybeInitControlConnection() {
-    return singleThreaded.firstSchemaRefreshFuture.isDone()
-        // Not the first schema refresh, so we know init was attempted already
-        ? singleThreaded.firstSchemaRefreshFuture
-        : controlConnection.init(false, true);
+    // TODO create an event/API method to force (even if disabled in config)
+    CompletableFuture<Metadata> future = new CompletableFuture<>();
+    RunOrSchedule.on(adminExecutor, () -> singleThreaded.acceptSchemaRequest(future, forceFlush));
+    return future;
   }
 
   /**
@@ -161,7 +142,7 @@ public class MetadataManager implements AsyncAutoCloseable {
     return singleThreaded.firstSchemaRefreshFuture;
   }
 
-  // TODO user-controlled refresh?
+  // TODO user-controlled schema refresh
 
   @Override
   public CompletionStage<Void> closeFuture() {
@@ -183,15 +164,33 @@ public class MetadataManager implements AsyncAutoCloseable {
     private final CompletableFuture<Void> closeFuture = new CompletableFuture<>();
     private boolean closeWasCalled;
     private final CompletableFuture<Void> firstSchemaRefreshFuture = new CompletableFuture<>();
+    private final Debouncer<CompletableFuture<Metadata>, CompletableFuture<Metadata>>
+        schemaRefreshDebouncer;
+
+    // We don't allow concurrent schema refreshes. If one is already running, the next one is queued
+    // (and the ones after that are merged with the queued one).
+    private CompletableFuture<Metadata> currentSchemaRefresh;
+    private CompletableFuture<Metadata> queuedSchemaRefresh;
+    private long schemaRefreshStart;
+
+    private SingleThreaded(DriverConfigProfile config) {
+      schemaRefreshDebouncer =
+          new Debouncer<>(
+              adminExecutor,
+              this::coalesceSchemaRequests,
+              this::startSchemaRequest,
+              config.getDuration(CoreDriverOption.METADATA_SCHEMA_WINDOW),
+              config.getInt(CoreDriverOption.METADATA_SCHEMA_MAX_EVENTS));
+    }
 
     private void initNodes(
         Set<InetSocketAddress> addresses, CompletableFuture<Void> initNodesFuture) {
-      refresh(new InitContactPointsRefresh(addresses, logPrefix));
+      apply(new InitContactPointsRefresh(addresses, logPrefix));
       initNodesFuture.complete(null);
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {
-      return refresh(new FullNodeListRefresh(nodeInfos, logPrefix));
+      return apply(new FullNodeListRefresh(nodeInfos, logPrefix));
     }
 
     private void addNode(InetSocketAddress address, Optional<NodeInfo> maybeInfo) {
@@ -207,7 +206,7 @@ public class MetadataManager implements AsyncAutoCloseable {
                 address,
                 info.getConnectAddress());
           } else {
-            refresh(new AddNodeRefresh(info, logPrefix));
+            apply(new AddNodeRefresh(info, logPrefix));
           }
         } else {
           LOG.debug(
@@ -222,14 +221,101 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private void removeNode(InetSocketAddress address) {
-      refresh(new RemoveNodeRefresh(address, logPrefix));
+      apply(new RemoveNodeRefresh(address, logPrefix));
     }
 
-    private Void refreshSchema(SchemaRows schemaRows) {
+    // An external component has requested a schema refresh, feed it to the debouncer.
+    private void acceptSchemaRequest(CompletableFuture<Metadata> future, boolean forceFlush) {
       assert adminExecutor.inEventLoop();
-      MetadataRefresh schemaRefresh = new SchemaParser(schemaRows, context).parse();
-      if (schemaRefresh != null) {
-        refresh(schemaRefresh);
+      schemaRefreshDebouncer.receive(future);
+      if (forceFlush) {
+        schemaRefreshDebouncer.flushNow();
+      }
+    }
+
+    // Multiple requests have arrived within the debouncer window, coalesce them.
+    private CompletableFuture<Metadata> coalesceSchemaRequests(
+        List<CompletableFuture<Metadata>> futures) {
+      assert adminExecutor.inEventLoop();
+      assert !futures.isEmpty();
+      // Keep only one, but ensure that the discarded ones will still be completed when we're done
+      CompletableFuture<Metadata> result = null;
+      for (CompletableFuture<Metadata> future : futures) {
+        if (result == null) {
+          result = future;
+        } else {
+          CompletableFutures.completeFrom(result, future);
+        }
+      }
+      return result;
+    }
+
+    // The debouncer has flushed, start the actual work.
+    private void startSchemaRequest(CompletableFuture<Metadata> future) {
+      assert adminExecutor.inEventLoop();
+      if (closeWasCalled) {
+        future.completeExceptionally(new IllegalStateException("Cluster is closed"));
+        return;
+      }
+      if (currentSchemaRefresh == null) {
+        currentSchemaRefresh = future;
+        LOG.debug("[{}] Starting schema refresh, sending queries", logPrefix);
+        schemaRefreshStart = System.nanoTime();
+        maybeInitControlConnection()
+            // 1. Query system tables
+            .thenCompose(v -> SchemaQueries.newInstance(future, context).execute())
+            // 2. Parse the rows into metadata objects, put them in a MetadataRefresh
+            // 3. Apply the MetadataRefresh
+            .thenApplyAsync(this::parseAndApplySchemaRows, adminExecutor)
+            .whenComplete(
+                (v, error) -> {
+                  if (error != null) {
+                    LOG.warn(
+                        "[{}] Unexpected error while refreshing schema, skipping",
+                        logPrefix,
+                        error);
+                  }
+                  singleThreaded.firstSchemaRefreshFuture.complete(null);
+                });
+      } else if (queuedSchemaRefresh == null) {
+        queuedSchemaRefresh = future; // wait for our turn
+      } else {
+        CompletableFutures.completeFrom(queuedSchemaRefresh, future); // join the queued request
+      }
+    }
+
+    // The control connection may or may not have been initialized already by TopologyMonitor.
+    private CompletionStage<Void> maybeInitControlConnection() {
+      return firstSchemaRefreshFuture.isDone()
+          // Not the first schema refresh, so we know init was attempted already
+          ? firstSchemaRefreshFuture
+          : controlConnection.init(false, true);
+    }
+
+    private Void parseAndApplySchemaRows(SchemaRows schemaRows) {
+      assert adminExecutor.inEventLoop();
+      assert schemaRows.refreshFuture == currentSchemaRefresh;
+      LOG.debug(
+          "[{}] Completed schema queries ({} ns), starting parsing",
+          logPrefix,
+          System.nanoTime() - schemaRefreshStart);
+      this.schemaRefreshStart = System.nanoTime();
+      try {
+        SchemaRefresh schemaRefresh = new SchemaParser(schemaRows, context).parse();
+        apply(schemaRefresh);
+        LOG.debug(
+            "[{}] Completed parsing ({} ns), schema refresh complete",
+            logPrefix,
+            System.nanoTime() - schemaRefreshStart);
+        currentSchemaRefresh.complete(metadata);
+      } catch (Throwable t) {
+        currentSchemaRefresh.completeExceptionally(t);
+      }
+      currentSchemaRefresh = null;
+      if (queuedSchemaRefresh != null) {
+        CompletableFuture<Metadata> tmp = this.queuedSchemaRefresh;
+        this.queuedSchemaRefresh = null;
+        startSchemaRequest(tmp);
       }
       return null;
     }
@@ -240,16 +326,20 @@ public class MetadataManager implements AsyncAutoCloseable {
       }
       closeWasCalled = true;
       LOG.debug("[{}] Closing", logPrefix);
+      // The current schema refresh should fail when its channel gets closed.
+      if (queuedSchemaRefresh != null) {
+        queuedSchemaRefresh.completeExceptionally(new IllegalStateException("Cluster is closed"));
+      }
       closeFuture.complete(null);
     }
   }
 
   @VisibleForTesting
-  Void refresh(MetadataRefresh refresh) {
+  Void apply(MetadataRefresh refresh) {
     assert adminExecutor.inEventLoop();
+    MetadataRefresh.Result result = refresh.compute(metadata);
+    metadata = result.newMetadata;
     if (!singleThreaded.closeWasCalled) {
-      MetadataRefresh.Result result = refresh.compute(metadata);
-      metadata = result.newMetadata;
       for (Object event : result.events) {
         context.eventBus().fire(event);
       }

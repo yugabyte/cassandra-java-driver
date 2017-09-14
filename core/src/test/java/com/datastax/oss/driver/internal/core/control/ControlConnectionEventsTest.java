@@ -144,6 +144,6 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
     callback.onEvent(event);
 
     // Then
-    Mockito.verify(metadataManager).refreshSchema();
+    Mockito.verify(metadataManager).refreshSchema(false);
   }
 }
