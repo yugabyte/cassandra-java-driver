@@ -15,74 +15,64 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
-import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.AggregateMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.AggregateChangeEvent;
-import com.google.common.base.Preconditions;
-import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AggregateRefresh
     extends SingleElementSchemaRefresh<FunctionSignature, AggregateMetadata> {
 
-  public static AggregateRefresh dropped(
-      DefaultMetadata current,
-      String keyspaceName,
-      String droppedAggregateName,
-      List<String> droppedAggregateArguments,
-      InternalDriverContext context) {
-    return new AggregateRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(keyspaceName),
-        buildSignature(
-            keyspaceName, droppedAggregateName, droppedAggregateArguments, current, context),
-        context.clusterName());
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(AggregateRefresh.class);
 
-  public static AggregateRefresh createdOrUpdated(
+  public AggregateRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       AggregateMetadata newAggregate,
       String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newAggregate == null)
-        ? null
-        : new AggregateRefresh(current, changeType, newAggregate, null, null, logPrefix);
-  }
-
-  private AggregateRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      AggregateMetadata newAggregate,
-      CqlIdentifier droppedAggregateKeyspace,
-      FunctionSignature droppedAggregateId,
-      String logPrefix) {
-    super(
-        current,
-        changeType,
-        "aggregate",
-        newAggregate,
-        droppedAggregateKeyspace,
-        droppedAggregateId,
-        logPrefix);
-  }
-
-  @Override
-  protected CqlIdentifier extractKeyspace(AggregateMetadata aggregate) {
-    return aggregate.getKeyspace();
+    super(current, request, newAggregate, logPrefix);
   }
 
   @Override
   protected FunctionSignature extractKey(AggregateMetadata aggregate) {
     return aggregate.getSignature();
+  }
+
+  @Override
+  protected AggregateMetadata findElementToDrop(
+      Map<FunctionSignature, AggregateMetadata> oldElements) {
+    // See explanations in FunctionRefresh
+    if (oldElements.size() > 10000) {
+      LOG.warn(
+          "It looks like keyspace {} has more than 10,000 aggregates! This violates some "
+              + "assumptions in the metadata refresh code and might affect performance. "
+              + "Please clean up your keyspace, or file a driver ticket if you think you "
+              + "have a legitimate use case.",
+          request.keyspace);
+    }
+    for (Map.Entry<FunctionSignature, AggregateMetadata> entry : oldElements.entrySet()) {
+      FunctionSignature signature = entry.getKey();
+      if (signature.getName().asInternal().equals(request.object)
+          && signature.getParameterTypes().size() == request.arguments.size()) {
+        boolean allMatch = true;
+        for (int i = 0; allMatch && i < signature.getParameterTypes().size(); i++) {
+          DataType type = signature.getParameterTypes().get(i);
+          String name = request.arguments.get(i);
+          allMatch = (name.equals(type.asCql(false, true)));
+        }
+        if (allMatch) {
+          return entry.getValue();
+        }
+      }
+    }
+    return null;
   }
 
   @Override

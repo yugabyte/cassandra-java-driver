@@ -24,6 +24,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.ViewRefresh;
 import com.google.common.collect.ImmutableList;
@@ -35,7 +36,7 @@ import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserViewTest extends SchemaParserTest {
+public class SchemaParserViewTest extends SchemaParserTestBase {
 
   static final AdminRow VIEW_ROW_3_0 =
       mockViewRow("ks", "alltimehigh", "scores", false, "game IS NOT NULL");
@@ -48,9 +49,13 @@ public class SchemaParserViewTest extends SchemaParserTest {
           mockModernColumnRow("ks", "alltimehigh", "month", "clustering", "int", "asc", 3),
           mockModernColumnRow("ks", "alltimehigh", "day", "clustering", "int", "asc", 4));
 
+  private static final SchemaRefreshRequest REQUEST =
+      new SchemaRefreshRequest(
+          SchemaChangeType.UPDATED, SchemaChangeScope.VIEW, "ks", "alltimehigh", null);
+
   @Test
   public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList())).isNull();
+    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList(), REQUEST)).isNull();
   }
 
   @Test
@@ -59,7 +64,7 @@ public class SchemaParserViewTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList())).isNull();
+    assertThat(parse(VIEW_ROW_3_0, Collections.emptyList(), REQUEST)).isNull();
   }
 
   @Test
@@ -68,8 +73,8 @@ public class SchemaParserViewTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    ViewRefresh refresh = (ViewRefresh) parse(VIEW_ROW_3_0, COLUMN_ROWS_3_0);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    ViewRefresh refresh = (ViewRefresh) parse(VIEW_ROW_3_0, COLUMN_ROWS_3_0, REQUEST);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     ViewMetadata view = refresh.newElement;
 
@@ -101,10 +106,10 @@ public class SchemaParserViewTest extends SchemaParserTest {
             CqlIdentifier.fromInternal("day"));
   }
 
-  private MetadataRefresh parse(AdminRow viewRow, Iterable<AdminRow> columnRows) {
+  private MetadataRefresh parse(
+      AdminRow viewRow, Iterable<AdminRow> columnRows, SchemaRefreshRequest request) {
     SchemaRows rows =
-        new SchemaRows.Builder(
-                node, SchemaChangeType.UPDATED, SchemaChangeScope.VIEW, "table_name", "test")
+        new SchemaRows.Builder(node, request, "table_name", "test")
             .withViews(ImmutableList.of(viewRow))
             .withColumns(columnRows)
             .build();

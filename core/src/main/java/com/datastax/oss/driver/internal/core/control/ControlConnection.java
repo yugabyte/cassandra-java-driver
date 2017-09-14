@@ -29,8 +29,7 @@ import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
@@ -191,15 +190,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   }
 
   private void processSchemaChange(Event event) {
-    SchemaChangeEvent sce = (SchemaChangeEvent) event;
     context
         .metadataManager()
-        .refreshSchema(
-            SchemaChangeType.fromProtocolString(sce.changeType),
-            SchemaChangeScope.fromProtocolString(sce.target),
-            sce.keyspace,
-            sce.object,
-            sce.arguments);
+        .refreshSchema(SchemaRefreshRequest.fromEvent((SchemaChangeEvent) event));
   }
 
   private class SingleThreaded {
@@ -371,14 +364,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                   try {
                     // This does nothing if the LBP is initialized already
                     context.loadBalancingPolicyWrapper().init();
-                    context
-                        .metadataManager()
-                        .refreshSchema(
-                            SchemaChangeType.UPDATED,
-                            SchemaChangeScope.FULL_SCHEMA,
-                            null,
-                            null,
-                            null);
+                    context.metadataManager().refreshSchema(SchemaRefreshRequest.full());
                     // TODO avoid refreshing the token map twice
                   } catch (Throwable t) {
                     LOG.warn("[{}] Unexpected error on control connection reconnect", logPrefix, t);

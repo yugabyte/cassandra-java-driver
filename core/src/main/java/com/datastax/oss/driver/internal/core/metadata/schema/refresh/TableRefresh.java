@@ -20,53 +20,28 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TableChangeEvent;
-import com.google.common.base.Preconditions;
 import java.util.Map;
 
 public class TableRefresh extends SingleElementSchemaRefresh<CqlIdentifier, TableMetadata> {
 
-  public static TableRefresh dropped(
-      DefaultMetadata current, String keyspaceName, String droppedTableName, String logPrefix) {
-    return new TableRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(keyspaceName),
-        CqlIdentifier.fromInternal(droppedTableName),
-        logPrefix);
-  }
-
-  public static TableRefresh createdOrUpdated(
+  public TableRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       TableMetadata newTable,
       String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newTable == null)
-        ? null
-        : new TableRefresh(current, changeType, newTable, null, null, logPrefix);
-  }
-
-  private TableRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      TableMetadata newTable,
-      CqlIdentifier droppedTableKeyspace,
-      CqlIdentifier droppedTableId,
-      String logPrefix) {
-    super(current, changeType, "table", newTable, droppedTableKeyspace, droppedTableId, logPrefix);
-  }
-
-  @Override
-  protected CqlIdentifier extractKeyspace(TableMetadata table) {
-    return table.getKeyspace();
+    super(current, request, newTable, logPrefix);
   }
 
   @Override
   protected CqlIdentifier extractKey(TableMetadata table) {
     return table.getName();
+  }
+
+  @Override
+  protected TableMetadata findElementToDrop(Map<CqlIdentifier, TableMetadata> oldTables) {
+    return oldTables.get(CqlIdentifier.fromInternal(request.object));
   }
 
   @Override

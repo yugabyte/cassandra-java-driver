@@ -21,9 +21,9 @@ import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultFunctionMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FunctionRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -96,7 +96,7 @@ class FunctionParser extends SchemaSingleRowElementParser<FunctionMetadata> {
   }
 
   @Override
-  MetadataRefresh newRefresh(FunctionMetadata function) {
-    return FunctionRefresh.createdOrUpdated(currentMetadata, rows.changeType, function, logPrefix);
+  SchemaRefresh newRefresh(FunctionMetadata function) {
+    return new FunctionRefresh(currentMetadata, rows.request, function, logPrefix);
   }
 }

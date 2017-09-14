@@ -19,62 +19,37 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
 import com.datastax.oss.driver.internal.core.util.ImmutableMaps;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SingleKeyspaceRefresh extends KeyspaceRefresh {
+public class SingleKeyspaceRefresh extends SchemaRefresh {
 
   private static final Logger LOG = LoggerFactory.getLogger(SingleKeyspaceRefresh.class);
 
-  public static SingleKeyspaceRefresh dropped(
-      DefaultMetadata current, String droppedKeyspaceName, String logPrefix) {
-    return new SingleKeyspaceRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(droppedKeyspaceName),
-        logPrefix);
-  }
-
-  public static SingleKeyspaceRefresh createdOrUpdated(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      KeyspaceMetadata newKeyspace,
-      String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newKeyspace == null)
-        ? null
-        : new SingleKeyspaceRefresh(current, changeType, newKeyspace, null, logPrefix);
-  }
-
-  @VisibleForTesting public final SchemaChangeType changeType;
   @VisibleForTesting public final KeyspaceMetadata newKeyspace;
-  private final CqlIdentifier droppedKeyspaceId;
 
-  private SingleKeyspaceRefresh(
+  public SingleKeyspaceRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       KeyspaceMetadata newKeyspace,
-      CqlIdentifier droppedKeyspaceId,
       String logPrefix) {
-    super(current, logPrefix);
-    this.changeType = changeType;
+    super(current, request, logPrefix);
     this.newKeyspace = newKeyspace;
-    this.droppedKeyspaceId = droppedKeyspaceId;
   }
 
   @Override
   public void compute() {
     Map<CqlIdentifier, KeyspaceMetadata> oldKeyspaces = oldMetadata.getKeyspaces();
 
-    if (changeType == SchemaChangeType.DROPPED) {
+    if (request.type == SchemaChangeType.DROPPED) {
+      CqlIdentifier droppedKeyspaceId = CqlIdentifier.fromInternal(request.keyspace);
       KeyspaceMetadata oldKeyspace = oldKeyspaces.get(droppedKeyspaceId);
       if (oldKeyspace == null) {
         LOG.warn(

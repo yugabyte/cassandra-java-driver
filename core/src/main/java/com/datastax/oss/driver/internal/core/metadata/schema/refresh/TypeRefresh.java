@@ -20,53 +20,28 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
-import com.google.common.base.Preconditions;
 import java.util.Map;
 
 public class TypeRefresh extends SingleElementSchemaRefresh<CqlIdentifier, UserDefinedType> {
 
-  public static TypeRefresh dropped(
-      DefaultMetadata current, String keyspaceName, String droppedTypeName, String logPrefix) {
-    return new TypeRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(keyspaceName),
-        CqlIdentifier.fromInternal(droppedTypeName),
-        logPrefix);
-  }
-
-  public static TypeRefresh createdOrUpdated(
+  public TypeRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       UserDefinedType newType,
       String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newType == null)
-        ? null
-        : new TypeRefresh(current, changeType, newType, null, null, logPrefix);
-  }
-
-  private TypeRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      UserDefinedType newType,
-      CqlIdentifier droppedTypeKeyspace,
-      CqlIdentifier droppedTypeId,
-      String logPrefix) {
-    super(current, changeType, "type", newType, droppedTypeKeyspace, droppedTypeId, logPrefix);
-  }
-
-  @Override
-  protected CqlIdentifier extractKeyspace(UserDefinedType type) {
-    return type.getKeyspace();
+    super(current, request, newType, logPrefix);
   }
 
   @Override
   protected CqlIdentifier extractKey(UserDefinedType type) {
     return type.getName();
+  }
+
+  @Override
+  protected UserDefinedType findElementToDrop(Map<CqlIdentifier, UserDefinedType> oldTypes) {
+    return oldTypes.get(CqlIdentifier.fromInternal(request.object));
   }
 
   @Override

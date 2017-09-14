@@ -21,6 +21,7 @@ import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.event.SchemaChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
@@ -148,10 +149,11 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
     // Then
     Mockito.verify(metadataManager)
         .refreshSchema(
-            SchemaChangeType.CREATED,
-            SchemaChangeScope.FUNCTION,
-            "ks",
-            "fn",
-            ImmutableList.of("text", "text"));
+            new SchemaRefreshRequest(
+                SchemaChangeType.CREATED,
+                SchemaChangeScope.FUNCTION,
+                "ks",
+                "fn",
+                ImmutableList.of("text", "text")));
   }
 }

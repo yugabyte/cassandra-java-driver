@@ -20,53 +20,28 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.ViewChangeEvent;
-import com.google.common.base.Preconditions;
 import java.util.Map;
 
 public class ViewRefresh extends SingleElementSchemaRefresh<CqlIdentifier, ViewMetadata> {
 
-  public static ViewRefresh dropped(
-      DefaultMetadata current, String keyspaceName, String droppedViewName, String logPrefix) {
-    return new ViewRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(keyspaceName),
-        CqlIdentifier.fromInternal(droppedViewName),
-        logPrefix);
-  }
-
-  public static ViewRefresh createdOrUpdated(
+  public ViewRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       ViewMetadata newView,
       String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newView == null)
-        ? null
-        : new ViewRefresh(current, changeType, newView, null, null, logPrefix);
-  }
-
-  private ViewRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      ViewMetadata newView,
-      CqlIdentifier droppedViewKeyspace,
-      CqlIdentifier droppedViewId,
-      String logPrefix) {
-    super(current, changeType, "view", newView, droppedViewKeyspace, droppedViewId, logPrefix);
-  }
-
-  @Override
-  protected CqlIdentifier extractKeyspace(ViewMetadata view) {
-    return view.getKeyspace();
+    super(current, request, newView, logPrefix);
   }
 
   @Override
   protected CqlIdentifier extractKey(ViewMetadata view) {
     return view.getName();
+  }
+
+  @Override
+  protected ViewMetadata findElementToDrop(Map<CqlIdentifier, ViewMetadata> oldViews) {
+    return oldViews.get(CqlIdentifier.fromInternal(request.object));
   }
 
   @Override

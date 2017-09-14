@@ -27,10 +27,10 @@ import com.datastax.oss.driver.api.core.type.MapType;
 import com.datastax.oss.driver.api.core.type.SetType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultColumnMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultIndexMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultTableMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TableRefresh;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -54,7 +54,7 @@ class TableParser extends RelationParser {
   }
 
   /** Called when the whole refresh is a single table. */
-  MetadataRefresh parse() {
+  SchemaRefresh parse() {
     Map.Entry<CqlIdentifier, AdminRow> tableEntry = rows.tables.entries().iterator().next();
     CqlIdentifier keyspaceId = tableEntry.getKey();
     AdminRow tableRow = tableEntry.getValue();
@@ -64,13 +64,15 @@ class TableParser extends RelationParser {
       LOG.warn(
           "[{}] Processing {} refresh for {}.{} but that keyspace is unknown, skipping",
           logPrefix,
-          rows.scope,
+          rows.request.scope,
           keyspaceId,
           tableRow.getString(rows.tableNameColumn));
       return null;
     }
     DefaultTableMetadata table = parseTable(tableRow, keyspaceId, keyspace.getUserDefinedTypes());
-    return TableRefresh.createdOrUpdated(currentMetadata, rows.changeType, table, logPrefix);
+    return (table == null)
+        ? null
+        : new TableRefresh(currentMetadata, rows.request, table, logPrefix);
   }
 
   /**

@@ -23,9 +23,9 @@ import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultColumnMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultViewMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.ViewRefresh;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
@@ -47,7 +47,7 @@ class ViewParser extends RelationParser {
   }
 
   /** Called when the whole refresh is a single view. */
-  MetadataRefresh parse() {
+  SchemaRefresh parse() {
     Map.Entry<CqlIdentifier, AdminRow> viewEntry = rows.views.entries().iterator().next();
     CqlIdentifier keyspaceId = viewEntry.getKey();
     AdminRow viewRow = viewEntry.getValue();
@@ -57,15 +57,13 @@ class ViewParser extends RelationParser {
       LOG.warn(
           "[{}] Processing {} refresh for {}.{} but that keyspace is unknown, skipping",
           logPrefix,
-          rows.scope,
+          rows.request.scope,
           keyspaceId,
           viewRow.getString("view_name"));
       return null;
     }
     ViewMetadata view = parseView(viewRow, keyspaceId, keyspace.getUserDefinedTypes());
-    return (view == null)
-        ? null
-        : new ViewRefresh(currentMetadata, rows.changeType, view, logPrefix);
+    return (view == null) ? null : new ViewRefresh(currentMetadata, rows.request, view, logPrefix);
   }
 
   /**

@@ -29,6 +29,7 @@ import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateManager;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
@@ -187,8 +188,7 @@ public class DefaultCluster implements Cluster {
           }
         }
         if (needSchemaRefresh) {
-          metadataManager.refreshSchema(
-              SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, null, null, null);
+          metadataManager.refreshSchema(SchemaRefreshRequest.full());
         }
         metadataManager.firstSchemaRefreshFuture().thenAccept(this::afterInitialSchemaRefresh);
 

@@ -18,8 +18,7 @@ package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FullSchemaRefresh;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +28,7 @@ import org.junit.Test;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserFullSchemaTest extends SchemaParserTest {
+public class SchemaParserFullSchemaTest extends SchemaParserTestBase {
 
   @Test
   public void should_parse_keyspaces() {
@@ -60,8 +59,7 @@ public class SchemaParserFullSchemaTest extends SchemaParserTest {
 
   private MetadataRefresh parse(Consumer<SchemaRows.Builder> builderConfig) {
     SchemaRows.Builder builder =
-        new SchemaRows.Builder(
-            node, SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, "table_name", "test");
+        new SchemaRows.Builder(node, SchemaRefreshRequest.full(), "table_name", "test");
     builderConfig.accept(builder);
     SchemaRows rows = builder.build();
     return new SchemaParser(rows, currentMetadata, context, "test").parse();

@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SingleKeyspaceRefresh;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
@@ -32,17 +33,22 @@ import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserKeyspaceTest extends SchemaParserTest {
+public class SchemaParserKeyspaceTest extends SchemaParserTestBase {
+
+  public static final SchemaRefreshRequest REQUEST =
+      new SchemaRefreshRequest(
+          SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null);
 
   @Test(expected = IllegalArgumentException.class)
   public void should_skip_when_no_rows() {
-    assertThat(parse(rows -> {})).isNull();
+    assertThat(parse(REQUEST, rows -> {})).isNull();
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void should_skip_when_too_many_rows() {
     assertThat(
             parse(
+                REQUEST,
                 rows ->
                     rows.withKeyspaces(
                         ImmutableList.of(
@@ -54,9 +60,10 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
   public void should_parse_modern_keyspace_row() {
     SingleKeyspaceRefresh refresh =
         (SingleKeyspaceRefresh)
-            parse(rows -> rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks"))));
+            parse(
+                REQUEST, rows -> rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks"))));
 
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
@@ -66,9 +73,10 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
   public void should_parse_legacy_keyspace_row() {
     SingleKeyspaceRefresh refresh =
         (SingleKeyspaceRefresh)
-            parse(rows -> rows.withKeyspaces(ImmutableList.of(mockLegacyKeyspaceRow("ks"))));
+            parse(
+                REQUEST, rows -> rows.withKeyspaces(ImmutableList.of(mockLegacyKeyspaceRow("ks"))));
 
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
@@ -82,6 +90,7 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
     SingleKeyspaceRefresh refresh =
         (SingleKeyspaceRefresh)
             parse(
+                REQUEST,
                 rows ->
                     rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks")))
                         .withTypes(
@@ -97,7 +106,7 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
                         .withAggregates(
                             ImmutableList.of(SchemaParserAggregateTest.SUM_AND_TO_STRING_ROW_3_0)));
 
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     KeyspaceMetadata keyspace = refresh.newKeyspace;
     checkKeyspace(keyspace);
@@ -128,10 +137,9 @@ public class SchemaParserKeyspaceTest extends SchemaParserTest {
         .containsEntry("replication_factor", "1");
   }
 
-  private MetadataRefresh parse(Consumer<SchemaRows.Builder> builderConfig) {
-    SchemaRows.Builder builder =
-        new SchemaRows.Builder(
-            node, SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "table_name", "test");
+  private MetadataRefresh parse(
+      SchemaRefreshRequest request, Consumer<SchemaRows.Builder> builderConfig) {
+    SchemaRows.Builder builder = new SchemaRows.Builder(node, request, "table_name", "test");
     builderConfig.accept(builder);
     SchemaRows rows = builder.build();
     return new SchemaParser(rows, currentMetadata, context, "test").parse();

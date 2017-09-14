@@ -18,6 +18,7 @@ package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.AggregateChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.FunctionChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
@@ -30,10 +31,13 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-abstract class KeyspaceRefresh extends MetadataRefresh {
+public abstract class SchemaRefresh extends MetadataRefresh {
 
-  protected KeyspaceRefresh(DefaultMetadata current, String logPrefix) {
+  public final SchemaRefreshRequest request;
+
+  protected SchemaRefresh(DefaultMetadata current, SchemaRefreshRequest request, String logPrefix) {
     super(current, logPrefix);
+    this.request = request;
   }
 
   protected static boolean shallowEquals(KeyspaceMetadata keyspace1, KeyspaceMetadata keyspace2) {

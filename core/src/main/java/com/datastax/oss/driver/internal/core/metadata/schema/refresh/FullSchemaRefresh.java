@@ -18,20 +18,22 @@ package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 import java.util.Map;
 
-public class FullSchemaRefresh extends KeyspaceRefresh {
+public class FullSchemaRefresh extends SchemaRefresh {
 
   @VisibleForTesting public final Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces;
 
   public FullSchemaRefresh(
       DefaultMetadata current,
+      SchemaRefreshRequest request,
       Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
       String logPrefix) {
-    super(current, logPrefix);
+    super(current, request, logPrefix);
     this.newKeyspaces = newKeyspaces;
   }
 

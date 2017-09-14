@@ -19,7 +19,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TypeRefresh;
 import com.datastax.oss.driver.internal.core.type.DefaultUserDefinedType;
 import java.util.List;
@@ -62,7 +62,7 @@ class UserDefinedTypeParser extends SchemaSingleRowElementParser<UserDefinedType
   }
 
   @Override
-  MetadataRefresh newRefresh(UserDefinedType type) {
-    return new TypeRefresh(currentMetadata, rows.changeType, type, logPrefix);
+  SchemaRefresh newRefresh(UserDefinedType type) {
+    return new TypeRefresh(currentMetadata, rows.request, type, logPrefix);
   }
 }

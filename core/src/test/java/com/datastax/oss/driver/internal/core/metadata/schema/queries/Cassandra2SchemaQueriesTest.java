@@ -22,6 +22,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.google.common.collect.ImmutableList;
 import java.util.Iterator;
 import java.util.Queue;
@@ -45,7 +46,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_type() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -59,7 +62,7 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     assertThat(result)
         .isSuccess(
             rows -> {
-              assertThat(rows.changeType).isEqualTo(SchemaChangeType.UPDATED);
+              assertThat(rows.request.type).isEqualTo(SchemaChangeType.UPDATED);
               assertThat(rows.types.keySet()).containsOnly(KS_ID);
               assertThat(rows.types.get(KS_ID)).hasSize(1);
               assertThat(rows.types.get(KS_ID).iterator().next().getString("type_name"))
@@ -71,11 +74,12 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   public void should_query_function() {
     CompletionStage<SchemaRows> result =
         queries.execute(
-            SchemaChangeType.UPDATED,
-            SchemaChangeScope.FUNCTION,
-            "ks",
-            "add",
-            ImmutableList.of("int", "int"));
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED,
+                SchemaChangeScope.FUNCTION,
+                "ks",
+                "add",
+                ImmutableList.of("int", "int")));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -101,11 +105,12 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   public void should_query_aggregate() {
     CompletionStage<SchemaRows> result =
         queries.execute(
-            SchemaChangeType.UPDATED,
-            SchemaChangeScope.AGGREGATE,
-            "ks",
-            "add",
-            ImmutableList.of("int", "int"));
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED,
+                SchemaChangeScope.AGGREGATE,
+                "ks",
+                "add",
+                ImmutableList.of("int", "int")));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -130,7 +135,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_table() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null));
 
     // Table
     Call call = queries.calls.poll();
@@ -175,7 +182,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_keyspace() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null));
 
     // Keyspace
     Call call = queries.calls.poll();
@@ -264,7 +273,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_query_full_schema() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, null, null, null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.FULL_SCHEMA, null, null, null));
 
     // Keyspace
     Call call = queries.calls.poll();
@@ -354,7 +365,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
     // But those scenarios require more queries to mock, so use type instead (the underlying logic
     // is shared).
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "type", null));
 
     Call call = queries.calls.poll();
     assertThat(call.query)
@@ -381,7 +394,9 @@ public class Cassandra2SchemaQueriesTest extends SchemaQueriesTest {
   @Test
   public void should_ignore_malformed_rows() {
     CompletionStage<SchemaRows> result =
-        queries.execute(SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
+        queries.execute(
+            new SchemaRefreshRequest(
+                SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null));
 
     // Table
     Call call = queries.calls.poll();

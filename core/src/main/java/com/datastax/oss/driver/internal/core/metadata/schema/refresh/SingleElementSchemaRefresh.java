@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2017-2017 DataStax Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
@@ -6,8 +21,8 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.DataTypeCqlNameParser;
 import com.datastax.oss.driver.internal.core.util.ImmutableMaps;
 import com.google.common.annotations.VisibleForTesting;
@@ -26,72 +41,50 @@ import org.slf4j.LoggerFactory;
  *     signature).
  * @param <T> the type of the element.
  */
-abstract class SingleElementSchemaRefresh<K, T> extends MetadataRefresh {
+abstract class SingleElementSchemaRefresh<K, T> extends SchemaRefresh {
 
   private static final Logger LOG = LoggerFactory.getLogger(SingleElementSchemaRefresh.class);
 
-  @VisibleForTesting public final SchemaChangeType changeType;
-  private final String elementType;
-
-  // null if the change type is DROPPED:
+  // null if the change type is DROPPED
   @VisibleForTesting public final T newElement;
 
-  // both null if the change type is UPDATED or CREATED:
-  private final CqlIdentifier droppedElementKeyspace;
-  private final K droppedElementKey;
-
   protected SingleElementSchemaRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      String elementType,
-      T newElement,
-      CqlIdentifier droppedElementKeyspace,
-      K droppedElementKey,
-      String logPrefix) {
-    super(current, logPrefix);
-    this.changeType = changeType;
-    this.elementType = elementType;
+      DefaultMetadata current, SchemaRefreshRequest request, T newElement, String logPrefix) {
+    super(current, request, logPrefix);
     this.newElement = newElement;
-    this.droppedElementKeyspace = droppedElementKeyspace;
-    this.droppedElementKey = droppedElementKey;
   }
 
   @Override
   public void compute() {
-    CqlIdentifier keyspaceId =
-        (changeType == SchemaChangeType.DROPPED)
-            ? droppedElementKeyspace
-            : extractKeyspace(newElement);
-    K elementKey =
-        (changeType == SchemaChangeType.DROPPED) ? droppedElementKey : extractKey(newElement);
-
     Map<CqlIdentifier, KeyspaceMetadata> oldKeyspaces = oldMetadata.getKeyspaces();
-    KeyspaceMetadata oldKeyspace = oldKeyspaces.get(keyspaceId);
+    KeyspaceMetadata oldKeyspace = oldKeyspaces.get(CqlIdentifier.fromInternal(request.keyspace));
     if (oldKeyspace == null) {
       LOG.warn(
-          "[{}] Got a {} event for {}.{}, "
+          "[{}] Got a {} {} event for {}.{}, "
               + "but this keyspace is unknown in our metadata, ignoring",
           logPrefix,
-          changeType,
-          keyspaceId,
-          elementKey);
+          request.type,
+          request.scope,
+          request.keyspace,
+          request.object);
       newMetadata = oldMetadata;
     } else {
       Map<K, T> oldElements = extractElements(oldKeyspace);
-      if (changeType == SchemaChangeType.DROPPED) {
-        T oldElement = oldElements.get(elementKey);
+      if (request.type == SchemaChangeType.DROPPED) {
+        T oldElement = findElementToDrop(oldElements);
         if (oldElement == null) {
           LOG.warn(
-              "[{}] Got a DROPPED event for {}.{}, "
-                  + "but this {} is unknown in our metadata, ignoring",
+              "[{}] [{}] Got a {} {} event for {}.{}, "
+                  + "but this element is unknown in our metadata, ignoring",
               logPrefix,
-              keyspaceId,
-              elementKey,
-              elementType);
+              request.type,
+              request.scope,
+              request.keyspace,
+              request.object);
           newMetadata = oldMetadata;
         } else {
           Map<K, T> newElements =
-              ImmutableMap.copyOf(Maps.filterKeys(oldElements, k -> !elementKey.equals(k)));
+              ImmutableMap.copyOf(Maps.filterValues(oldElements, v -> !oldElement.equals(v)));
           KeyspaceMetadata newKeyspace = replace(oldKeyspace, newElements);
           newMetadata =
               oldMetadata.withKeyspaces(
@@ -99,6 +92,7 @@ abstract class SingleElementSchemaRefresh<K, T> extends MetadataRefresh {
           events.add(newDroppedEvent(oldElement));
         }
       } else {
+        K elementKey = extractKey(newElement);
         T oldElement = oldElements.get(elementKey);
         Map<K, T> newElements = ImmutableMaps.replace(oldElements, elementKey, newElement);
         KeyspaceMetadata newKeyspace = replace(oldKeyspace, newElements);
@@ -114,9 +108,9 @@ abstract class SingleElementSchemaRefresh<K, T> extends MetadataRefresh {
     }
   }
 
-  protected abstract CqlIdentifier extractKeyspace(T element);
-
   protected abstract K extractKey(T element);
+
+  protected abstract T findElementToDrop(Map<K, T> oldElements);
 
   protected abstract Map<K, T> extractElements(KeyspaceMetadata keyspace);
 

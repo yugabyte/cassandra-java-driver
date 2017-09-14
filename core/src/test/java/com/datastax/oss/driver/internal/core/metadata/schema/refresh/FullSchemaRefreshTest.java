@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.KeyspaceChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
 import com.datastax.oss.driver.internal.core.type.UserDefinedTypeBuilder;
@@ -32,7 +33,9 @@ public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
 
   @Test
   public void should_detect_dropped_keyspace() {
-    FullSchemaRefresh refresh = new FullSchemaRefresh(oldMetadata, Collections.emptyMap(), "test");
+    FullSchemaRefresh refresh =
+        new FullSchemaRefresh(
+            oldMetadata, SchemaRefreshRequest.full(), Collections.emptyMap(), "test");
     refresh.compute();
     assertThat(refresh.newMetadata.getKeyspaces()).isEmpty();
     assertThat(refresh.events).containsExactly(KeyspaceChangeEvent.dropped(OLD_KS1));
@@ -43,7 +46,10 @@ public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
     DefaultKeyspaceMetadata ks2 = newKeyspace("ks2", true);
     FullSchemaRefresh refresh =
         new FullSchemaRefresh(
-            oldMetadata, ImmutableMap.of(OLD_KS1.getName(), OLD_KS1, ks2.getName(), ks2), "test");
+            oldMetadata,
+            SchemaRefreshRequest.full(),
+            ImmutableMap.of(OLD_KS1.getName(), OLD_KS1, ks2.getName(), ks2),
+            "test");
     refresh.compute();
     assertThat(refresh.newMetadata.getKeyspaces()).hasSize(2);
     assertThat(refresh.events).containsExactly(KeyspaceChangeEvent.created(ks2));
@@ -54,7 +60,11 @@ public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
     // Change only one top-level option (durable writes)
     DefaultKeyspaceMetadata newKs1 = newKeyspace("ks1", false, OLD_T1, OLD_T2);
     FullSchemaRefresh refresh =
-        new FullSchemaRefresh(oldMetadata, ImmutableMap.of(OLD_KS1.getName(), newKs1), "test");
+        new FullSchemaRefresh(
+            oldMetadata,
+            SchemaRefreshRequest.full(),
+            ImmutableMap.of(OLD_KS1.getName(), newKs1),
+            "test");
     refresh.compute();
     assertThat(refresh.newMetadata.getKeyspaces()).hasSize(1);
     assertThat(refresh.events).containsExactly(KeyspaceChangeEvent.updated(OLD_KS1, newKs1));
@@ -76,7 +86,11 @@ public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
     DefaultKeyspaceMetadata newKs1 = newKeyspace("ks1", true, newT2, t3);
 
     FullSchemaRefresh refresh =
-        new FullSchemaRefresh(oldMetadata, ImmutableMap.of(OLD_KS1.getName(), newKs1), "test");
+        new FullSchemaRefresh(
+            oldMetadata,
+            SchemaRefreshRequest.full(),
+            ImmutableMap.of(OLD_KS1.getName(), newKs1),
+            "test");
     refresh.compute();
     assertThat(refresh.newMetadata.getKeyspaces().get(OLD_KS1.getName())).isEqualTo(newKs1);
     assertThat(refresh.events)
@@ -103,7 +117,11 @@ public class FullSchemaRefreshTest extends KeyspaceRefreshTestBase {
     DefaultKeyspaceMetadata newKs1 = newKeyspace("ks1", false, newT2, t3);
 
     FullSchemaRefresh refresh =
-        new FullSchemaRefresh(oldMetadata, ImmutableMap.of(OLD_KS1.getName(), newKs1), "test");
+        new FullSchemaRefresh(
+            oldMetadata,
+            SchemaRefreshRequest.full(),
+            ImmutableMap.of(OLD_KS1.getName(), newKs1),
+            "test");
     refresh.compute();
     assertThat(refresh.newMetadata.getKeyspaces().get(OLD_KS1.getName())).isEqualTo(newKs1);
     assertThat(refresh.events)

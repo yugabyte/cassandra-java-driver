@@ -26,6 +26,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.AggregateRefresh;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
@@ -39,7 +40,7 @@ import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserAggregateTest extends SchemaParserTest {
+public class SchemaParserAggregateTest extends SchemaParserTestBase {
 
   private static final AdminRow SUM_AND_TO_STRING_ROW_2_2 =
       mockAggregateRow(
@@ -63,6 +64,14 @@ public class SchemaParserAggregateTest extends SchemaParserTest {
           "text",
           "0");
 
+  private static final SchemaRefreshRequest REQUEST =
+      new SchemaRefreshRequest(
+          SchemaChangeType.UPDATED,
+          SchemaChangeScope.AGGREGATE,
+          "ks",
+          "sum_and_to_string",
+          ImmutableList.of("int"));
+
   @Before
   public void setup() {
     super.setup();
@@ -72,12 +81,12 @@ public class SchemaParserAggregateTest extends SchemaParserTest {
 
   @Test
   public void should_skip_when_no_rows() {
-    assertThat(parse(/*no rows*/ )).isNull();
+    assertThat(parse(REQUEST /*no rows*/)).isNull();
   }
 
   @Test
   public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(SUM_AND_TO_STRING_ROW_3_0)).isNull();
+    assertThat(parse(REQUEST, SUM_AND_TO_STRING_ROW_3_0)).isNull();
   }
 
   @Test
@@ -86,10 +95,10 @@ public class SchemaParserAggregateTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    AggregateRefresh refresh = (AggregateRefresh) parse(SUM_AND_TO_STRING_ROW_3_0);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    AggregateRefresh refresh = (AggregateRefresh) parse(REQUEST, SUM_AND_TO_STRING_ROW_3_0);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
-    AggregateMetadata aggregate = refresh.aggregate;
+    AggregateMetadata aggregate = refresh.newElement;
     assertThat(aggregate.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(aggregate.getSignature().getName().asInternal()).isEqualTo("sum_and_to_string");
     assertThat(aggregate.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -116,10 +125,10 @@ public class SchemaParserAggregateTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    AggregateRefresh refresh = (AggregateRefresh) parse(SUM_AND_TO_STRING_ROW_2_2);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    AggregateRefresh refresh = (AggregateRefresh) parse(REQUEST, SUM_AND_TO_STRING_ROW_2_2);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
-    AggregateMetadata aggregate = refresh.aggregate;
+    AggregateMetadata aggregate = refresh.newElement;
     assertThat(aggregate.getKeyspace().asInternal()).isEqualTo("ks");
     assertThat(aggregate.getSignature().getName().asInternal()).isEqualTo("sum_and_to_string");
     assertThat(aggregate.getSignature().getParameterTypes()).containsExactly(DataTypes.INT);
@@ -138,10 +147,9 @@ public class SchemaParserAggregateTest extends SchemaParserTest {
     assertThat(aggregate.getInitCond()).isInstanceOf(Integer.class).isEqualTo(0);
   }
 
-  private MetadataRefresh parse(AdminRow... aggregateRows) {
+  private MetadataRefresh parse(SchemaRefreshRequest request, AdminRow... aggregateRows) {
     SchemaRows rows =
-        new SchemaRows.Builder(
-                node, SchemaChangeType.UPDATED, SchemaChangeScope.AGGREGATE, "table_name", "test")
+        new SchemaRows.Builder(node, request, "table_name", "test")
             .withAggregates(Arrays.asList(aggregateRows))
             .build();
     return new SchemaParser(rows, currentMetadata, context, "test").parse();

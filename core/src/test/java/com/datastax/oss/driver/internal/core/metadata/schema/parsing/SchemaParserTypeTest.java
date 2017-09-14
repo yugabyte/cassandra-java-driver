@@ -24,6 +24,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TypeRefresh;
 import com.google.common.collect.ImmutableList;
@@ -34,7 +35,7 @@ import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class SchemaParserTypeTest extends SchemaParserTest {
+public class SchemaParserTypeTest extends SchemaParserTestBase {
 
   private static final AdminRow PERSON_ROW_2_2 =
       mockTypeRow(
@@ -55,15 +56,18 @@ public class SchemaParserTypeTest extends SchemaParserTest {
           "person",
           ImmutableList.of("first_name", "last_name", "address"),
           ImmutableList.of("text", "text", "address"));
+  public static final SchemaRefreshRequest REQUEST =
+      new SchemaRefreshRequest(
+          SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "ks", "person", null);
 
   @Test
   public void should_skip_when_no_rows() {
-    assertThat(parse(/*no rows*/ )).isNull();
+    assertThat(parse(REQUEST /*no rows*/)).isNull();
   }
 
   @Test
   public void should_skip_when_keyspace_unknown() {
-    assertThat(parse(PERSON_ROW_3_0)).isNull();
+    assertThat(parse(REQUEST, PERSON_ROW_3_0)).isNull();
   }
 
   @Test
@@ -78,8 +82,8 @@ public class SchemaParserTypeTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    TypeRefresh refresh = (TypeRefresh) parse(PERSON_ROW_3_0);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    TypeRefresh refresh = (TypeRefresh) parse(REQUEST, PERSON_ROW_3_0);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     UserDefinedType type = refresh.newElement;
     assertThat(type.getKeyspace().asInternal()).isEqualTo("ks");
@@ -105,8 +109,8 @@ public class SchemaParserTypeTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    TypeRefresh refresh = (TypeRefresh) parse(PERSON_ROW_2_2);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    TypeRefresh refresh = (TypeRefresh) parse(REQUEST, PERSON_ROW_2_2);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     UserDefinedType type = refresh.newElement;
     assertThat(type.getKeyspace().asInternal()).isEqualTo("ks");
@@ -121,10 +125,9 @@ public class SchemaParserTypeTest extends SchemaParserTest {
     assertThat(type.getFieldTypes().get(2)).isSameAs(addressType);
   }
 
-  private MetadataRefresh parse(AdminRow... typeRows) {
+  private MetadataRefresh parse(SchemaRefreshRequest request, AdminRow... typeRows) {
     SchemaRows rows =
-        new SchemaRows.Builder(
-                node, SchemaChangeType.UPDATED, SchemaChangeScope.TYPE, "table_name", "test")
+        new SchemaRows.Builder(node, request, "table_name", "test")
             .withTypes(Arrays.asList(typeRows))
             .build();
     return new SchemaParser(rows, currentMetadata, context, "test").parse();

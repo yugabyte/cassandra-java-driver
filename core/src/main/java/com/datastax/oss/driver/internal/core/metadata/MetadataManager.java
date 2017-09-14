@@ -22,6 +22,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueries;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
@@ -123,28 +124,20 @@ public class MetadataManager implements AsyncAutoCloseable {
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.removeNode(address));
   }
 
-  public CompletionStage<Void> refreshSchema(
-      SchemaChangeType type,
-      SchemaChangeScope scope,
-      String keyspace,
-      String object,
-      List<String> arguments) {
+  public CompletionStage<Void> refreshSchema(SchemaRefreshRequest request) {
 
     // TODO check if metadata disabled in config
     // TODO debounce
     // TODO create an event to force (even if disabled in config)
     // TODO join current update if already in progress?
 
-    if (type == SchemaChangeType.DROPPED) {
+    if (request.type == SchemaChangeType.DROPPED) {
       // TODO no need to query, create a refresh and apply it directly
       throw new UnsupportedOperationException("TODO handle schema drops");
     } else {
       return maybeInitControlConnection()
           // 1. Query system tables
-          .thenCompose(
-              v ->
-                  SchemaQueries.newInstance(context, logPrefix)
-                      .execute(type, scope, keyspace, object, arguments))
+          .thenCompose(v -> SchemaQueries.newInstance(context, logPrefix).execute(request))
           // 2. Parse the rows into metadata objects, put them in a MetadataRefresh
           // 3. Apply the MetadataRefresh
           .thenApplyAsync(singleThreaded::refreshSchema, adminExecutor)

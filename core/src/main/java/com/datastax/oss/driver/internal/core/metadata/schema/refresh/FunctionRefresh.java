@@ -15,74 +15,70 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.refresh;
 
-import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.FunctionChangeEvent;
-import com.google.common.base.Preconditions;
-import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FunctionRefresh
     extends SingleElementSchemaRefresh<FunctionSignature, FunctionMetadata> {
 
-  public static FunctionRefresh dropped(
-      DefaultMetadata current,
-      String keyspaceName,
-      String droppedFunctionName,
-      List<String> droppedFunctionArguments,
-      InternalDriverContext context) {
-    return new FunctionRefresh(
-        current,
-        SchemaChangeType.DROPPED,
-        null,
-        CqlIdentifier.fromInternal(keyspaceName),
-        buildSignature(
-            keyspaceName, droppedFunctionName, droppedFunctionArguments, current, context),
-        context.clusterName());
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionRefresh.class);
 
-  public static FunctionRefresh createdOrUpdated(
+  public FunctionRefresh(
       DefaultMetadata current,
-      SchemaChangeType changeType,
+      SchemaRefreshRequest request,
       FunctionMetadata newFunction,
       String logPrefix) {
-    Preconditions.checkArgument(changeType != SchemaChangeType.DROPPED);
-    return (newFunction == null)
-        ? null
-        : new FunctionRefresh(current, changeType, newFunction, null, null, logPrefix);
-  }
-
-  private FunctionRefresh(
-      DefaultMetadata current,
-      SchemaChangeType changeType,
-      FunctionMetadata newFunction,
-      CqlIdentifier droppedFunctionKeyspace,
-      FunctionSignature droppedFunctionId,
-      String logPrefix) {
-    super(
-        current,
-        changeType,
-        "function",
-        newFunction,
-        droppedFunctionKeyspace,
-        droppedFunctionId,
-        logPrefix);
-  }
-
-  @Override
-  protected CqlIdentifier extractKeyspace(FunctionMetadata function) {
-    return function.getKeyspace();
+    super(current, request, newFunction, logPrefix);
   }
 
   @Override
   protected FunctionSignature extractKey(FunctionMetadata function) {
     return function.getSignature();
+  }
+
+  @Override
+  protected FunctionMetadata findElementToDrop(
+      Map<FunctionSignature, FunctionMetadata> oldElements) {
+    // When we process a DROP request we don't have a FunctionSignature, and re-building it is a bit
+    // cumbersome because we would need to re-parse all the types.
+    // So instead we go the other way and traverse all known functions, trying to find a signature
+    // that matches the request. This is linear, but that shouldn't be a problem unless the number
+    // of functions is insane.
+    if (oldElements.size() > 10000) {
+      LOG.warn(
+          "It looks like keyspace {} has more than 10,000 functions! This violates some "
+              + "assumptions in the metadata refresh code and might affect performance. "
+              + "Please clean up your keyspace, or file a driver ticket if you think you "
+              + "have a legitimate use case.",
+          request.keyspace);
+    }
+    for (Map.Entry<FunctionSignature, FunctionMetadata> entry : oldElements.entrySet()) {
+      FunctionSignature signature = entry.getKey();
+      // Cheap checks: name and number of arguments
+      if (signature.getName().asInternal().equals(request.object)
+          && signature.getParameterTypes().size() == request.arguments.size()) {
+        // Now compare the arguments one by one
+        boolean allMatch = true;
+        for (int i = 0; allMatch && i < signature.getParameterTypes().size(); i++) {
+          DataType type = signature.getParameterTypes().get(i);
+          String name = request.arguments.get(i);
+          allMatch = (name.equals(type.asCql(false, true)));
+        }
+        if (allMatch) {
+          return entry.getValue();
+        }
+      }
+    }
+    return null;
   }
 
   @Override

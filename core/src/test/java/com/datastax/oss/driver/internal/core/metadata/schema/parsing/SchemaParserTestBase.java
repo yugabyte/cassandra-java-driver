@@ -33,7 +33,7 @@ import org.mockito.junit.MockitoJUnitRunner;
 import static org.assertj.core.api.Assertions.fail;
 
 @RunWith(MockitoJUnitRunner.Silent.class)
-public abstract class SchemaParserTest {
+public abstract class SchemaParserTestBase {
 
   @Mock protected DefaultMetadata currentMetadata;
   @Mock protected InternalDriverContext context;

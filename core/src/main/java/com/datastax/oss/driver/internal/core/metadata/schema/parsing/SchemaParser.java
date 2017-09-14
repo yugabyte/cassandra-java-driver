@@ -18,8 +18,8 @@ package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 
 /**
  * The main entry point for system schema rows parsing.
@@ -57,8 +57,8 @@ public class SchemaParser {
    * @return the refresh, or {@code null} if it could not be computed (most likely due to malformed
    *     system rows).
    */
-  public MetadataRefresh parse() {
-    switch (rows.scope) {
+  public SchemaRefresh parse() {
+    switch (rows.request.scope) {
       case FULL_SCHEMA:
         return new FullSchemaParser(this).parse();
       case KEYSPACE:
@@ -74,7 +74,7 @@ public class SchemaParser {
       case AGGREGATE:
         return new AggregateParser(this).parse();
       default:
-        throw new AssertionError("Unsupported schema refresh kind " + this.rows.scope);
+        throw new AssertionError("Unsupported schema refresh kind " + rows.request.scope);
     }
   }
 }

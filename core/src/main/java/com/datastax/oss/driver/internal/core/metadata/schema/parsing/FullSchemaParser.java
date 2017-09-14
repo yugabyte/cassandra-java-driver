@@ -18,8 +18,8 @@ package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.FullSchemaRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.google.common.collect.ImmutableMap;
 
 class FullSchemaParser extends SchemaElementParser {
@@ -31,12 +31,13 @@ class FullSchemaParser extends SchemaElementParser {
     this.keyspaceParser = new KeyspaceParser(parent);
   }
 
-  MetadataRefresh parse() {
+  SchemaRefresh parse() {
     ImmutableMap.Builder<CqlIdentifier, KeyspaceMetadata> keyspacesBuilder = ImmutableMap.builder();
     for (AdminRow row : rows.keyspaces) {
       KeyspaceMetadata keyspace = keyspaceParser.parseKeyspace(row);
       keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
-    return new FullSchemaRefresh(currentMetadata, keyspacesBuilder.build(), logPrefix);
+    return new FullSchemaRefresh(
+        currentMetadata, rows.request, keyspacesBuilder.build(), logPrefix);
   }
 }

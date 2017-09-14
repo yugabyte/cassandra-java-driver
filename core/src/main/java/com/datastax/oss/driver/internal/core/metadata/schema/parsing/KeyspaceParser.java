@@ -24,8 +24,8 @@ import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SingleKeyspaceRefresh;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
@@ -48,7 +48,7 @@ class KeyspaceParser extends SchemaElementParser {
     this.aggregateParser = new AggregateParser(parent);
   }
 
-  MetadataRefresh parse() {
+  SchemaRefresh parse() {
     if (rows.keyspaces.size() != 1) {
       throw new IllegalArgumentException(
           "Processing a KEYSPACE refresh, expecting exactly one keyspace row but found "
@@ -58,8 +58,9 @@ class KeyspaceParser extends SchemaElementParser {
     AdminRow keyspaceRow = rows.keyspaces.get(0);
 
     KeyspaceMetadata keyspace = parseKeyspace(keyspaceRow);
-    return SingleKeyspaceRefresh.createdOrUpdated(
-        currentMetadata, rows.changeType, keyspace, logPrefix);
+    return (keyspace == null)
+        ? null
+        : new SingleKeyspaceRefresh(currentMetadata, rows.request, keyspace, logPrefix);
   }
 
   // Note that the server only issues KEYSPACE UPDATED events when an ALTER KEYSPACE command has

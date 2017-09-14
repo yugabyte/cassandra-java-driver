@@ -28,6 +28,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.TableRefresh;
 import com.google.common.collect.ImmutableList;
@@ -40,7 +41,7 @@ import org.mockito.Mockito;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
-public class SchemaParserTableTest extends SchemaParserTest {
+public class SchemaParserTableTest extends SchemaParserTestBase {
 
   private static final AdminRow TABLE_ROW_2_2 =
       mockLegacyTableRow(
@@ -85,9 +86,13 @@ public class SchemaParserTableTest extends SchemaParserTest {
       ImmutableList.of(
           mockIndexRow("ks", "foo", "foo_v_idx", "COMPOSITES", ImmutableMap.of("target", "v")));
 
+  private static final SchemaRefreshRequest REQUEST =
+      new SchemaRefreshRequest(
+          SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "ks", "foo", null);
+
   @Test
   public void should_skip_when_keyspace_unknown() {
-    assertThat(parseLegacy(TABLE_ROW_2_2, Collections.emptyList())).isNull();
+    assertThat(parseLegacy(REQUEST, TABLE_ROW_2_2, Collections.emptyList())).isNull();
   }
 
   @Test
@@ -96,7 +101,7 @@ public class SchemaParserTableTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    assertThat(parseLegacy(TABLE_ROW_2_2, Collections.emptyList())).isNull();
+    assertThat(parseLegacy(REQUEST, TABLE_ROW_2_2, Collections.emptyList())).isNull();
   }
 
   @Test
@@ -105,8 +110,8 @@ public class SchemaParserTableTest extends SchemaParserTest {
     Mockito.when(currentMetadata.getKeyspaces())
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
-    TableRefresh refresh = (TableRefresh) parseLegacy(TABLE_ROW_2_2, COLUMN_ROWS_2_2);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+    TableRefresh refresh = (TableRefresh) parseLegacy(REQUEST, TABLE_ROW_2_2, COLUMN_ROWS_2_2);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     TableMetadata table = refresh.newElement;
 
@@ -123,8 +128,8 @@ public class SchemaParserTableTest extends SchemaParserTest {
         .thenReturn(ImmutableMap.of(CqlIdentifier.fromInternal("ks"), ks));
 
     TableRefresh refresh =
-        (TableRefresh) parseModern(TABLE_ROW_3_0, COLUMN_ROWS_3_0, INDEX_ROWS_3_0);
-    assertThat(refresh.changeType).isEqualTo(SchemaChangeType.UPDATED);
+        (TableRefresh) parseModern(REQUEST, TABLE_ROW_3_0, COLUMN_ROWS_3_0, INDEX_ROWS_3_0);
+    assertThat(refresh.request).isEqualTo(REQUEST);
 
     TableMetadata table = refresh.newElement;
 
@@ -185,15 +190,11 @@ public class SchemaParserTableTest extends SchemaParserTest {
         .containsEntry("mock_option", "1");
   }
 
-  private MetadataRefresh parseLegacy(AdminRow tableRow, Iterable<AdminRow> columnRows) {
+  private MetadataRefresh parseLegacy(
+      SchemaRefreshRequest request, AdminRow tableRow, Iterable<AdminRow> columnRows) {
     Mockito.when(node.getCassandraVersion()).thenReturn(CassandraVersion.V2_2_0);
     SchemaRows rows =
-        new SchemaRows.Builder(
-                node,
-                SchemaChangeType.UPDATED,
-                SchemaChangeScope.TABLE,
-                "columnfamily_name",
-                "test")
+        new SchemaRows.Builder(node, request, "columnfamily_name", "test")
             .withTables(ImmutableList.of(tableRow))
             .withColumns(columnRows)
             .build();
@@ -201,10 +202,12 @@ public class SchemaParserTableTest extends SchemaParserTest {
   }
 
   private MetadataRefresh parseModern(
-      AdminRow tableRow, Iterable<AdminRow> columnRows, Iterable<AdminRow> indexesRows) {
+      SchemaRefreshRequest request,
+      AdminRow tableRow,
+      Iterable<AdminRow> columnRows,
+      Iterable<AdminRow> indexesRows) {
     SchemaRows rows =
-        new SchemaRows.Builder(
-                node, SchemaChangeType.UPDATED, SchemaChangeScope.TABLE, "table_name", "test")
+        new SchemaRows.Builder(node, request, "table_name", "test")
             .withTables(ImmutableList.of(tableRow))
             .withColumns(columnRows)
             .withIndexes(indexesRows)

@@ -19,7 +19,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
@@ -40,8 +40,7 @@ public class SchemaRows {
   /** The node we got the data from */
   public final Node node;
 
-  public final SchemaChangeType changeType;
-  public final SchemaChangeScope scope;
+  public final SchemaRefreshRequest request;
   /** @see SchemaQueries#tableNameColumn() */
   public final String tableNameColumn;
 
@@ -56,8 +55,7 @@ public class SchemaRows {
 
   private SchemaRows(
       Node node,
-      SchemaChangeType changeType,
-      SchemaChangeScope scope,
+      SchemaRefreshRequest request,
       String tableNameColumn,
       List<AdminRow> keyspaces,
       Multimap<CqlIdentifier, AdminRow> tables,
@@ -68,8 +66,7 @@ public class SchemaRows {
       Multimap<CqlIdentifier, AdminRow> functions,
       Multimap<CqlIdentifier, AdminRow> aggregates) {
     this.node = node;
-    this.changeType = changeType;
-    this.scope = scope;
+    this.request = request;
     this.tableNameColumn = tableNameColumn;
     this.keyspaces = keyspaces;
     this.tables = tables;
@@ -85,8 +82,7 @@ public class SchemaRows {
     private static final Logger LOG = LoggerFactory.getLogger(Builder.class);
 
     private final Node node;
-    private final SchemaChangeType type;
-    private final SchemaChangeScope scope;
+    private final SchemaRefreshRequest request;
     private final String tableNameColumn;
     private final String logPrefix;
     private final ImmutableList.Builder<AdminRow> keyspacesBuilder = ImmutableList.builder();
@@ -106,14 +102,9 @@ public class SchemaRows {
         indexesBuilders = new LinkedHashMap<>();
 
     public Builder(
-        Node node,
-        SchemaChangeType type,
-        SchemaChangeScope scope,
-        String tableNameColumn,
-        String logPrefix) {
+        Node node, SchemaRefreshRequest request, String tableNameColumn, String logPrefix) {
       this.node = node;
-      this.type = type;
-      this.scope = scope;
+      this.request = request;
       this.tableNameColumn = tableNameColumn;
       this.logPrefix = logPrefix;
     }
@@ -205,22 +196,21 @@ public class SchemaRows {
 
       // Single view notifications are issued with the TABLE scope, now that we have the rows we can
       // check which it actually is.
-      SchemaChangeScope adjustedScope;
-      if (this.scope == SchemaChangeScope.TABLE) {
+      SchemaRefreshRequest adjustedRequest = request;
+      if (request.scope == SchemaChangeScope.TABLE) {
         if (tables.size() + views.size() != 1) {
           throw new IllegalStateException(
               String.format(
                   "Processing TABLE or VIEW refresh, expected exactly one row but found %d table(s) and %d view(s)",
                   tables.size(), views.size()));
         }
-        adjustedScope = tables.isEmpty() ? SchemaChangeScope.VIEW : SchemaChangeScope.TABLE;
-      } else {
-        adjustedScope = scope;
+        if (tables.isEmpty()) {
+          adjustedRequest = request.copy(SchemaChangeScope.VIEW);
+        }
       }
       return new SchemaRows(
           node,
-          type,
-          adjustedScope,
+          adjustedRequest,
           tableNameColumn,
           keyspacesBuilder.build(),
           tables,

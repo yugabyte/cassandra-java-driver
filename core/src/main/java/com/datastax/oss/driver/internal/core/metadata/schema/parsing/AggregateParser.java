@@ -22,9 +22,9 @@ import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
-import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultAggregateMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.AggregateRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -117,7 +117,7 @@ class AggregateParser extends SchemaSingleRowElementParser<AggregateMetadata> {
   }
 
   @Override
-  MetadataRefresh newRefresh(AggregateMetadata aggregate) {
-    return new AggregateRefresh(currentMetadata, rows.changeType, aggregate, logPrefix);
+  SchemaRefresh newRefresh(AggregateMetadata aggregate) {
+    return new AggregateRefresh(currentMetadata, rows.request, aggregate, logPrefix);
   }
 }

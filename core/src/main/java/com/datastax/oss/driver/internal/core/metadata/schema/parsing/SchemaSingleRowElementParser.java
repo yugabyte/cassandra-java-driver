@@ -20,6 +20,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
+import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.google.common.collect.Multimap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -45,12 +46,12 @@ abstract class SchemaSingleRowElementParser<T> extends SchemaElementParser {
   }
 
   /** Called when the whole refresh is a single element of this type. */
-  MetadataRefresh parse() {
+  SchemaRefresh parse() {
     if (elementRows.size() != 1) {
       LOG.warn(
           "[{}] Processing {} refresh, expected a single row but found {}, skipping",
           logPrefix,
-          rows.scope,
+          rows.request.scope,
           elementRows.size());
       return null;
     } else {
@@ -64,9 +65,9 @@ abstract class SchemaSingleRowElementParser<T> extends SchemaElementParser {
         LOG.warn(
             "[{}] Processing {} refresh for {}.{} " + "but that keyspace is unknown, skipping",
             logPrefix,
-            rows.scope,
+            rows.request.scope,
             keyspaceId,
-            row.getString(rows.scope.name().toLowerCase() + "_name"));
+            row.getString(rows.request.scope.name().toLowerCase() + "_name"));
         return null;
       }
       T t = parseRow(row, keyspaceId, keyspace.getUserDefinedTypes());
@@ -81,5 +82,5 @@ abstract class SchemaSingleRowElementParser<T> extends SchemaElementParser {
   abstract T parseRow(
       AdminRow row, CqlIdentifier keyspaceId, Map<CqlIdentifier, UserDefinedType> userDefinedTypes);
 
-  abstract MetadataRefresh newRefresh(T t);
+  abstract SchemaRefresh newRefresh(T t);
 }

@@ -27,7 +27,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
-import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
@@ -125,38 +125,29 @@ public abstract class SchemaQueries {
 
   protected abstract String signatureColumn();
 
-  public CompletionStage<SchemaRows> execute(
-      SchemaChangeType type,
-      SchemaChangeScope scope,
-      String keyspace,
-      String object,
-      List<String> arguments) {
-    RunOrSchedule.on(
-        adminExecutor, () -> executeOnAdminExecutor(type, scope, keyspace, object, arguments));
+  public CompletionStage<SchemaRows> execute(SchemaRefreshRequest request) {
+    RunOrSchedule.on(adminExecutor, () -> executeOnAdminExecutor(request));
     return schemaRowsFuture;
   }
 
-  private void executeOnAdminExecutor(
-      SchemaChangeType type,
-      SchemaChangeScope scope,
-      String keyspace,
-      String object,
-      List<String> arguments) {
+  private void executeOnAdminExecutor(SchemaRefreshRequest request) {
     assert adminExecutor.inEventLoop();
 
-    schemaRowsBuilder = new SchemaRows.Builder(node, type, scope, tableNameColumn(), logPrefix);
+    schemaRowsBuilder = new SchemaRows.Builder(node, request, tableNameColumn(), logPrefix);
 
-    String whereClause = buildWhereClause(scope, keyspace, object, arguments);
+    String whereClause =
+        buildWhereClause(request.scope, request.keyspace, request.object, request.arguments);
 
     boolean isFullOrKeyspace =
-        scope == SchemaChangeScope.FULL_SCHEMA || scope == SchemaChangeScope.KEYSPACE;
+        request.scope == SchemaChangeScope.FULL_SCHEMA
+            || request.scope == SchemaChangeScope.KEYSPACE;
     if (isFullOrKeyspace) {
       query(selectKeyspacesQuery() + whereClause, schemaRowsBuilder::withKeyspaces);
     }
-    if (isFullOrKeyspace || scope == SchemaChangeScope.TYPE) {
+    if (isFullOrKeyspace || request.scope == SchemaChangeScope.TYPE) {
       query(selectTypesQuery() + whereClause, schemaRowsBuilder::withTypes);
     }
-    if (isFullOrKeyspace || scope == SchemaChangeScope.TABLE) {
+    if (isFullOrKeyspace || request.scope == SchemaChangeScope.TABLE) {
       query(selectTablesQuery() + whereClause, schemaRowsBuilder::withTables);
       query(selectColumnsQuery() + whereClause, schemaRowsBuilder::withColumns);
       selectIndexesQuery()
@@ -167,16 +158,19 @@ public abstract class SchemaQueries {
                 // Individual view notifications are sent with the TABLE type, we need to translate
                 // to VIEW to generate the appropriate WHERE clause.
                 SchemaChangeScope whereClauseKind =
-                    (scope == SchemaChangeScope.TABLE ? SchemaChangeScope.VIEW : scope);
+                    (request.scope == SchemaChangeScope.TABLE
+                        ? SchemaChangeScope.VIEW
+                        : request.scope);
                 String viewWhereClause =
-                    buildWhereClause(whereClauseKind, keyspace, object, arguments);
+                    buildWhereClause(
+                        whereClauseKind, request.keyspace, request.object, request.arguments);
                 query(select + viewWhereClause, schemaRowsBuilder::withViews);
               });
     }
-    if (isFullOrKeyspace || scope == SchemaChangeScope.FUNCTION) {
+    if (isFullOrKeyspace || request.scope == SchemaChangeScope.FUNCTION) {
       query(selectFunctionsQuery() + whereClause, schemaRowsBuilder::withFunctions);
     }
-    if (isFullOrKeyspace || scope == SchemaChangeScope.AGGREGATE) {
+    if (isFullOrKeyspace || request.scope == SchemaChangeScope.AGGREGATE) {
       query(selectAggregatesQuery() + whereClause, schemaRowsBuilder::withAggregates);
     }
   }

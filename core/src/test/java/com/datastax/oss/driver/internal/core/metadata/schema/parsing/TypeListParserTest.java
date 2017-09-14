@@ -24,18 +24,17 @@ import com.datastax.oss.driver.api.core.type.TupleType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeScope;
 import com.datastax.oss.driver.internal.core.metadata.schema.SchemaChangeType;
+import com.datastax.oss.driver.internal.core.metadata.schema.SchemaRefreshRequest;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TypeListParserTest extends SchemaParserTest {
+public class TypeListParserTest extends SchemaParserTestBase {
   private static final CqlIdentifier KEYSPACE_ID = CqlIdentifier.fromInternal("ks");
 
   private TypeListParser parser;
@@ -45,7 +44,11 @@ public class TypeListParserTest extends SchemaParserTest {
     super.setup();
     SchemaRows rows =
         new SchemaRows.Builder(
-                node, SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "table_name", "test")
+                node,
+                new SchemaRefreshRequest(
+                    SchemaChangeType.UPDATED, SchemaChangeScope.KEYSPACE, "ks", null, null),
+                "table_name",
+                "test")
             .build();
     SchemaParser parent = new SchemaParser(rows, currentMetadata, context, "test");
 
