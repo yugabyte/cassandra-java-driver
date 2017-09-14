@@ -139,6 +139,6 @@ public class SchemaParserTest extends SchemaParserTestBase {
     SchemaRows.Builder builder = new SchemaRows.Builder(true, null, "test");
     builderConfig.accept(builder);
     SchemaRows rows = builder.build();
-    return new SchemaParser(currentMetadata, rows, context).parse();
+    return new SchemaParser(rows, context).parse();
   }
 }

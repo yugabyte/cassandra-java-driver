@@ -27,6 +27,7 @@ import com.datastax.oss.driver.internal.core.metadata.schema.events.TableChangeE
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.ViewChangeEvent;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Objects;
@@ -40,18 +41,17 @@ public class SchemaRefresh extends MetadataRefresh {
   @VisibleForTesting public final Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces;
 
   public SchemaRefresh(
-      DefaultMetadata current,
       CompletionStage<Metadata> refreshFuture,
       Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
       String logPrefix) {
-    super(current, logPrefix);
+    super(logPrefix);
     this.refreshFuture = refreshFuture;
     this.newKeyspaces = newKeyspaces;
   }
 
   @Override
-  public void compute() {
-    newMetadata = oldMetadata.withKeyspaces(this.newKeyspaces);
+  public Result compute(DefaultMetadata oldMetadata) {
+    ImmutableList.Builder<Object> events = ImmutableList.builder();
 
     Map<CqlIdentifier, KeyspaceMetadata> oldKeyspaces = oldMetadata.getKeyspaces();
     for (CqlIdentifier removedKey : Sets.difference(oldKeyspaces.keySet(), newKeyspaces.keySet())) {
@@ -59,8 +59,10 @@ public class SchemaRefresh extends MetadataRefresh {
     }
     for (Map.Entry<CqlIdentifier, KeyspaceMetadata> entry : newKeyspaces.entrySet()) {
       CqlIdentifier key = entry.getKey();
-      computeEvents(oldKeyspaces.get(key), entry.getValue());
+      computeEvents(oldKeyspaces.get(key), entry.getValue(), events);
     }
+
+    return new Result(oldMetadata.withKeyspaces(this.newKeyspaces), events.build());
   }
 
   private static boolean shallowEquals(KeyspaceMetadata keyspace1, KeyspaceMetadata keyspace2) {
@@ -77,48 +79,59 @@ public class SchemaRefresh extends MetadataRefresh {
    * initiated by coalesced child element refreshes. We need to traverse all children to check what
    * has exactly changed.
    */
-  private void computeEvents(KeyspaceMetadata oldKeyspace, KeyspaceMetadata newKeyspace) {
+  private void computeEvents(
+      KeyspaceMetadata oldKeyspace,
+      KeyspaceMetadata newKeyspace,
+      ImmutableList.Builder<Object> events) {
     if (oldKeyspace == null) {
       events.add(KeyspaceChangeEvent.created(newKeyspace));
     } else {
       if (!shallowEquals(oldKeyspace, newKeyspace)) {
         events.add(KeyspaceChangeEvent.updated(oldKeyspace, newKeyspace));
       }
-      computeChildEvents(oldKeyspace, newKeyspace);
+      computeChildEvents(oldKeyspace, newKeyspace, events);
     }
   }
 
-  private void computeChildEvents(KeyspaceMetadata oldKeyspace, KeyspaceMetadata newKeyspace) {
+  private void computeChildEvents(
+      KeyspaceMetadata oldKeyspace,
+      KeyspaceMetadata newKeyspace,
+      ImmutableList.Builder<Object> events) {
     computeChildEvents(
         oldKeyspace.getTables(),
         newKeyspace.getTables(),
         TableChangeEvent::dropped,
         TableChangeEvent::created,
-        TableChangeEvent::updated);
+        TableChangeEvent::updated,
+        events);
     computeChildEvents(
         oldKeyspace.getViews(),
         newKeyspace.getViews(),
         ViewChangeEvent::dropped,
         ViewChangeEvent::created,
-        ViewChangeEvent::updated);
+        ViewChangeEvent::updated,
+        events);
     computeChildEvents(
         oldKeyspace.getUserDefinedTypes(),
         newKeyspace.getUserDefinedTypes(),
         TypeChangeEvent::dropped,
         TypeChangeEvent::created,
-        TypeChangeEvent::updated);
+        TypeChangeEvent::updated,
+        events);
     computeChildEvents(
         oldKeyspace.getFunctions(),
         newKeyspace.getFunctions(),
         FunctionChangeEvent::dropped,
         FunctionChangeEvent::created,
-        FunctionChangeEvent::updated);
+        FunctionChangeEvent::updated,
+        events);
     computeChildEvents(
         oldKeyspace.getAggregates(),
         newKeyspace.getAggregates(),
         AggregateChangeEvent::dropped,
         AggregateChangeEvent::created,
-        AggregateChangeEvent::updated);
+        AggregateChangeEvent::updated,
+        events);
   }
 
   private <K, V> void computeChildEvents(
@@ -126,7 +139,8 @@ public class SchemaRefresh extends MetadataRefresh {
       Map<K, V> newChildren,
       Function<V, Object> newDroppedEvent,
       Function<V, Object> newCreatedEvent,
-      BiFunction<V, V, Object> newUpdatedEvent) {
+      BiFunction<V, V, Object> newUpdatedEvent,
+      ImmutableList.Builder<Object> events) {
     for (K removedKey : Sets.difference(oldChildren.keySet(), newChildren.keySet())) {
       events.add(newDroppedEvent.apply(oldChildren.get(removedKey)));
     }

@@ -186,12 +186,12 @@ public class MetadataManager implements AsyncAutoCloseable {
 
     private void initNodes(
         Set<InetSocketAddress> addresses, CompletableFuture<Void> initNodesFuture) {
-      refresh(new InitContactPointsRefresh(metadata, addresses, logPrefix));
+      refresh(new InitContactPointsRefresh(addresses, logPrefix));
       initNodesFuture.complete(null);
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {
-      return refresh(new FullNodeListRefresh(metadata, nodeInfos, logPrefix));
+      return refresh(new FullNodeListRefresh(nodeInfos, logPrefix));
     }
 
     private void addNode(InetSocketAddress address, Optional<NodeInfo> maybeInfo) {
@@ -207,7 +207,7 @@ public class MetadataManager implements AsyncAutoCloseable {
                 address,
                 info.getConnectAddress());
           } else {
-            refresh(new AddNodeRefresh(metadata, info, logPrefix));
+            refresh(new AddNodeRefresh(info, logPrefix));
           }
         } else {
           LOG.debug(
@@ -222,12 +222,12 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private void removeNode(InetSocketAddress address) {
-      refresh(new RemoveNodeRefresh(metadata, address, logPrefix));
+      refresh(new RemoveNodeRefresh(address, logPrefix));
     }
 
     private Void refreshSchema(SchemaRows schemaRows) {
       assert adminExecutor.inEventLoop();
-      MetadataRefresh schemaRefresh = new SchemaParser(metadata, schemaRows, context).parse();
+      MetadataRefresh schemaRefresh = new SchemaParser(schemaRows, context).parse();
       if (schemaRefresh != null) {
         refresh(schemaRefresh);
       }
@@ -248,9 +248,9 @@ public class MetadataManager implements AsyncAutoCloseable {
   Void refresh(MetadataRefresh refresh) {
     assert adminExecutor.inEventLoop();
     if (!singleThreaded.closeWasCalled) {
-      refresh.compute();
-      metadata = refresh.newMetadata;
-      for (Object event : refresh.events) {
+      MetadataRefresh.Result result = refresh.compute(metadata);
+      metadata = result.newMetadata;
+      for (Object event : result.events) {
         context.eventBus().fire(event);
       }
     }

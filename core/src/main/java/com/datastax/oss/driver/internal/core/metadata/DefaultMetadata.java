@@ -56,19 +56,9 @@ public class DefaultMetadata implements Metadata {
     return keyspaces;
   }
 
-  public DefaultMetadata addNode(Node toAdd) {
-    Map<InetSocketAddress, Node> newNodes;
-    if (nodes.containsKey(toAdd.getConnectAddress())) {
-      return this;
-    } else {
-      newNodes =
-          ImmutableMap.<InetSocketAddress, Node>builder()
-              .putAll(nodes)
-              .put(toAdd.getConnectAddress(), toAdd)
-              .build();
-      // TODO recompute token map
-      return new DefaultMetadata(newNodes);
-    }
+  public DefaultMetadata withNodes(Map<InetSocketAddress, Node> newNodes) {
+    // TODO recompute token map
+    return new DefaultMetadata(ImmutableMap.copyOf(newNodes), this.keyspaces);
   }
 
   public DefaultMetadata withKeyspaces(Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces) {

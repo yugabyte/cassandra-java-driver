@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.metadata.schema.ViewMetadata;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.DefaultMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
@@ -36,14 +35,11 @@ import java.util.Map;
 /**
  * The main entry point for system schema rows parsing.
  *
- * <p>
- *
  * <p>For modularity, the code for each element row is split into separate classes (schema stuff is
  * not on the hot path, so creating a few extra objects doesn't matter).
  */
 public class SchemaParser {
 
-  private final DefaultMetadata currentMetadata;
   private final SchemaRows rows;
   private final UserDefinedTypeParser userDefinedTypeParser;
   private final TableParser tableParser;
@@ -52,10 +48,8 @@ public class SchemaParser {
   private final AggregateParser aggregateParser;
   private final String logPrefix;
 
-  public SchemaParser(
-      DefaultMetadata currentMetadata, SchemaRows rows, InternalDriverContext context) {
+  public SchemaParser(SchemaRows rows, InternalDriverContext context) {
     this.rows = rows;
-    this.currentMetadata = currentMetadata;
     this.logPrefix = context.clusterName();
 
     DataTypeParser dataTypeParser =
@@ -74,8 +68,7 @@ public class SchemaParser {
       KeyspaceMetadata keyspace = parseKeyspace(row);
       keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
-    return new SchemaRefresh(
-        currentMetadata, rows.refreshFuture, keyspacesBuilder.build(), logPrefix);
+    return new SchemaRefresh(rows.refreshFuture, keyspacesBuilder.build(), logPrefix);
   }
 
   private KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {

@@ -16,8 +16,7 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.Cluster;
-import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -34,16 +33,26 @@ import java.util.List;
  * @see Cluster#getMetadata()
  */
 public abstract class MetadataRefresh {
-  protected final DefaultMetadata oldMetadata;
-  @VisibleForTesting public DefaultMetadata newMetadata;
-  @VisibleForTesting public final List<Object> events;
+
   protected final String logPrefix;
 
-  protected MetadataRefresh(DefaultMetadata current, String logPrefix) {
-    this.oldMetadata = current;
+  protected MetadataRefresh(String logPrefix) {
     this.logPrefix = logPrefix;
-    this.events = new ArrayList<>();
   }
 
-  public abstract void compute();
+  public abstract Result compute(DefaultMetadata oldMetadata);
+
+  public static class Result {
+    public final DefaultMetadata newMetadata;
+    public final List<Object> events;
+
+    public Result(DefaultMetadata newMetadata, List<Object> events) {
+      this.newMetadata = newMetadata;
+      this.events = events;
+    }
+
+    public Result(DefaultMetadata newMetadata) {
+      this(newMetadata, Collections.emptyList());
+    }
+  }
 }
