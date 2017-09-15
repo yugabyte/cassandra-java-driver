@@ -26,6 +26,7 @@ import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParse
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueries;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
+import com.datastax.oss.driver.internal.core.util.NanoTime;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Debouncer;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
@@ -171,7 +172,6 @@ public class MetadataManager implements AsyncAutoCloseable {
     // (and the ones after that are merged with the queued one).
     private CompletableFuture<Metadata> currentSchemaRefresh;
     private CompletableFuture<Metadata> queuedSchemaRefresh;
-    private long schemaRefreshStart;
 
     private SingleThreaded(DriverConfigProfile config) {
       schemaRefreshDebouncer =
@@ -259,8 +259,7 @@ public class MetadataManager implements AsyncAutoCloseable {
       }
       if (currentSchemaRefresh == null) {
         currentSchemaRefresh = future;
-        LOG.debug("[{}] Starting schema refresh, sending queries", logPrefix);
-        schemaRefreshStart = System.nanoTime();
+        LOG.debug("[{}] Starting schema refresh", logPrefix);
         maybeInitControlConnection()
             // 1. Query system tables
             .thenCompose(v -> SchemaQueries.newInstance(future, context).execute())
@@ -295,19 +294,13 @@ public class MetadataManager implements AsyncAutoCloseable {
     private Void parseAndApplySchemaRows(SchemaRows schemaRows) {
       assert adminExecutor.inEventLoop();
       assert schemaRows.refreshFuture == currentSchemaRefresh;
-      LOG.debug(
-          "[{}] Completed schema queries ({} ns), starting parsing",
-          logPrefix,
-          System.nanoTime() - schemaRefreshStart);
-      this.schemaRefreshStart = System.nanoTime();
       try {
         SchemaRefresh schemaRefresh = new SchemaParser(schemaRows, context).parse();
+        long start = System.nanoTime();
         apply(schemaRefresh);
-        LOG.debug(
-            "[{}] Completed parsing ({} ns), schema refresh complete",
-            logPrefix,
-            System.nanoTime() - schemaRefreshStart);
         currentSchemaRefresh.complete(metadata);
+        LOG.debug(
+            "[{}] Applying schema refresh took {}", logPrefix, NanoTime.formatTimeSince(start));
       } catch (Throwable t) {
         currentSchemaRefresh.completeExceptionally(t);
       }

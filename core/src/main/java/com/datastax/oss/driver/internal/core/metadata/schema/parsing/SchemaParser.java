@@ -28,9 +28,12 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.DefaultKeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
+import com.datastax.oss.driver.internal.core.util.NanoTime;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The main entry point for system schema rows parsing.
@@ -40,6 +43,8 @@ import java.util.Map;
  */
 public class SchemaParser {
 
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaParser.class);
+
   private final SchemaRows rows;
   private final UserDefinedTypeParser userDefinedTypeParser;
   private final TableParser tableParser;
@@ -47,6 +52,7 @@ public class SchemaParser {
   private final FunctionParser functionParser;
   private final AggregateParser aggregateParser;
   private final String logPrefix;
+  private final long startTimeNs = System.nanoTime();
 
   public SchemaParser(SchemaRows rows, InternalDriverContext context) {
     this.rows = rows;
@@ -68,7 +74,9 @@ public class SchemaParser {
       KeyspaceMetadata keyspace = parseKeyspace(row);
       keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
-    return new SchemaRefresh(keyspacesBuilder.build(), logPrefix);
+    SchemaRefresh refresh = new SchemaRefresh(keyspacesBuilder.build(), logPrefix);
+    LOG.debug("[{}] Schema parsing took {}", logPrefix, NanoTime.formatTimeSince(startTimeNs));
+    return refresh;
   }
 
   private KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {

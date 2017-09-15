@@ -25,6 +25,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.NanoTime;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
@@ -98,6 +99,7 @@ public abstract class SchemaQueries {
   // A future that completes later, when the whole refresh is done. We just store it here to pass it
   // down to the next step.
   public final CompletableFuture<Metadata> refreshFuture;
+  private final long startTimeNs = System.nanoTime();
 
   // All non-final fields are accessed exclusively on adminExecutor
   private SchemaRows.Builder schemaRowsBuilder;
@@ -220,6 +222,8 @@ public abstract class SchemaQueries {
       } else {
         pendingQueries -= 1;
         if (pendingQueries == 0) {
+          LOG.debug(
+              "[{}] Schema queries took {}", logPrefix, NanoTime.formatTimeSince(startTimeNs));
           schemaRowsFuture.complete(schemaRowsBuilder.build());
         }
       }
