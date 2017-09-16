@@ -97,7 +97,12 @@ public abstract class RelationParser {
             (TypeCodec<Object>) RelationParser.OPTION_CODECS.get(name.asInternal());
         formattedValue = codec.format(value);
       }
-      builder.newLine().andWith().append(name).append(" = ").append(formattedValue);
+      String optionName = name.asCql(true);
+      if ("local_read_repair_chance".equals(optionName)) {
+        // Another small quirk in C* <= 2.2
+        optionName = "dclocal_read_repair_chance";
+      }
+      builder.newLine().andWith().append(optionName).append(" = ").append(formattedValue);
     }
   }
 
