@@ -70,13 +70,13 @@ public class AggregateChangeEvent {
   public String toString() {
     switch (changeType) {
       case CREATED:
-        return String.format("TypeChangeEvent(CREATED %s)", newAggregate.getSignature());
+        return String.format("AggregateChangeEvent(CREATED %s)", newAggregate.getSignature());
       case UPDATED:
         return String.format(
-            "TypeChangeEvent(UPDATED %s=>%s)",
+            "AggregateChangeEvent(UPDATED %s=>%s)",
             oldAggregate.getSignature(), newAggregate.getSignature());
       case DROPPED:
-        return String.format("TypeChangeEvent(DROPPED %s)", oldAggregate.getSignature());
+        return String.format("AggregateChangeEvent(DROPPED %s)", oldAggregate.getSignature());
       default:
         throw new IllegalStateException("Unsupported change type " + changeType);
     }

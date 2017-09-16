@@ -68,12 +68,12 @@ public class ViewChangeEvent {
   public String toString() {
     switch (changeType) {
       case CREATED:
-        return String.format("TypeChangeEvent(CREATED %s)", newView.getName());
+        return String.format("ViewChangeEvent(CREATED %s)", newView.getName());
       case UPDATED:
         return String.format(
-            "TypeChangeEvent(UPDATED %s=>%s)", oldView.getName(), newView.getName());
+            "ViewChangeEvent(UPDATED %s=>%s)", oldView.getName(), newView.getName());
       case DROPPED:
-        return String.format("TypeChangeEvent(DROPPED %s)", oldView.getName());
+        return String.format("ViewChangeEvent(DROPPED %s)", oldView.getName());
       default:
         throw new IllegalStateException("Unsupported change type " + changeType);
     }

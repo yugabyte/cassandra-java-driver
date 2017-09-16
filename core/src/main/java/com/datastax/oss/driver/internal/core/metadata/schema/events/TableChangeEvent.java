@@ -69,12 +69,12 @@ public class TableChangeEvent {
   public String toString() {
     switch (changeType) {
       case CREATED:
-        return String.format("TypeChangeEvent(CREATED %s)", newTable.getName());
+        return String.format("TableChangeEvent(CREATED %s)", newTable.getName());
       case UPDATED:
         return String.format(
-            "TypeChangeEvent(UPDATED %s=>%s)", oldTable.getName(), newTable.getName());
+            "TableChangeEvent(UPDATED %s=>%s)", oldTable.getName(), newTable.getName());
       case DROPPED:
-        return String.format("TypeChangeEvent(DROPPED %s)", oldTable.getName());
+        return String.format("TableChangeEvent(DROPPED %s)", oldTable.getName());
       default:
         throw new IllegalStateException("Unsupported change type " + changeType);
     }

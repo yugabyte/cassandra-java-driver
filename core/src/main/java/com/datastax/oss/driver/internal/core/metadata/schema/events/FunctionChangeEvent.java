@@ -70,13 +70,13 @@ public class FunctionChangeEvent {
   public String toString() {
     switch (changeType) {
       case CREATED:
-        return String.format("TypeChangeEvent(CREATED %s)", newFunction.getSignature());
+        return String.format("FunctionChangeEvent(CREATED %s)", newFunction.getSignature());
       case UPDATED:
         return String.format(
-            "TypeChangeEvent(UPDATED %s=>%s)",
+            "FunctionChangeEvent(UPDATED %s=>%s)",
             oldFunction.getSignature(), newFunction.getSignature());
       case DROPPED:
-        return String.format("TypeChangeEvent(DROPPED %s)", oldFunction.getSignature());
+        return String.format("FunctionChangeEvent(DROPPED %s)", oldFunction.getSignature());
       default:
         throw new IllegalStateException("Unsupported change type " + changeType);
     }

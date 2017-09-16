@@ -70,12 +70,12 @@ public class KeyspaceChangeEvent {
   public String toString() {
     switch (changeType) {
       case CREATED:
-        return String.format("TypeChangeEvent(CREATED %s)", newKeyspace.getName());
+        return String.format("KeyspaceChangeEvent(CREATED %s)", newKeyspace.getName());
       case UPDATED:
         return String.format(
-            "TypeChangeEvent(UPDATED %s=>%s)", oldKeyspace.getName(), newKeyspace.getName());
+            "KeyspaceChangeEvent(UPDATED %s=>%s)", oldKeyspace.getName(), newKeyspace.getName());
       case DROPPED:
-        return String.format("TypeChangeEvent(DROPPED %s)", oldKeyspace.getName());
+        return String.format("KeyspaceChangeEvent(DROPPED %s)", oldKeyspace.getName());
       default:
         throw new IllegalStateException("Unsupported change type " + changeType);
     }
