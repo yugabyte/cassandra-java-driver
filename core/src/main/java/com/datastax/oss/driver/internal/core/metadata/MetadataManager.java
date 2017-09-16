@@ -332,7 +332,9 @@ public class MetadataManager implements AsyncAutoCloseable {
     assert adminExecutor.inEventLoop();
     MetadataRefresh.Result result = refresh.compute(metadata);
     metadata = result.newMetadata;
-    if (!singleThreaded.closeWasCalled) {
+    boolean isFirstSchemaRefresh =
+        refresh instanceof SchemaRefresh && !singleThreaded.firstSchemaRefreshFuture.isDone();
+    if (!singleThreaded.closeWasCalled && !isFirstSchemaRefresh) {
       for (Object event : result.events) {
         context.eventBus().fire(event);
       }
