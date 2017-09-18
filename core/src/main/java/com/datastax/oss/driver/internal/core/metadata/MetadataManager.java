@@ -24,7 +24,9 @@ import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
-import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueries;
+import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParserFactory;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.DefaultSchemaQueriesFactory;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueriesFactory;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
 import com.datastax.oss.driver.internal.core.util.NanoTime;
@@ -64,7 +66,7 @@ public class MetadataManager implements AsyncAutoCloseable {
     this.logPrefix = context.clusterName();
     this.adminExecutor = context.nettyOptions().adminEventExecutorGroup().next();
     this.config = context.config().getDefaultProfile();
-    this.singleThreaded = new SingleThreaded(config);
+    this.singleThreaded = new SingleThreaded(context, config);
     this.controlConnection = context.controlConnection();
     this.metadata = DefaultMetadata.EMPTY;
     this.schemaEnabledInConfig = config.getBoolean(CoreDriverOption.METADATA_SCHEMA_ENABLED);
@@ -223,20 +225,24 @@ public class MetadataManager implements AsyncAutoCloseable {
     private final CompletableFuture<Void> firstSchemaRefreshFuture = new CompletableFuture<>();
     private final Debouncer<CompletableFuture<Metadata>, CompletableFuture<Metadata>>
         schemaRefreshDebouncer;
+    private final SchemaQueriesFactory schemaQueriesFactory;
+    private final SchemaParserFactory schemaParserFactory;
 
     // We don't allow concurrent schema refreshes. If one is already running, the next one is queued
     // (and the ones after that are merged with the queued one).
     private CompletableFuture<Metadata> currentSchemaRefresh;
     private CompletableFuture<Metadata> queuedSchemaRefresh;
 
-    private SingleThreaded(DriverConfigProfile config) {
-      schemaRefreshDebouncer =
+    private SingleThreaded(InternalDriverContext context, DriverConfigProfile config) {
+      this.schemaRefreshDebouncer =
           new Debouncer<>(
               adminExecutor,
               this::coalesceSchemaRequests,
               this::startSchemaRequest,
               config.getDuration(CoreDriverOption.METADATA_SCHEMA_WINDOW),
               config.getInt(CoreDriverOption.METADATA_SCHEMA_MAX_EVENTS));
+      this.schemaQueriesFactory = context.schemaQueriesFactory();
+      this.schemaParserFactory = context.schemaParserFactory();
     }
 
     private void initNodes(
@@ -318,7 +324,7 @@ public class MetadataManager implements AsyncAutoCloseable {
         LOG.debug("[{}] Starting schema refresh", logPrefix);
         maybeInitControlConnection()
             // 1. Query system tables
-            .thenCompose(v -> SchemaQueries.newInstance(future, context).execute())
+            .thenCompose(v -> schemaQueriesFactory.newInstance(future).execute())
             // 2. Parse the rows into metadata objects, put them in a MetadataRefresh
             // 3. Apply the MetadataRefresh
             .thenApplyAsync(this::parseAndApplySchemaRows, adminExecutor)
@@ -351,7 +357,7 @@ public class MetadataManager implements AsyncAutoCloseable {
       assert adminExecutor.inEventLoop();
       assert schemaRows.refreshFuture == currentSchemaRefresh;
       try {
-        SchemaRefresh schemaRefresh = new SchemaParser(schemaRows, context).parse();
+        SchemaRefresh schemaRefresh = schemaParserFactory.newInstance(schemaRows).parse();
         long start = System.nanoTime();
         apply(schemaRefresh);
         currentSchemaRefresh.complete(metadata);

@@ -79,7 +79,7 @@ public class SchemaParser {
     return refresh;
   }
 
-  private KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {
+  protected KeyspaceMetadata parseKeyspace(AdminRow keyspaceRow) {
 
     // Cassandra <= 2.2
     // CREATE TABLE system.schema_keyspaces (

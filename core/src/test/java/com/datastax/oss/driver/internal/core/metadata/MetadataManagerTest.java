@@ -22,6 +22,8 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
+import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParserFactory;
+import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueriesFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -43,6 +45,7 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.MockitoJUnitRunner;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -59,6 +62,8 @@ public class MetadataManagerTest {
   @Mock private DriverConfig config;
   @Mock private DriverConfigProfile defaultProfile;
   @Mock private EventBus eventBus;
+  @Mock private SchemaQueriesFactory schemaQueriesFactory;
+  @Mock private SchemaParserFactory schemaParserFactory;
 
   private DefaultEventLoopGroup adminEventLoopGroup;
 
@@ -81,6 +86,8 @@ public class MetadataManagerTest {
     Mockito.when(context.config()).thenReturn(config);
 
     Mockito.when(context.eventBus()).thenReturn(eventBus);
+    Mockito.when(context.schemaQueriesFactory()).thenReturn(schemaQueriesFactory);
+    Mockito.when(context.schemaParserFactory()).thenReturn(schemaParserFactory);
 
     metadataManager = new TestMetadataManager(context);
   }
