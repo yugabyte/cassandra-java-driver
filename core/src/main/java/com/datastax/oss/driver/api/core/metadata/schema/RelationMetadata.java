@@ -36,6 +36,10 @@ public interface RelationMetadata extends Describable {
 
   Map<CqlIdentifier, ColumnMetadata> getColumns();
 
+  default ColumnMetadata getColumn(CqlIdentifier columnName) {
+    return getColumns().get(columnName);
+  }
+
   /**
    * The options of this table or materialized view.
    *
