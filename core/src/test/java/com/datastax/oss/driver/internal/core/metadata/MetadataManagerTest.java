@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.google.common.collect.ImmutableList;
@@ -57,6 +58,7 @@ public class MetadataManagerTest {
   @Mock private TopologyMonitor topologyMonitor;
   @Mock private DriverConfig config;
   @Mock private DriverConfigProfile defaultProfile;
+  @Mock private EventBus eventBus;
 
   private DefaultEventLoopGroup adminEventLoopGroup;
 
@@ -77,6 +79,8 @@ public class MetadataManagerTest {
     Mockito.when(defaultProfile.getInt(CoreDriverOption.METADATA_SCHEMA_MAX_EVENTS)).thenReturn(1);
     Mockito.when(config.getDefaultProfile()).thenReturn(defaultProfile);
     Mockito.when(context.config()).thenReturn(config);
+
+    Mockito.when(context.eventBus()).thenReturn(eventBus);
 
     metadataManager = new TestMetadataManager(context);
   }

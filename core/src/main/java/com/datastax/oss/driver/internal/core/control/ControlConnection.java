@@ -17,6 +17,7 @@ package com.datastax.oss.driver.internal.core.control;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
+import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -35,6 +36,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Event;
+import com.datastax.oss.protocol.internal.response.event.SchemaChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
 import com.google.common.collect.ImmutableList;
@@ -149,7 +151,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           processStatusChange(event);
           break;
         case ProtocolConstants.EventType.SCHEMA_CHANGE:
-          context.metadataManager().refreshSchema(false);
+          processSchemaChange(event);
           break;
         default:
           LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
@@ -185,6 +187,11 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       default:
         LOG.warn("[{}] Unsupported status change type: {}", logPrefix, sce.changeType);
     }
+  }
+
+  private void processSchemaChange(Event event) {
+    SchemaChangeEvent sce = (SchemaChangeEvent) event;
+    context.metadataManager().refreshSchema(sce.keyspace, false, false);
   }
 
   private class SingleThreaded {
@@ -356,7 +363,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                   try {
                     // This does nothing if the LBP is initialized already
                     context.loadBalancingPolicyWrapper().init();
-                    context.metadataManager().refreshSchema(true);
+                    context.metadataManager().refreshSchema(null, false, true);
                     // TODO avoid refreshing the token map twice
                   } catch (Throwable t) {
                     LOG.warn("[{}] Unexpected error on control connection reconnect", logPrefix, t);

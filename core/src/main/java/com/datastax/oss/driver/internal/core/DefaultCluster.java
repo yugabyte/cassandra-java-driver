@@ -83,6 +83,21 @@ public class DefaultCluster implements Cluster {
   }
 
   @Override
+  public boolean isSchemaMetadataEnabled() {
+    return metadataManager.isSchemaEnabled();
+  }
+
+  @Override
+  public void setSchemaMetadataEnabled(Boolean newValue) {
+    metadataManager.setSchemaEnabled(newValue);
+  }
+
+  @Override
+  public CompletionStage<Metadata> refreshSchemaAsync() {
+    return metadataManager.refreshSchema(null, true, true);
+  }
+
+  @Override
   public DriverContext getContext() {
     return context;
   }
@@ -185,7 +200,7 @@ public class DefaultCluster implements Cluster {
           }
         }
         if (needSchemaRefresh) {
-          metadataManager.refreshSchema(true);
+          metadataManager.refreshSchema(null, false, true);
         }
         metadataManager.firstSchemaRefreshFuture().thenAccept(this::afterInitialSchemaRefresh);
 

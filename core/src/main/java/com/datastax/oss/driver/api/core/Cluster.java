@@ -68,6 +68,44 @@ public interface Cluster extends AsyncAutoCloseable {
    */
   Metadata getMetadata();
 
+  /** Whether schema metadata is currently enabled. */
+  boolean isSchemaMetadataEnabled();
+
+  /**
+   * Enable or disable schema metadata programmatically.
+   *
+   * <p>Use this method to override the value defined in the driver's configuration; one typical use
+   * case is to temporarily disable schema metadata while the client issues a sequence of DDL
+   * statements.
+   *
+   * <p>If calling this method re-enables the metadata (that is, {@link #isSchemaMetadataEnabled()}
+   * was false before, and becomes true as a result of the call), a refresh is also triggered.
+   *
+   * @param newValue a boolean value to enable or disable schema metadata programmatically, or
+   *     {@code null} to use the driver's configuration.
+   * @see CoreDriverOption#METADATA_SCHEMA_ENABLED
+   */
+  void setSchemaMetadataEnabled(Boolean newValue);
+
+  /**
+   * Force an immediate refresh of the schema metadata, even if it is currently disabled (either in
+   * the configuration or via {@link #setSchemaMetadataEnabled(Boolean)}).
+   *
+   * <p>The new metadata is returned in the resulting future (and will also be reflected by {@link
+   * #getMetadata()} when that future completes).
+   */
+  CompletionStage<Metadata> refreshSchemaAsync();
+
+  /**
+   * Convenience method to call {@link #refreshSchemaAsync()} and block for the result.
+   *
+   * <p>This must not be called on a driver thread.
+   */
+  default Metadata refreshSchema() {
+    BlockingOperation.checkNotDriverThread();
+    return CompletableFutures.getUninterruptibly(refreshSchemaAsync());
+  }
+
   /** Returns a context that provides access to all the policies used by this driver instance. */
   DriverContext getContext();
 

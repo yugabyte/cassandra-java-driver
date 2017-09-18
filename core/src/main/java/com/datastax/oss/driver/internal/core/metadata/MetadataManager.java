@@ -20,6 +20,7 @@ import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigProfile;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
@@ -33,6 +34,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.util.concurrent.EventExecutor;
 import java.net.InetSocketAddress;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -48,17 +50,45 @@ public class MetadataManager implements AsyncAutoCloseable {
   private final InternalDriverContext context;
   private final String logPrefix;
   private final EventExecutor adminExecutor;
+  private final DriverConfigProfile config;
   private final SingleThreaded singleThreaded;
   private final ControlConnection controlConnection;
-  private volatile DefaultMetadata metadata; // must be updated on adminExecutor only
+
+  private volatile DefaultMetadata metadata; // only updated from adminExecutor
+  private volatile boolean schemaEnabledInConfig;
+  private volatile List<String> refreshedKeyspaces;
+  private volatile Boolean schemaEnabledProgrammatically;
 
   public MetadataManager(InternalDriverContext context) {
     this.context = context;
     this.logPrefix = context.clusterName();
     this.adminExecutor = context.nettyOptions().adminEventExecutorGroup().next();
-    this.singleThreaded = new SingleThreaded(context.config().getDefaultProfile());
+    this.config = context.config().getDefaultProfile();
+    this.singleThreaded = new SingleThreaded(config);
     this.controlConnection = context.controlConnection();
     this.metadata = DefaultMetadata.EMPTY;
+    this.schemaEnabledInConfig = config.getBoolean(CoreDriverOption.METADATA_SCHEMA_ENABLED);
+    this.refreshedKeyspaces =
+        config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            ? config.getStringList(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            : Collections.emptyList();
+
+    context.eventBus().register(ConfigChangeEvent.class, this::onConfigChanged);
+  }
+
+  private void onConfigChanged(@SuppressWarnings("unused") ConfigChangeEvent event) {
+    boolean wasEnabledBefore = isSchemaEnabled();
+    List<String> keyspacesBefore = this.refreshedKeyspaces;
+
+    this.schemaEnabledInConfig = config.getBoolean(CoreDriverOption.METADATA_SCHEMA_ENABLED);
+    this.refreshedKeyspaces =
+        config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            ? config.getStringList(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
+            : Collections.emptyList();
+
+    if ((!wasEnabledBefore || !keyspacesBefore.equals(refreshedKeyspaces)) && isSchemaEnabled()) {
+      refreshSchema(null, false, true);
+    }
   }
 
   public Metadata getMetadata() {
@@ -127,12 +157,40 @@ public class MetadataManager implements AsyncAutoCloseable {
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.removeNode(address));
   }
 
-  public CompletionStage<Metadata> refreshSchema(boolean forceFlush) {
-    // TODO check if metadata disabled in config
-    // TODO create an event/API method to force (even if disabled in config)
+  /**
+   * @param keyspace if this refresh was triggered by an event, that event's keyspace, otherwise
+   *     null
+   * @param evenIfDisabled force the refresh even if schema is currently disabled (used for user
+   *     request)
+   * @param flushNow bypass the debouncer and force an immediate refresh (used to avoid a delay at
+   *     startup)
+   */
+  public CompletionStage<Metadata> refreshSchema(
+      String keyspace, boolean evenIfDisabled, boolean flushNow) {
+    boolean isRefreshedKeyspace =
+        keyspace == null || refreshedKeyspaces.isEmpty() || refreshedKeyspaces.contains(keyspace);
     CompletableFuture<Metadata> future = new CompletableFuture<>();
-    RunOrSchedule.on(adminExecutor, () -> singleThreaded.acceptSchemaRequest(future, forceFlush));
+    if (isRefreshedKeyspace && (evenIfDisabled || isSchemaEnabled())) {
+      RunOrSchedule.on(adminExecutor, () -> singleThreaded.acceptSchemaRequest(future, flushNow));
+    } else {
+      future.complete(metadata);
+      singleThreaded.firstSchemaRefreshFuture.complete(null);
+    }
     return future;
+  }
+
+  public boolean isSchemaEnabled() {
+    return (schemaEnabledProgrammatically != null)
+        ? schemaEnabledProgrammatically
+        : schemaEnabledInConfig;
+  }
+
+  public void setSchemaEnabled(Boolean newValue) {
+    boolean wasEnabledBefore = isSchemaEnabled();
+    schemaEnabledProgrammatically = newValue;
+    if (!wasEnabledBefore && isSchemaEnabled()) {
+      refreshSchema(null, false, true);
+    }
   }
 
   /**
@@ -142,8 +200,6 @@ public class MetadataManager implements AsyncAutoCloseable {
   public CompletionStage<Void> firstSchemaRefreshFuture() {
     return singleThreaded.firstSchemaRefreshFuture;
   }
-
-  // TODO user-controlled schema refresh
 
   @Override
   public CompletionStage<Void> closeFuture() {
@@ -225,10 +281,10 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     // An external component has requested a schema refresh, feed it to the debouncer.
-    private void acceptSchemaRequest(CompletableFuture<Metadata> future, boolean forceFlush) {
+    private void acceptSchemaRequest(CompletableFuture<Metadata> future, boolean flushNow) {
       assert adminExecutor.inEventLoop();
       schemaRefreshDebouncer.receive(future);
-      if (forceFlush) {
+      if (flushNow) {
         schemaRefreshDebouncer.flushNow();
       }
     }
