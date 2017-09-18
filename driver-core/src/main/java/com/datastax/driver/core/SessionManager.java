@@ -150,11 +150,6 @@ class SessionManager extends AbstractSession {
 
     @Override
     protected ListenableFuture<PreparedStatement> prepareAsync(String query, String keyspace, Map<String, ByteBuffer> customPayload) {
-        try {
-            checkCanSetKeyspace(keyspace);
-        } catch (UnsupportedFeatureException ufe) {
-            return Futures.immediateFailedFuture(ufe);
-        }
         Requests.Prepare request = new Requests.Prepare(query, keyspace);
         request.setCustomPayload(customPayload);
         Connection.Future future = new Connection.Future(request);
@@ -216,11 +211,11 @@ class SessionManager extends AbstractSession {
                             case PREPARED:
                                 Responses.Result.Prepared pmsg = (Responses.Result.Prepared) rm;
                                 String keyspaceToUse = poolsState.keyspace;
-                                if (keyspace != null && !keyspace.equals(keyspaceToUse)) {
-                                    try {
-                                        checkCanSetKeyspace(keyspace);
-                                    } catch (UnsupportedFeatureException ufe) {
-                                        return Futures.immediateFailedFuture(ufe);
+                                if (keyspace != null && !Metadata.handleId(keyspace).equals(keyspaceToUse)) {
+                                    if (cluster.manager.protocolVersion().compareTo(ProtocolVersion.V5) < 0) {
+                                        throw new UnsupportedFeatureException(cluster.manager.protocolVersion(), String.format(
+                                                "Statement uses keyspace '%s' which is not the same as the" +
+                                                        " session keyspace '%s'.", Metadata.handleId(keyspace), poolsState.keyspace));
                                     }
                                     keyspaceToUse = keyspace;
                                 }
@@ -590,8 +585,6 @@ class SessionManager extends AbstractSession {
             Map<String, ByteBuffer> namedValues = rawNamedValues == null ? Collections.<String, ByteBuffer>emptyMap() : rawNamedValues;
 
             String qString = rs.getQueryString(codecRegistry);
-
-            checkCanSetKeyspace(statement.getKeyspace());
 
             Requests.QueryProtocolOptions options = new Requests.QueryProtocolOptions(Message.Request.Type.QUERY, consistency, positionalValues, namedValues,
                     false, fetchSize, usedPagingState, serialConsistency, defaultTimestamp, statement.getKeyspace());
