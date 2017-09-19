@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
+import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
@@ -35,6 +36,7 @@ import com.google.common.collect.ImmutableList;
 import io.netty.util.concurrent.EventExecutor;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -110,6 +112,18 @@ public class DefaultCluster implements Cluster {
   }
 
   @Override
+  public Cluster register(SchemaChangeListener listener) {
+    RunOrSchedule.on(adminExecutor, () -> singleThreaded.register(listener));
+    return this;
+  }
+
+  @Override
+  public Cluster unregister(SchemaChangeListener listener) {
+    RunOrSchedule.on(adminExecutor, () -> singleThreaded.unregister(listener));
+    return this;
+  }
+
+  @Override
   public CompletionStage<Void> closeFuture() {
     return singleThreaded.closeFuture;
   }
@@ -140,12 +154,14 @@ public class DefaultCluster implements Cluster {
     // is something really wrong in the client program
     private List<Session> sessions;
     private int sessionCounter;
+    private Set<SchemaChangeListener> schemaChangeListeners = new HashSet<>();
 
     private SingleThreaded(InternalDriverContext context, Set<InetSocketAddress> contactPoints) {
       this.context = context;
       this.nodeStateManager = new NodeStateManager(context);
       this.initialContactPoints = contactPoints;
       this.sessions = new ArrayList<>();
+      new SchemaListenerNotifier(schemaChangeListeners, context.eventBus(), adminExecutor);
     }
 
     private void init() {
@@ -248,6 +264,28 @@ public class DefaultCluster implements Cluster {
       }
     }
 
+    private void register(SchemaChangeListener listener) {
+      assert adminExecutor.inEventLoop();
+      if (closeWasCalled) {
+        return;
+      }
+      // We want onRegister to be called before any event. We can add the listener before, because
+      // schema events are processed on this same thread.
+      if (schemaChangeListeners.add(listener)) {
+        listener.onRegister(DefaultCluster.this);
+      }
+    }
+
+    private void unregister(SchemaChangeListener listener) {
+      assert adminExecutor.inEventLoop();
+      if (closeWasCalled) {
+        return;
+      }
+      if (schemaChangeListeners.remove(listener)) {
+        listener.onUnregister(DefaultCluster.this);
+      }
+    }
+
     private void close() {
       assert adminExecutor.inEventLoop();
       if (closeWasCalled) {
@@ -256,6 +294,10 @@ public class DefaultCluster implements Cluster {
       closeWasCalled = true;
 
       LOG.debug("[{}] Starting shutdown", logPrefix);
+      for (SchemaChangeListener listener : schemaChangeListeners) {
+        listener.onUnregister(DefaultCluster.this);
+      }
+      schemaChangeListeners.clear();
       List<CompletionStage<Void>> childrenCloseStages = new ArrayList<>();
       closePolicies();
       for (AsyncAutoCloseable closeable : internalComponentsToClose()) {

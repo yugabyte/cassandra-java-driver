@@ -19,6 +19,7 @@ import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
@@ -139,4 +140,18 @@ public interface Cluster extends AsyncAutoCloseable {
   default Session connect() {
     return connect(null);
   }
+
+  /**
+   * Registers the provided schema change listener.
+   *
+   * <p>This is a no-op if the listener was registered already.
+   */
+  Cluster register(SchemaChangeListener listener);
+
+  /**
+   * Unregisters the provided schema change listener.
+   *
+   * <p>This is a no-op if the listener was not registered.
+   */
+  Cluster unregister(SchemaChangeListener listener);
 }
