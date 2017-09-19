@@ -16,6 +16,7 @@
 package com.datastax.oss.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
 import com.google.common.collect.Iterables;
@@ -33,13 +34,51 @@ public interface KeyspaceMetadata extends Describable {
 
   Map<CqlIdentifier, TableMetadata> getTables();
 
+  default TableMetadata getTable(CqlIdentifier tableId) {
+    return getTables().get(tableId);
+  }
+
   Map<CqlIdentifier, ViewMetadata> getViews();
+
+  default ViewMetadata getView(CqlIdentifier viewId) {
+    return getViews().get(viewId);
+  }
 
   Map<CqlIdentifier, UserDefinedType> getUserDefinedTypes();
 
+  default UserDefinedType getUserDefinedType(CqlIdentifier typeId) {
+    return getUserDefinedTypes().get(typeId);
+  }
+
   Map<FunctionSignature, FunctionMetadata> getFunctions();
 
+  default FunctionMetadata getFunction(FunctionSignature functionSignature) {
+    return getFunctions().get(functionSignature);
+  }
+
+  default FunctionMetadata getFunction(
+      CqlIdentifier functionId, Iterable<DataType> parameterTypes) {
+    return getFunctions().get(new FunctionSignature(functionId, parameterTypes));
+  }
+
+  default FunctionMetadata getFunction(CqlIdentifier functionId, DataType... parameterTypes) {
+    return getFunctions().get(new FunctionSignature(functionId, parameterTypes));
+  }
+
   Map<FunctionSignature, AggregateMetadata> getAggregates();
+
+  default AggregateMetadata getAggregate(FunctionSignature aggregateSignature) {
+    return getAggregates().get(aggregateSignature);
+  }
+
+  default AggregateMetadata getAggregate(
+      CqlIdentifier aggregateId, Iterable<DataType> parameterTypes) {
+    return getAggregates().get(new FunctionSignature(aggregateId, parameterTypes));
+  }
+
+  default AggregateMetadata getAggregate(CqlIdentifier aggregateId, DataType... parameterTypes) {
+    return getAggregates().get(new FunctionSignature(aggregateId, parameterTypes));
+  }
 
   @Override
   default String describe(boolean pretty) {

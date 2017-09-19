@@ -31,7 +31,7 @@ public class FunctionSignature {
   private final CqlIdentifier name;
   private final List<DataType> parameterTypes;
 
-  public FunctionSignature(CqlIdentifier name, List<DataType> parameterTypes) {
+  public FunctionSignature(CqlIdentifier name, Iterable<DataType> parameterTypes) {
     this.name = name;
     this.parameterTypes = ImmutableList.copyOf(parameterTypes);
   }

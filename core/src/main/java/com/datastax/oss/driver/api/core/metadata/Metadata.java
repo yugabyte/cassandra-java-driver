@@ -39,4 +39,8 @@ public interface Metadata {
   Map<InetSocketAddress, Node> getNodes();
 
   Map<CqlIdentifier, KeyspaceMetadata> getKeyspaces();
+
+  default KeyspaceMetadata getKeyspace(CqlIdentifier keyspaceId) {
+    return getKeyspaces().get(keyspaceId);
+  }
 }
