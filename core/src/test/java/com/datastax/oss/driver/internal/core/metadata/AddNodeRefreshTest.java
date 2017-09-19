@@ -32,7 +32,7 @@ public class AddNodeRefreshTest {
   @Test
   public void should_add_new_node() {
     // Given
-    DefaultMetadata oldMetadata = new DefaultMetadata(ImmutableMap.of(ADDRESS1, node1));
+    DefaultMetadata oldMetadata = new DefaultMetadata(ImmutableMap.of(ADDRESS1, node1), "test");
     DefaultNodeInfo newNodeInfo =
         DefaultNodeInfo.builder()
             .withConnectAddress(ADDRESS2)
@@ -56,7 +56,7 @@ public class AddNodeRefreshTest {
   @Test
   public void should_not_add_existing_node() {
     // Given
-    DefaultMetadata oldMetadata = new DefaultMetadata(ImmutableMap.of(ADDRESS1, node1));
+    DefaultMetadata oldMetadata = new DefaultMetadata(ImmutableMap.of(ADDRESS1, node1), "test");
     DefaultNodeInfo newNodeInfo =
         DefaultNodeInfo.builder()
             .withConnectAddress(ADDRESS1)

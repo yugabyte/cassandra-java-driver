@@ -55,7 +55,7 @@ public class SchemaRefresh extends MetadataRefresh {
       computeEvents(oldKeyspaces.get(key), entry.getValue(), events);
     }
 
-    return new Result(oldMetadata.withKeyspaces(this.newKeyspaces), events.build());
+    return new Result(oldMetadata.withSchema(this.newKeyspaces), events.build());
   }
 
   private static boolean shallowEquals(KeyspaceMetadata keyspace1, KeyspaceMetadata keyspace2) {

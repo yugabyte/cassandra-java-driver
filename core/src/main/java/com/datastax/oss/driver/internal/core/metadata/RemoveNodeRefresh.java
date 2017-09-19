@@ -52,7 +52,7 @@ public class RemoveNodeRefresh extends NodesRefresh {
         }
       }
       return new Result(
-          oldMetadata.withNodes(newNodesBuilder.build()),
+          oldMetadata.withNodes(newNodesBuilder.build(), false, null),
           ImmutableList.of(NodeStateEvent.removed((DefaultNode) node)));
     }
   }

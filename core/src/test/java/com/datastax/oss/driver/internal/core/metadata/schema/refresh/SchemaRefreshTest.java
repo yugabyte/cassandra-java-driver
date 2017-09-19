@@ -45,7 +45,7 @@ public class SchemaRefreshTest {
   private static final DefaultKeyspaceMetadata OLD_KS1 = newKeyspace("ks1", true, OLD_T1, OLD_T2);
 
   private DefaultMetadata oldMetadata =
-      DefaultMetadata.EMPTY.withKeyspaces(ImmutableMap.of(OLD_KS1.getName(), OLD_KS1));
+      DefaultMetadata.EMPTY.withSchema(ImmutableMap.of(OLD_KS1.getName(), OLD_KS1));
 
   private static DefaultKeyspaceMetadata newKeyspace(
       String name, boolean durableWrites, UserDefinedType... userTypes) {

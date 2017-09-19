@@ -19,10 +19,12 @@ import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.token.Token;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Metadata about a Cassandra node in the cluster. */
 public interface Node {
@@ -58,7 +60,8 @@ public interface Node {
 
   CassandraVersion getCassandraVersion();
 
-  // TODO tokens? (might be better to have a method on TokenMap)
+  /** The tokens that this node owns on the ring. */
+  Set<Token> getTokens();
 
   /**
    * An additional map of free-form properties.

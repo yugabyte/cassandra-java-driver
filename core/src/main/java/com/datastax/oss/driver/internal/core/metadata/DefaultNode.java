@@ -19,10 +19,13 @@ import com.datastax.oss.driver.api.core.CassandraVersion;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.api.core.metadata.token.Token;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Implementation note: all the mutable state in this class is read concurrently, but only mutated
@@ -37,6 +40,10 @@ public class DefaultNode implements Node {
   volatile String datacenter;
   volatile String rack;
   volatile CassandraVersion cassandraVersion;
+  // Keep a copy of the raw tokens, to avoid re-parsing everything when we refresh the node and the
+  // tokens haven't changed.
+  volatile Set<String> rawTokens;
+  volatile Set<Token> tokens;
   volatile Map<String, Object> extras;
 
   // These 3 fields are read concurrently, but only mutated on NodeStateManager's admin thread
@@ -50,6 +57,9 @@ public class DefaultNode implements Node {
     this.connectAddress = connectAddress;
     this.state = NodeState.UNKNOWN;
     this.distance = NodeDistance.IGNORED;
+    this.rawTokens = Collections.emptySet();
+    this.tokens = Collections.emptySet();
+    this.extras = Collections.emptyMap();
   }
 
   @Override
@@ -80,6 +90,11 @@ public class DefaultNode implements Node {
   @Override
   public CassandraVersion getCassandraVersion() {
     return cassandraVersion;
+  }
+
+  @Override
+  public Set<Token> getTokens() {
+    return tokens;
   }
 
   @Override

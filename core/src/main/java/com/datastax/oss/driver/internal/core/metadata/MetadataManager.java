@@ -23,9 +23,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
-import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParser;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParserFactory;
-import com.datastax.oss.driver.internal.core.metadata.schema.queries.DefaultSchemaQueriesFactory;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueriesFactory;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.refresh.SchemaRefresh;
@@ -120,11 +118,14 @@ public class MetadataManager implements AsyncAutoCloseable {
     return context
         .topologyMonitor()
         .refreshNode(node)
-        // The callback only updates volatile fields so no need to schedule it on adminExecutor
-        .thenApply(
+        .thenApplyAsync(
             maybeInfo -> {
               if (maybeInfo.isPresent()) {
-                NodesRefresh.copyInfos(maybeInfo.get(), (DefaultNode) node, logPrefix);
+                boolean tokensChanged =
+                    NodesRefresh.copyInfos(maybeInfo.get(), (DefaultNode) node, null, logPrefix);
+                if (tokensChanged) {
+                  apply(new TokensChangedRefresh(logPrefix));
+                }
               } else {
                 LOG.debug(
                     "[{}] Topology monitor did not return any info for the refresh of {}, skipping",
@@ -132,7 +133,8 @@ public class MetadataManager implements AsyncAutoCloseable {
                     node);
               }
               return null;
-            });
+            },
+            adminExecutor);
   }
 
   public void addNode(InetSocketAddress address) {
@@ -252,7 +254,7 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {
-      return apply(new FullNodeListRefresh(nodeInfos, logPrefix));
+      return apply(new FullNodeListRefresh(nodeInfos, context));
     }
 
     private void addNode(InetSocketAddress address, Optional<NodeInfo> maybeInfo) {

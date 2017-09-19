@@ -38,14 +38,15 @@ public class AddNodeRefresh extends NodesRefresh {
       return new Result(oldMetadata);
     } else {
       DefaultNode newNode = new DefaultNode(newNodeInfo.getConnectAddress());
-      copyInfos(newNodeInfo, newNode, logPrefix);
+      copyInfos(newNodeInfo, newNode, null, logPrefix);
       Map<InetSocketAddress, Node> newNodes =
           ImmutableMap.<InetSocketAddress, Node>builder()
               .putAll(oldNodes)
               .put(newNode.getConnectAddress(), newNode)
               .build();
       return new Result(
-          oldMetadata.withNodes(newNodes), ImmutableList.of(NodeStateEvent.added(newNode)));
+          oldMetadata.withNodes(newNodes, false, null),
+          ImmutableList.of(NodeStateEvent.added(newNode)));
     }
   }
 }

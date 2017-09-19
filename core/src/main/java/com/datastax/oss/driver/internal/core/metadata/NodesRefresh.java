@@ -16,7 +16,10 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.CassandraVersion;
+import com.datastax.oss.driver.api.core.metadata.token.Token;
+import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +32,12 @@ abstract class NodesRefresh extends MetadataRefresh {
     super(logPrefix);
   }
 
-  protected static void copyInfos(NodeInfo nodeInfo, DefaultNode node, String logPrefix) {
+  /**
+   * @return whether the node's token have changed as a result of this operation (unfortunately we
+   *     mutate the tokens in-place, so there is no way to check this after the fact).
+   */
+  protected static boolean copyInfos(
+      NodeInfo nodeInfo, DefaultNode node, TokenFactory tokenFactory, String logPrefix) {
     node.broadcastAddress = nodeInfo.getBroadcastAddress();
     node.listenAddress = nodeInfo.getListenAddress();
     node.datacenter = nodeInfo.getDatacenter();
@@ -38,11 +46,29 @@ abstract class NodesRefresh extends MetadataRefresh {
     try {
       node.cassandraVersion = CassandraVersion.parse(versionString);
     } catch (IllegalArgumentException e) {
-      LOG.warn("[{}] Error converting Cassandra version '{}'", logPrefix, versionString);
+      LOG.warn(
+          "[{}] Error converting Cassandra version '{}' for {}",
+          logPrefix,
+          versionString,
+          node.getConnectAddress());
+    }
+    boolean tokensChanged = tokenFactory != null && !node.rawTokens.equals(nodeInfo.getTokens());
+    if (tokensChanged) {
+      try {
+        ImmutableSet.Builder<Token> tokensBuilder = ImmutableSet.builder();
+        for (String tokenString : nodeInfo.getTokens()) {
+          tokensBuilder.add(tokenFactory.parse(tokenString));
+        }
+        node.rawTokens = nodeInfo.getTokens();
+        node.tokens = tokensBuilder.build();
+      } catch (Throwable t) {
+        LOG.warn("[{}] Error parsing tokens for {}", logPrefix, node.getConnectAddress());
+      }
     }
     node.extras =
         (nodeInfo.getExtras() == null)
             ? Collections.emptyMap()
             : ImmutableMap.copyOf(nodeInfo.getExtras());
+    return tokensChanged;
   }
 }

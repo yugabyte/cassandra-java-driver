@@ -4,6 +4,7 @@
 
 ### 4.0.0-alpha2 (in progress)
 
+- [new feature] JAVA-1525: Handle token metadata
 - [new feature] JAVA-1493: Handle schema metadata
 - [improvement] JAVA-1542: Enable JaCoCo code coverage
 - [improvement] JAVA-1295: Auto-detect best protocol version in mixed cluster
