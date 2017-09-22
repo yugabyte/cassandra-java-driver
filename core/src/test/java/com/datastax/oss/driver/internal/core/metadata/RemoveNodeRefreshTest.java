@@ -37,7 +37,7 @@ public class RemoveNodeRefreshTest {
     RemoveNodeRefresh refresh = new RemoveNodeRefresh(ADDRESS2, "test");
 
     // When
-    MetadataRefresh.Result result = refresh.compute(oldMetadata);
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false);
 
     // Then
     assertThat(result.newMetadata.getNodes()).containsOnlyKeys(ADDRESS1);
@@ -51,7 +51,7 @@ public class RemoveNodeRefreshTest {
     RemoveNodeRefresh refresh = new RemoveNodeRefresh(ADDRESS2, "test");
 
     // When
-    MetadataRefresh.Result result = refresh.compute(oldMetadata);
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false);
 
     // Then
     assertThat(result.newMetadata.getNodes()).containsOnlyKeys(ADDRESS1);

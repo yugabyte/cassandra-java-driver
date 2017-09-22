@@ -58,6 +58,7 @@ public class MetadataManager implements AsyncAutoCloseable {
   private volatile boolean schemaEnabledInConfig;
   private volatile List<String> refreshedKeyspaces;
   private volatile Boolean schemaEnabledProgrammatically;
+  private volatile boolean tokenMapEnabled;
 
   public MetadataManager(InternalDriverContext context) {
     this.context = context;
@@ -72,12 +73,14 @@ public class MetadataManager implements AsyncAutoCloseable {
         config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
             ? config.getStringList(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
             : Collections.emptyList();
+    this.tokenMapEnabled = config.getBoolean(CoreDriverOption.METADATA_TOKEN_MAP_ENABLED);
 
     context.eventBus().register(ConfigChangeEvent.class, this::onConfigChanged);
   }
 
   private void onConfigChanged(@SuppressWarnings("unused") ConfigChangeEvent event) {
-    boolean wasEnabledBefore = isSchemaEnabled();
+    boolean schemaEnabledBefore = isSchemaEnabled();
+    boolean tokenMapEnabledBefore = tokenMapEnabled;
     List<String> keyspacesBefore = this.refreshedKeyspaces;
 
     this.schemaEnabledInConfig = config.getBoolean(CoreDriverOption.METADATA_SCHEMA_ENABLED);
@@ -85,8 +88,12 @@ public class MetadataManager implements AsyncAutoCloseable {
         config.isDefined(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
             ? config.getStringList(CoreDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES)
             : Collections.emptyList();
+    this.tokenMapEnabled = config.getBoolean(CoreDriverOption.METADATA_TOKEN_MAP_ENABLED);
 
-    if ((!wasEnabledBefore || !keyspacesBefore.equals(refreshedKeyspaces)) && isSchemaEnabled()) {
+    if ((!schemaEnabledBefore
+            || !keyspacesBefore.equals(refreshedKeyspaces)
+            || (!tokenMapEnabledBefore && tokenMapEnabled))
+        && isSchemaEnabled()) {
       refreshSchema(null, false, true);
     }
   }
@@ -394,7 +401,7 @@ public class MetadataManager implements AsyncAutoCloseable {
   @VisibleForTesting
   Void apply(MetadataRefresh refresh) {
     assert adminExecutor.inEventLoop();
-    MetadataRefresh.Result result = refresh.compute(metadata);
+    MetadataRefresh.Result result = refresh.compute(metadata, tokenMapEnabled);
     metadata = result.newMetadata;
     boolean isFirstSchemaRefresh =
         refresh instanceof SchemaRefresh && !singleThreaded.firstSchemaRefreshFuture.isDone();

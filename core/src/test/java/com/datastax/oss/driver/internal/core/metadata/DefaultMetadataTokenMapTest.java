@@ -60,8 +60,18 @@ public class DefaultMetadataTokenMapTest {
         new DefaultMetadata(ImmutableMap.of(ADDRESS1, NODE1), "test");
     DefaultMetadata firstRefreshMetadata =
         contactPointsMetadata.withNodes(
-            ImmutableMap.of(ADDRESS1, NODE1), true, new Murmur3TokenFactory());
+            ImmutableMap.of(ADDRESS1, NODE1), true, true, new Murmur3TokenFactory());
     assertThat(firstRefreshMetadata.getTokenMap().get().getTokenRanges()).hasSize(1);
+  }
+
+  @Test
+  public void should_not_build_token_map_when_disabled() {
+    DefaultMetadata contactPointsMetadata =
+        new DefaultMetadata(ImmutableMap.of(ADDRESS1, NODE1), "test");
+    DefaultMetadata firstRefreshMetadata =
+        contactPointsMetadata.withNodes(
+            ImmutableMap.of(ADDRESS1, NODE1), false, true, new Murmur3TokenFactory());
+    assertThat(firstRefreshMetadata.getTokenMap()).isNotPresent();
   }
 
   @Test
@@ -69,7 +79,7 @@ public class DefaultMetadataTokenMapTest {
     DefaultMetadata contactPointsMetadata =
         new DefaultMetadata(ImmutableMap.of(ADDRESS1, NODE1), "test");
     DefaultMetadata firstRefreshMetadata =
-        contactPointsMetadata.withNodes(ImmutableMap.of(ADDRESS1, NODE1), true, null);
+        contactPointsMetadata.withNodes(ImmutableMap.of(ADDRESS1, NODE1), true, true, null);
     assertThat(firstRefreshMetadata.getTokenMap()).isNotPresent();
   }
 
@@ -79,10 +89,10 @@ public class DefaultMetadataTokenMapTest {
         new DefaultMetadata(ImmutableMap.of(ADDRESS1, NODE1), "test");
     DefaultMetadata firstRefreshMetadata =
         contactPointsMetadata.withNodes(
-            ImmutableMap.of(ADDRESS1, NODE1), true, new Murmur3TokenFactory());
+            ImmutableMap.of(ADDRESS1, NODE1), true, true, new Murmur3TokenFactory());
     DefaultMetadata secondRefreshMetadata =
         firstRefreshMetadata.withNodes(
-            ImmutableMap.of(ADDRESS1, NODE1, ADDRESS2, NODE2), false, null);
+            ImmutableMap.of(ADDRESS1, NODE1, ADDRESS2, NODE2), true, false, null);
     assertThat(secondRefreshMetadata.getTokenMap().get().getTokenRanges()).hasSize(2);
   }
 
@@ -92,9 +102,9 @@ public class DefaultMetadataTokenMapTest {
         new DefaultMetadata(ImmutableMap.of(ADDRESS1, NODE1), "test");
     DefaultMetadata firstRefreshMetadata =
         contactPointsMetadata.withNodes(
-            ImmutableMap.of(ADDRESS1, NODE1), true, new Murmur3TokenFactory());
+            ImmutableMap.of(ADDRESS1, NODE1), true, true, new Murmur3TokenFactory());
     DefaultMetadata schemaRefreshMetadata =
-        firstRefreshMetadata.withSchema(ImmutableMap.of(KEYSPACE_NAME, KEYSPACE));
+        firstRefreshMetadata.withSchema(ImmutableMap.of(KEYSPACE_NAME, KEYSPACE), true);
     assertThat(schemaRefreshMetadata.getTokenMap().get().getTokenRanges(KEYSPACE_NAME, NODE1))
         .isNotEmpty();
   }

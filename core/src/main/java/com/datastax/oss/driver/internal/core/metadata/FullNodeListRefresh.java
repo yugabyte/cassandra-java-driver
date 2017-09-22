@@ -46,7 +46,7 @@ class FullNodeListRefresh extends NodesRefresh {
   }
 
   @Override
-  public Result compute(DefaultMetadata oldMetadata) {
+  public Result compute(DefaultMetadata oldMetadata, boolean tokenMapEnabled) {
     Map<InetSocketAddress, Node> oldNodes = oldMetadata.getNodes();
 
     Map<InetSocketAddress, Node> added = new HashMap<>();
@@ -82,7 +82,8 @@ class FullNodeListRefresh extends NodesRefresh {
       // first refresh, we get here so we need to set the token factory and trigger a token map
       // rebuild:
       if (!oldMetadata.getTokenMap().isPresent() && tokenFactory != null) {
-        return new Result(oldMetadata.withNodes(oldMetadata.getNodes(), true, tokenFactory));
+        return new Result(
+            oldMetadata.withNodes(oldMetadata.getNodes(), tokenMapEnabled, true, tokenFactory));
       } else {
         return new Result(oldMetadata);
       }
@@ -106,7 +107,8 @@ class FullNodeListRefresh extends NodesRefresh {
       }
 
       return new Result(
-          oldMetadata.withNodes(newNodesBuilder.build(), tokensChanged, tokenFactory),
+          oldMetadata.withNodes(
+              newNodesBuilder.build(), tokenMapEnabled, tokensChanged, tokenFactory),
           eventsBuilder.build());
     }
   }

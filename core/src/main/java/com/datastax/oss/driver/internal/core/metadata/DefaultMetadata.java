@@ -23,7 +23,6 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.internal.core.metadata.token.DefaultTokenMap;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.datastax.oss.driver.internal.core.util.NanoTime;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -77,13 +76,16 @@ public class DefaultMetadata implements Metadata {
   }
 
   /**
+   * @param tokenMapEnabled
    * @param tokensChanged whether we observed a change of tokens for at least one node. This will
    *     require a full rebuild of the token map.
    * @param tokenFactory only needed for the initial refresh, afterwards the existing one in the
-   *     token map will be used.
    */
   public DefaultMetadata withNodes(
-      Map<InetSocketAddress, Node> newNodes, boolean tokensChanged, TokenFactory tokenFactory) {
+      Map<InetSocketAddress, Node> newNodes,
+      boolean tokenMapEnabled,
+      boolean tokensChanged,
+      TokenFactory tokenFactory) {
 
     // Force a rebuild if at least one node has different tokens, or there are new or removed nodes.
     boolean forceFullRebuild = tokensChanged || !newNodes.equals(nodes);
@@ -91,24 +93,30 @@ public class DefaultMetadata implements Metadata {
     return new DefaultMetadata(
         ImmutableMap.copyOf(newNodes),
         this.keyspaces,
-        rebuildTokenMap(newNodes, keyspaces, forceFullRebuild, tokenFactory),
+        rebuildTokenMap(newNodes, keyspaces, tokenMapEnabled, forceFullRebuild, tokenFactory),
         logPrefix);
   }
 
-  public DefaultMetadata withSchema(Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces) {
+  public DefaultMetadata withSchema(
+      Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces, boolean tokenMapEnabled) {
     return new DefaultMetadata(
         this.nodes,
         ImmutableMap.copyOf(newKeyspaces),
-        rebuildTokenMap(nodes, newKeyspaces, false, null),
+        rebuildTokenMap(nodes, newKeyspaces, tokenMapEnabled, false, null),
         logPrefix);
   }
 
   private Optional<TokenMap> rebuildTokenMap(
       Map<InetSocketAddress, Node> newNodes,
       Map<CqlIdentifier, KeyspaceMetadata> newKeyspaces,
+      boolean tokenMapEnabled,
       boolean forceFullRebuild,
       TokenFactory tokenFactory) {
 
+    if (!tokenMapEnabled) {
+      LOG.debug("[{}] Token map is disabled, skipping", logPrefix);
+      return this.tokenMap;
+    }
     long start = System.nanoTime();
     try {
       DefaultTokenMap oldTokenMap = (DefaultTokenMap) this.tokenMap.orElse(null);
@@ -118,7 +126,7 @@ public class DefaultMetadata implements Metadata {
           LOG.debug(
               "[{}] Building initial token map but the token factory is missing, skipping",
               logPrefix);
-          return Optional.empty();
+          return this.tokenMap;
         } else {
           LOG.debug("[{}] Building initial token map", logPrefix);
           return Optional.of(

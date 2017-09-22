@@ -51,7 +51,7 @@ public class FullNodeListRefreshTest {
     FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos, context);
 
     // When
-    MetadataRefresh.Result result = refresh.compute(oldMetadata);
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false);
 
     // Then
     assertThat(result.newMetadata.getNodes()).containsOnlyKeys(ADDRESS2, ADDRESS3);
@@ -79,7 +79,7 @@ public class FullNodeListRefreshTest {
     FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos, context);
 
     // When
-    MetadataRefresh.Result result = refresh.compute(oldMetadata);
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false);
 
     // Then
     assertThat(result.newMetadata.getNodes()).containsOnlyKeys(ADDRESS1, ADDRESS2);

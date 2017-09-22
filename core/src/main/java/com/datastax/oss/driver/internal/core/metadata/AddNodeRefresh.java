@@ -32,7 +32,7 @@ public class AddNodeRefresh extends NodesRefresh {
   }
 
   @Override
-  public Result compute(DefaultMetadata oldMetadata) {
+  public Result compute(DefaultMetadata oldMetadata, boolean tokenMapEnabled) {
     Map<InetSocketAddress, Node> oldNodes = oldMetadata.getNodes();
     if (oldNodes.containsKey(newNodeInfo.getConnectAddress())) {
       return new Result(oldMetadata);
@@ -45,7 +45,7 @@ public class AddNodeRefresh extends NodesRefresh {
               .put(newNode.getConnectAddress(), newNode)
               .build();
       return new Result(
-          oldMetadata.withNodes(newNodes, false, null),
+          oldMetadata.withNodes(newNodes, tokenMapEnabled, false, null),
           ImmutableList.of(NodeStateEvent.added(newNode)));
     }
   }

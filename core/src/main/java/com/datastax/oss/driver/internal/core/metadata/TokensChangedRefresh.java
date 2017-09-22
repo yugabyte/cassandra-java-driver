@@ -22,7 +22,7 @@ class TokensChangedRefresh extends MetadataRefresh {
   }
 
   @Override
-  public Result compute(DefaultMetadata oldMetadata) {
-    return new Result(oldMetadata.withNodes(oldMetadata.getNodes(), true, null));
+  public Result compute(DefaultMetadata oldMetadata, boolean tokenMapEnabled) {
+    return new Result(oldMetadata.withNodes(oldMetadata.getNodes(), tokenMapEnabled, true, null));
   }
 }
