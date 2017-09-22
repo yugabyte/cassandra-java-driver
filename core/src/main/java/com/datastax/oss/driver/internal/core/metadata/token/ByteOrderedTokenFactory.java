@@ -18,6 +18,7 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
 import com.datastax.oss.protocol.internal.util.Bytes;
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 
 public class ByteOrderedTokenFactory implements TokenFactory {
@@ -43,12 +44,22 @@ public class ByteOrderedTokenFactory implements TokenFactory {
   }
 
   @Override
+  public String format(Token token) {
+    Preconditions.checkArgument(
+        token instanceof ByteOrderedToken, "Can only format ByteOrderedToken instances");
+    return Bytes.toHexString(((ByteOrderedToken) token).getValue());
+  }
+
+  @Override
   public Token minToken() {
     return MIN_TOKEN;
   }
 
   @Override
   public TokenRange range(Token start, Token end) {
+    Preconditions.checkArgument(
+        start instanceof ByteOrderedToken && end instanceof ByteOrderedToken,
+        "Can only build ranges of ByteOrderedToken instances");
     return new ByteOrderedTokenRange(((ByteOrderedToken) start), ((ByteOrderedToken) end));
   }
 }

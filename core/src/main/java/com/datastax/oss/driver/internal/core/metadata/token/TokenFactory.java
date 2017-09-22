@@ -26,6 +26,8 @@ public interface TokenFactory {
 
   Token parse(String tokenString);
 
+  String format(Token token);
+
   /**
    * The minimum token is a special value that no key ever hashes to, it's used both as lower and
    * upper bound.

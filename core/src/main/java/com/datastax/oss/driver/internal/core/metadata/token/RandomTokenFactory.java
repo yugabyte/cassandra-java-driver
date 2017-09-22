@@ -17,6 +17,7 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
+import com.google.common.base.Preconditions;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -55,12 +56,22 @@ public class RandomTokenFactory implements TokenFactory {
   }
 
   @Override
+  public String format(Token token) {
+    Preconditions.checkArgument(
+        token instanceof RandomToken, "Can only format RandomToken instances");
+    return ((RandomToken) token).getValue().toString();
+  }
+
+  @Override
   public Token minToken() {
     return MIN_TOKEN;
   }
 
   @Override
   public TokenRange range(Token start, Token end) {
+    Preconditions.checkArgument(
+        start instanceof RandomToken && end instanceof RandomToken,
+        "Can only build ranges of RandomToken instances");
     return new RandomTokenRange((RandomToken) start, (RandomToken) end);
   }
 

@@ -94,8 +94,13 @@ public class DefaultTokenMap implements TokenMap {
   }
 
   @Override
-  public Token newToken(String tokenString) {
+  public Token parse(String tokenString) {
     return tokenFactory.parse(tokenString);
+  }
+
+  @Override
+  public String format(Token token) {
+    return tokenFactory.format(token);
   }
 
   @Override

@@ -17,6 +17,7 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 
 public class Murmur3TokenFactory implements TokenFactory {
@@ -36,12 +37,22 @@ public class Murmur3TokenFactory implements TokenFactory {
   }
 
   @Override
+  public String format(Token token) {
+    Preconditions.checkArgument(
+        token instanceof Murmur3Token, "Can only format Murmur3Token instances");
+    return Long.toString(((Murmur3Token) token).getValue());
+  }
+
+  @Override
   public Token minToken() {
     return MIN_TOKEN;
   }
 
   @Override
   public TokenRange range(Token start, Token end) {
+    Preconditions.checkArgument(
+        start instanceof Murmur3Token && end instanceof Murmur3Token,
+        "Can only build ranges of Murmur3Token instances");
     return new Murmur3TokenRange((Murmur3Token) start, (Murmur3Token) end);
   }
 

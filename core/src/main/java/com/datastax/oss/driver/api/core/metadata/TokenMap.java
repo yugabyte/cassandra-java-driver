@@ -39,7 +39,10 @@ import java.util.Set;
 public interface TokenMap {
 
   /** Builds a token from its string representation. */
-  Token newToken(String tokenString);
+  Token parse(String tokenString);
+
+  /** Formats a token into a string representation appropriate for concatenation in a CQL query. */
+  String format(Token token);
 
   /**
    * Builds a token from a partition key.
