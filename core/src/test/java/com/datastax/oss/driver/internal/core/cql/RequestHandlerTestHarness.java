@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.mockito.Mock;
@@ -119,6 +120,9 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     Map<Node, ChannelPool> pools = builder.buildMockPools();
     Mockito.when(session.getPools()).thenReturn(pools);
     Mockito.when(session.getRepreparePayloads()).thenReturn(new ConcurrentHashMap<>());
+
+    Mockito.when(session.setKeyspace(any(CqlIdentifier.class)))
+        .thenReturn(CompletableFuture.completedFuture(null));
   }
 
   public DefaultSession getSession() {
