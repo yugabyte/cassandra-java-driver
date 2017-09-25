@@ -605,7 +605,7 @@ class Requests {
             public int encodedSize(Prepare msg, ProtocolVersion version) {
                 int size = CBUtil.sizeOfLongString(msg.query);
 
-                if (version.compareTo(ProtocolVersion.V5) >= 0 && msg.keyspace != null)
+                if (version.supportsKeyspaceOnQuery() && msg.keyspace != null)
                     size += CBUtil.sizeOfString(msg.keyspace);
                 return size;
             }
