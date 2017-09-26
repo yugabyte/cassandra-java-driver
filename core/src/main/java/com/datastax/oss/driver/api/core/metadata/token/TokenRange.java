@@ -58,6 +58,9 @@ public interface TokenRange extends Comparable<TokenRange> {
   /** Whether this range wraps around the end of the ring. */
   boolean isWrappedAround();
 
+  /** Whether this range represents the full ring. */
+  boolean isFullRing();
+
   /**
    * Splits this range into a list of two non-wrapping ranges. This will return the range itself if
    * it is non-wrapping, or two ranges otherwise.

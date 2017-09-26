@@ -18,9 +18,8 @@ package com.datastax.oss.driver.internal.core.metadata;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
-import com.datastax.oss.driver.api.core.metadata.token.Token;
-import com.datastax.oss.driver.internal.core.metadata.token.Murmur3Token;
 import com.datastax.oss.driver.internal.core.metadata.token.Murmur3TokenFactory;
+import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.net.InetSocketAddress;
@@ -36,8 +35,9 @@ public class DefaultMetadataTokenMapTest {
   // map itself, only how the metadata interacts with it.
   private static final InetSocketAddress ADDRESS1 = new InetSocketAddress("127.0.0.1", 9042);
   private static final InetSocketAddress ADDRESS2 = new InetSocketAddress("127.0.0.2", 9042);
-  private static final Token TOKEN1 = new Murmur3Token(-9000000000000000000L);
-  private static final Token TOKEN2 = new Murmur3Token(9000000000000000000L);
+  private static final String TOKEN1 = "-9000000000000000000";
+  private static final String TOKEN2 = "9000000000000000000";
+  private static final TokenFactory TOKEN_FACTORY = new Murmur3TokenFactory();
   private static final Node NODE1 = mockNode(TOKEN1);
   private static final Node NODE2 = mockNode(TOKEN2);
   private static final CqlIdentifier KEYSPACE_NAME = CqlIdentifier.fromInternal("ks");
@@ -109,9 +109,9 @@ public class DefaultMetadataTokenMapTest {
         .isNotEmpty();
   }
 
-  private static Node mockNode(Token token) {
-    Node node = Mockito.mock(Node.class);
-    Mockito.when(node.getTokens()).thenReturn(ImmutableSet.of(token));
+  private static DefaultNode mockNode(String token) {
+    DefaultNode node = Mockito.mock(DefaultNode.class);
+    Mockito.when(node.getRawTokens()).thenReturn(ImmutableSet.of(token));
     return node;
   }
 

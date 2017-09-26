@@ -108,6 +108,11 @@ public abstract class TokenRangeBase implements TokenRange {
   }
 
   @Override
+  public boolean isFullRing() {
+    return start.equals(minToken) && end.equals(minToken);
+  }
+
+  @Override
   public List<TokenRange> unwrap() {
     if (isWrappedAround()) {
       return ImmutableList.of(newTokenRange(start, minToken), newTokenRange(minToken, end));

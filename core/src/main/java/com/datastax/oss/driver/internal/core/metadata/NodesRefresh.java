@@ -16,10 +16,8 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.CassandraVersion;
-import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,16 +52,7 @@ abstract class NodesRefresh extends MetadataRefresh {
     }
     boolean tokensChanged = tokenFactory != null && !node.rawTokens.equals(nodeInfo.getTokens());
     if (tokensChanged) {
-      try {
-        ImmutableSet.Builder<Token> tokensBuilder = ImmutableSet.builder();
-        for (String tokenString : nodeInfo.getTokens()) {
-          tokensBuilder.add(tokenFactory.parse(tokenString));
-        }
-        node.rawTokens = nodeInfo.getTokens();
-        node.tokens = tokensBuilder.build();
-      } catch (Throwable t) {
-        LOG.warn("[{}] Error parsing tokens for {}", logPrefix, node.getConnectAddress());
-      }
+      node.rawTokens = nodeInfo.getTokens();
     }
     node.extras =
         (nodeInfo.getExtras() == null)

@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -46,10 +47,10 @@ public class DefaultTokenMapTest {
 
   private static final TokenFactory TOKEN_FACTORY = new Murmur3TokenFactory();
 
-  private static final Token TOKEN1 = new Murmur3Token(-9000000000000000000L);
-  private static final Token TOKEN2 = new Murmur3Token(-6000000000000000000L);
-  private static final Token TOKEN3 = new Murmur3Token(4000000000000000000L);
-  private static final Token TOKEN4 = new Murmur3Token(9000000000000000000L);
+  private static final String TOKEN1 = "-9000000000000000000";
+  private static final String TOKEN2 = "-6000000000000000000";
+  private static final String TOKEN3 = "4000000000000000000";
+  private static final String TOKEN4 = "9000000000000000000";
   private static final TokenRange RANGE12 = range(TOKEN1, TOKEN2);
   private static final TokenRange RANGE23 = range(TOKEN2, TOKEN3);
   private static final TokenRange RANGE34 = range(TOKEN3, TOKEN4);
@@ -175,6 +176,7 @@ public class DefaultTokenMapTest {
     // Then
     // Nothing was recomputed
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.replicationConfigs).isSameAs(oldTokenMap.replicationConfigs);
     assertThat(newTokenMap.keyspaceMaps).isSameAs(oldTokenMap.keyspaceMaps);
   }
@@ -200,6 +202,7 @@ public class DefaultTokenMapTest {
 
     // Then
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.keyspaceMaps).isEqualTo(oldTokenMap.keyspaceMaps);
     assertThat(newTokenMap.replicationConfigs)
         .hasSize(2)
@@ -228,6 +231,7 @@ public class DefaultTokenMapTest {
 
     // Then
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.keyspaceMaps).containsOnlyKeys(REPLICATE_ON_BOTH_DCS, REPLICATE_ON_DC1);
     assertThat(newTokenMap.replicationConfigs)
         .hasSize(2)
@@ -256,6 +260,7 @@ public class DefaultTokenMapTest {
 
     // Then
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.keyspaceMaps).containsOnlyKeys(REPLICATE_ON_BOTH_DCS);
     assertThat(newTokenMap.replicationConfigs).hasSize(1).containsEntry(KS1, REPLICATE_ON_BOTH_DCS);
   }
@@ -281,6 +286,7 @@ public class DefaultTokenMapTest {
 
     // Then
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.keyspaceMaps).containsOnlyKeys(REPLICATE_ON_BOTH_DCS);
     assertThat(newTokenMap.replicationConfigs).hasSize(1).containsEntry(KS1, REPLICATE_ON_BOTH_DCS);
   }
@@ -307,6 +313,7 @@ public class DefaultTokenMapTest {
 
     // Then
     assertThat(newTokenMap.tokenRanges).isSameAs(oldTokenMap.tokenRanges);
+    assertThat(newTokenMap.tokenRangesByPrimary).isSameAs(oldTokenMap.tokenRangesByPrimary);
     assertThat(newTokenMap.keyspaceMaps).containsOnlyKeys(REPLICATE_ON_BOTH_DCS);
     assertThat(newTokenMap.replicationConfigs)
         .hasSize(2)
@@ -314,11 +321,11 @@ public class DefaultTokenMapTest {
         .containsEntry(KS2, REPLICATE_ON_BOTH_DCS);
   }
 
-  private Node mockNode(String dc, String rack, Set<Token> tokens) {
-    Node node = Mockito.mock(Node.class);
+  private DefaultNode mockNode(String dc, String rack, Set<String> tokens) {
+    DefaultNode node = Mockito.mock(DefaultNode.class);
     Mockito.when(node.getDatacenter()).thenReturn(dc);
     Mockito.when(node.getRack()).thenReturn(rack);
-    Mockito.when(node.getTokens()).thenReturn(tokens);
+    Mockito.when(node.getRawTokens()).thenReturn(tokens);
     return node;
   }
 
@@ -329,7 +336,11 @@ public class DefaultTokenMapTest {
     return keyspace;
   }
 
-  private static TokenRange range(Token start, Token end) {
-    return new Murmur3TokenRange(((Murmur3Token) start), ((Murmur3Token) end));
+  private static TokenRange range(String start, String end) {
+    return range(TOKEN_FACTORY.parse(start), TOKEN_FACTORY.parse(end));
+  }
+
+  private static TokenRange range(Token startToken, Token endToken) {
+    return new Murmur3TokenRange((Murmur3Token) startToken, (Murmur3Token) endToken);
   }
 }

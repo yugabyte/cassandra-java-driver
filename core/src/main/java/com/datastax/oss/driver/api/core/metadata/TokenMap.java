@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.config.CoreDriverOption;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import com.google.common.collect.ImmutableSet;
 import java.nio.ByteBuffer;
 import java.util.Set;
 
@@ -56,6 +57,23 @@ public interface TokenMap {
 
   /** The token ranges that define data distribution on the ring. */
   Set<TokenRange> getTokenRanges();
+
+  /** The token ranges for which a given node is the primary replica. */
+  Set<TokenRange> getTokenRanges(Node node);
+
+  /**
+   * The tokens owned by the given node.
+   *
+   * <p>This is functionally equivalent to {@code getTokenRanges(node).map(r -> r.getEnd())}. Note
+   * that the set is rebuilt every time you call this method.
+   */
+  default Set<Token> getTokens(Node node) {
+    ImmutableSet.Builder<Token> result = ImmutableSet.builder();
+    for (TokenRange range : getTokenRanges(node)) {
+      result.add(range.getEnd());
+    }
+    return result.build();
+  }
 
   /** The token ranges that are replicated on the given node, for the given keyspace. */
   Set<TokenRange> getTokenRanges(CqlIdentifier keyspace, Node replica);

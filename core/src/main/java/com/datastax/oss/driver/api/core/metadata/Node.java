@@ -60,9 +60,6 @@ public interface Node {
 
   CassandraVersion getCassandraVersion();
 
-  /** The tokens that this node owns on the ring. */
-  Set<Token> getTokens();
-
   /**
    * An additional map of free-form properties.
    *

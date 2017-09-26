@@ -21,11 +21,15 @@ import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.util.RoutingKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.SetMultimap;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,12 +51,24 @@ public class DefaultTokenMap implements TokenMap {
       TokenFactory tokenFactory,
       String logPrefix) {
 
-    TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes);
+    TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory);
     Map<Token, Node> tokenToPrimary = tmp.tokenToPrimary;
     List<Token> ring = tmp.ring;
     LOG.debug("[{}] Rebuilt ring ({} tokens)", logPrefix, ring.size());
 
     Set<TokenRange> tokenRanges = buildTokenRanges(ring, tokenFactory);
+
+    ImmutableSetMultimap.Builder<Node, TokenRange> tokenRangesByPrimary =
+        ImmutableSetMultimap.builder();
+    for (TokenRange range : tokenRanges) {
+      if (range.isFullRing()) {
+        // The full ring is always ]min, min], so getEnd() doesn't match the node's token
+        assert tokenToPrimary.size() == 1;
+        tokenRangesByPrimary.put(tokenToPrimary.values().iterator().next(), range);
+      } else {
+        tokenRangesByPrimary.put(tokenToPrimary.get(range.getEnd()), range);
+      }
+    }
 
     Map<CqlIdentifier, Map<String, String>> replicationConfigs =
         buildReplicationConfigs(keyspaces, logPrefix);
@@ -67,11 +83,17 @@ public class DefaultTokenMap implements TokenMap {
               config, tokenToPrimary, ring, tokenRanges, tokenFactory, logPrefix));
     }
     return new DefaultTokenMap(
-        tokenFactory, tokenRanges, replicationConfigs, keyspaceMapsBuilder.build(), logPrefix);
+        tokenFactory,
+        tokenRanges,
+        tokenRangesByPrimary.build(),
+        replicationConfigs,
+        keyspaceMapsBuilder.build(),
+        logPrefix);
   }
 
   private final TokenFactory tokenFactory;
   @VisibleForTesting final Set<TokenRange> tokenRanges;
+  @VisibleForTesting final SetMultimap<Node, TokenRange> tokenRangesByPrimary;
   @VisibleForTesting final Map<CqlIdentifier, Map<String, String>> replicationConfigs;
   @VisibleForTesting final Map<Map<String, String>, KeyspaceTokenMap> keyspaceMaps;
   private final String logPrefix;
@@ -79,11 +101,13 @@ public class DefaultTokenMap implements TokenMap {
   public DefaultTokenMap(
       TokenFactory tokenFactory,
       Set<TokenRange> tokenRanges,
+      SetMultimap<Node, TokenRange> tokenRangesByPrimary,
       Map<CqlIdentifier, Map<String, String>> replicationConfigs,
       Map<Map<String, String>, KeyspaceTokenMap> keyspaceMaps,
       String logPrefix) {
     this.tokenFactory = tokenFactory;
     this.tokenRanges = tokenRanges;
+    this.tokenRangesByPrimary = tokenRangesByPrimary;
     this.replicationConfigs = replicationConfigs;
     this.keyspaceMaps = keyspaceMaps;
     this.logPrefix = logPrefix;
@@ -116,6 +140,11 @@ public class DefaultTokenMap implements TokenMap {
   @Override
   public Set<TokenRange> getTokenRanges() {
     return tokenRanges;
+  }
+
+  @Override
+  public Set<TokenRange> getTokenRanges(Node node) {
+    return tokenRangesByPrimary.get(node);
   }
 
   @Override
@@ -165,7 +194,7 @@ public class DefaultTokenMap implements TokenMap {
       } else {
         LOG.debug("[{}] Computing new keyspace-level data for {}", logPrefix, config);
         if (tokenToPrimary == null) {
-          TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes);
+          TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory);
           tokenToPrimary = tmp.tokenToPrimary;
           ring = tmp.ring;
         }
@@ -178,16 +207,19 @@ public class DefaultTokenMap implements TokenMap {
     return new DefaultTokenMap(
         tokenFactory,
         tokenRanges,
+        tokenRangesByPrimary,
         newReplicationConfigs,
         newKeyspaceMapsBuilder.build(),
         logPrefix);
   }
 
-  private static TokenToPrimaryAndRing buildTokenToPrimaryAndRing(Collection<Node> nodes) {
+  private static TokenToPrimaryAndRing buildTokenToPrimaryAndRing(
+      Collection<Node> nodes, TokenFactory tokenFactory) {
     ImmutableMap.Builder<Token, Node> tokenToPrimaryBuilder = ImmutableMap.builder();
     SortedSet<Token> sortedTokens = new TreeSet<>();
     for (Node node : nodes) {
-      for (Token token : node.getTokens()) {
+      for (String tokenString : ((DefaultNode) node).getRawTokens()) {
+        Token token = tokenFactory.parse(tokenString);
         sortedTokens.add(token);
         tokenToPrimaryBuilder.put(token, node);
       }
