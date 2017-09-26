@@ -21,6 +21,7 @@
 - [improvement] JAVA-1310: Make mapper's ignored properties configurable.
 - [improvement] JAVA-1316: Add strategy for resolving properties into CQL names.
 - [bug] JAVA-1424: Handle new WRITE_FAILURE and READ_FAILURE format in v5 protocol.
+- [bug] JAVA-1630: Fix Metadata.addIfAbsent.
 
 Merged from 3.1.x branch:
 
