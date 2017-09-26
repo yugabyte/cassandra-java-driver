@@ -18,8 +18,9 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,12 +54,12 @@ class NetworkTopologyReplicationStrategy implements ReplicationStrategy {
   }
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public SetMultimap<Token, Node> computeReplicasByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
 
     // This is essentially a copy of org.apache.cassandra.locator.NetworkTopologyStrategy
+    ImmutableSetMultimap.Builder<Token, Node> result = ImmutableSetMultimap.builder();
     Map<String, Set<String>> racks = getRacksInDcs(tokenToPrimary.values());
-    Map<Token, Set<Node>> replicaMap = new HashMap<>(tokenToPrimary.size());
     Map<String, Integer> dcNodeCount = Maps.newHashMapWithExpectedSize(replicationFactors.size());
     Set<String> warnedDcs = Sets.newHashSetWithExpectedSize(replicationFactors.size());
     // find maximum number of nodes in each DC
@@ -136,9 +137,9 @@ class NetworkTopologyReplicationStrategy implements ReplicationStrategy {
         }
       }
 
-      replicaMap.put(ring.get(i), ImmutableSet.copyOf(replicas));
+      result.putAll(ring.get(i), replicas);
     }
-    return replicaMap;
+    return result.build();
   }
 
   private boolean allDone(Map<String, Set<Node>> map, Map<String, Integer> dcNodeCount) {

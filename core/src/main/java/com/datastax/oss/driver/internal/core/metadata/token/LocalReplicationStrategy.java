@@ -17,21 +17,20 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.SetMultimap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 class LocalReplicationStrategy implements ReplicationStrategy {
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public SetMultimap<Token, Node> computeReplicasByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
-    ImmutableMap.Builder<Token, Set<Node>> builder = ImmutableMap.builder();
+    ImmutableSetMultimap.Builder<Token, Node> result = ImmutableSetMultimap.builder();
     for (Map.Entry<Token, Node> entry : tokenToPrimary.entrySet()) {
-      builder.put(entry.getKey(), ImmutableSet.of(entry.getValue()));
+      result.put(entry.getKey(), entry.getValue());
     }
-    return builder.build();
+    return result.build();
   }
 }

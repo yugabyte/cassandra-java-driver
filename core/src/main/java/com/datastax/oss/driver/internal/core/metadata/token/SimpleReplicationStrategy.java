@@ -19,8 +19,8 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.SetMultimap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,19 +40,19 @@ class SimpleReplicationStrategy implements ReplicationStrategy {
   }
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public SetMultimap<Token, Node> computeReplicasByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
 
     int rf = Math.min(replicationFactor, ring.size());
 
-    ImmutableMap.Builder<Token, Set<Node>> result = ImmutableMap.builder();
+    ImmutableSetMultimap.Builder<Token, Node> result = ImmutableSetMultimap.builder();
     for (int i = 0; i < ring.size(); i++) {
       // Consecutive sections of the ring can be assigned to the same node
       Set<Node> replicas = new LinkedHashSet<>();
       for (int j = 0; j < ring.size() && replicas.size() < rf; j++) {
         replicas.add(tokenToPrimary.get(getTokenWrapping(i + j, ring)));
       }
-      result.put(ring.get(i), ImmutableSet.copyOf(replicas));
+      result.putAll(ring.get(i), replicas);
     }
     return result.build();
   }

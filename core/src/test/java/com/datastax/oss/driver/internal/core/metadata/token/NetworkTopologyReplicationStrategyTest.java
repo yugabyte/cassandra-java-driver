@@ -23,9 +23,9 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.SetMultimap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -91,10 +91,11 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "1", DC2, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     // Note: this also asserts the iteration order of the sets (unlike containsEntry(token, set))
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node2);
     assertThat(replicasByToken.get(TOKEN04)).containsExactly(node2, node1);
@@ -127,10 +128,11 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "1", DC2, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node2);
     assertThat(replicasByToken.get(TOKEN03)).containsExactly(node2, node3);
     assertThat(replicasByToken.get(TOKEN05)).containsExactly(node3, node4);
@@ -163,10 +165,11 @@ public class NetworkTopologyReplicationStrategyTest {
             ImmutableMap.of(DC1, "1", DC2, "1", DC3, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node2, node3);
     assertThat(replicasByToken.get(TOKEN05)).containsExactly(node2, node3, node1);
     assertThat(replicasByToken.get(TOKEN09)).containsExactly(node3, node1, node2);
@@ -204,10 +207,11 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "2", DC2, "2"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node2, node3, node4);
     assertThat(replicasByToken.get(TOKEN03)).containsExactly(node1, node2, node3, node4);
     assertThat(replicasByToken.get(TOKEN05)).containsExactly(node2, node3, node4, node1);
@@ -259,10 +263,11 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "2", DC2, "2"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node2, node3, node4);
     assertThat(replicasByToken.get(TOKEN02)).containsExactly(node2, node3, node4, node5);
     assertThat(replicasByToken.get(TOKEN03)).containsExactly(node3, node4, node5, node6);
@@ -327,10 +332,11 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "3", DC2, "3"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    SetMultimap<Token, Node> replicasByToken =
+        strategy.computeReplicasByToken(tokenToPrimary, ring);
 
     // Then
-    assertThat(replicasByToken).hasSameSizeAs(ring);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
     assertThat(replicasByToken.get(TOKEN01))
         .containsExactly(node1, node2, node5, node3, node6, node4);
     assertThat(replicasByToken.get(TOKEN02))
@@ -374,10 +380,10 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_pick_dc_replicas_in_different_racks_first_when_nodes_own_consecutive_tokens() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(3);
+    SetMultimap<Token, Node> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(3);
 
     // Then
-    assertThat(replicasByToken).hasSize(16);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(16);
     assertThat(replicasByToken.get(TOKEN01))
         .containsExactly(node1, node5, node3, node2, node6, node4);
     assertThat(replicasByToken.get(TOKEN02))
@@ -422,10 +428,10 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_pick_dc_replicas_in_different_racks_first_when_all_nodes_contain_all_data() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(4);
+    SetMultimap<Token, Node> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(4);
 
     // Then
-    assertThat(replicasByToken).hasSize(16);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(16);
     assertThat(replicasByToken.get(TOKEN01))
         .containsExactly(node1, node5, node3, node7, node2, node6, node4, node8);
     assertThat(replicasByToken.get(TOKEN02))
@@ -460,7 +466,7 @@ public class NetworkTopologyReplicationStrategyTest {
         .containsExactly(node8, node1, node5, node3, node7, node2, node4, node6);
   }
 
-  private Map<Token, Set<Node>> computeWithDifferentRacksAndConsecutiveTokens(
+  private SetMultimap<Token, Node> computeWithDifferentRacksAndConsecutiveTokens(
       int replicationFactor) {
     List<Token> ring =
         ImmutableList.of(
@@ -510,10 +516,10 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_compute_complex_layout() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeComplexLayout(2);
+    SetMultimap<Token, Node> replicasByToken = computeComplexLayout(2);
 
     // Then
-    assertThat(replicasByToken).hasSize(18);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(18);
     assertThat(replicasByToken.get(TOKEN01)).containsExactly(node1, node5, node2, node6);
     assertThat(replicasByToken.get(TOKEN02)).containsExactly(node1, node5, node2, node6);
     assertThat(replicasByToken.get(TOKEN03)).containsExactly(node5, node3, node2, node6);
@@ -543,10 +549,10 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_compute_complex_layout_with_rf_too_high() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeComplexLayout(4);
+    SetMultimap<Token, Node> replicasByToken = computeComplexLayout(4);
 
     // Then
-    assertThat(replicasByToken).hasSize(18);
+    assertThat(replicasByToken.keySet().size()).isEqualTo(18);
     assertThat(replicasByToken.get(TOKEN01))
         .containsExactly(node1, node5, node3, node2, node6, node4);
     assertThat(replicasByToken.get(TOKEN02))
@@ -585,7 +591,7 @@ public class NetworkTopologyReplicationStrategyTest {
         .containsExactly(node6, node1, node5, node3, node2, node4);
   }
 
-  private Map<Token, Set<Node>> computeComplexLayout(int replicationFactor) {
+  private SetMultimap<Token, Node> computeComplexLayout(int replicationFactor) {
     List<Token> ring =
         ImmutableList.of(
             TOKEN01, TOKEN02, TOKEN03, TOKEN04, TOKEN05, TOKEN06, TOKEN07, TOKEN08, TOKEN09,

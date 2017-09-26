@@ -19,11 +19,10 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
 import com.datastax.oss.driver.internal.core.util.NanoTime;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.SetMultimap;
 import java.nio.ByteBuffer;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,14 +49,15 @@ class KeyspaceTokenMap {
     try {
       ReplicationStrategy strategy = ReplicationStrategy.newInstance(replicationConfig, logPrefix);
 
-      Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
-      Map<Node, Set<TokenRange>> tokenRangesByNode;
+      SetMultimap<Token, Node> replicasByToken =
+          strategy.computeReplicasByToken(tokenToPrimary, ring);
+      SetMultimap<Node, TokenRange> tokenRangesByNode;
       if (ring.size() == 1) {
         // We forced the single range to ]minToken,minToken], make sure to use that instead of relying
         // on the node's token
-        ImmutableMap.Builder<Node, Set<TokenRange>> builder = ImmutableMap.builder();
+        ImmutableSetMultimap.Builder<Node, TokenRange> builder = ImmutableSetMultimap.builder();
         for (Node node : tokenToPrimary.values()) {
-          builder.put(node, tokenRanges);
+          builder.putAll(node, tokenRanges);
         }
         tokenRangesByNode = builder.build();
       } else {
@@ -74,14 +74,14 @@ class KeyspaceTokenMap {
   }
 
   private final List<Token> ring;
-  private final Map<Node, Set<TokenRange>> tokenRangesByNode;
-  private final Map<Token, Set<Node>> replicasByToken;
+  private final SetMultimap<Node, TokenRange> tokenRangesByNode;
+  private final SetMultimap<Token, Node> replicasByToken;
   private final TokenFactory tokenFactory;
 
   private KeyspaceTokenMap(
       List<Token> ring,
-      Map<Node, Set<TokenRange>> tokenRangesByNode,
-      Map<Token, Set<Node>> replicasByToken,
+      SetMultimap<Node, TokenRange> tokenRangesByNode,
+      SetMultimap<Token, Node> replicasByToken,
       TokenFactory tokenFactory) {
     this.ring = ring;
     this.tokenRangesByNode = tokenRangesByNode;
@@ -90,7 +90,7 @@ class KeyspaceTokenMap {
   }
 
   Set<TokenRange> getTokenRanges(Node replica) {
-    return tokenRangesByNode.getOrDefault(replica, Collections.emptySet());
+    return tokenRangesByNode.get(replica);
   }
 
   Set<Node> getReplicas(ByteBuffer partitionKey) {
@@ -104,10 +104,10 @@ class KeyspaceTokenMap {
   private Set<Node> getReplicas(Token token) {
     // If the token happens to be one of the "primary" tokens, get result directly
     Set<Node> nodes = replicasByToken.get(token);
-    if (nodes != null) {
+    if (!nodes.isEmpty()) {
       return nodes;
     }
-    // Otherwise, find closest "primary" token on the ring
+    // Otherwise, find the closest "primary" token on the ring
     int i = Collections.binarySearch(ring, token);
     if (i < 0) {
       i = -i - 1;
@@ -118,20 +118,13 @@ class KeyspaceTokenMap {
     return replicasByToken.get(ring.get(i));
   }
 
-  private static Map<Node, Set<TokenRange>> buildTokenRangesByNode(
-      Set<TokenRange> tokenRanges, Map<Token, Set<Node>> replicasByToken) {
-    Map<Node, ImmutableSet.Builder<TokenRange>> builders = new HashMap<>();
+  private static SetMultimap<Node, TokenRange> buildTokenRangesByNode(
+      Set<TokenRange> tokenRanges, SetMultimap<Token, Node> replicasByToken) {
+    ImmutableSetMultimap.Builder<Node, TokenRange> result = ImmutableSetMultimap.builder();
     for (TokenRange range : tokenRanges) {
-      Set<Node> replicas = replicasByToken.get(range.getEnd());
-      for (Node node : replicas) {
-        ImmutableSet.Builder<TokenRange> nodeRanges =
-            builders.computeIfAbsent(node, k -> ImmutableSet.builder());
-        nodeRanges.add(range);
+      for (Node node : replicasByToken.get(range.getEnd())) {
+        result.put(node, range);
       }
-    }
-    ImmutableMap.Builder<Node, Set<TokenRange>> result = ImmutableMap.builder();
-    for (Map.Entry<Node, ImmutableSet.Builder<TokenRange>> entry : builders.entrySet()) {
-      result.put(entry.getKey(), entry.getValue().build());
     }
     return result.build();
   }
