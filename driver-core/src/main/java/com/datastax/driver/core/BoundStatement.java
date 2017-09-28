@@ -293,6 +293,9 @@ public class BoundStatement extends Statement implements SettableData<BoundState
      */
     @Override
     public String getKeyspace() {
+        if (statement.getQueryKeyspace() != null)
+            return statement.getQueryKeyspace();
+
         return statement.getPreparedId().metadata.size() == 0 ? null : statement.getPreparedId().metadata.getKeyspace(0);
     }
 
