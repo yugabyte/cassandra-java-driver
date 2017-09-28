@@ -15,30 +15,39 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
-import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
-import com.datastax.oss.driver.api.core.cql.ResultSet;
-import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.cql.PrepareRequest;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.session.Request;
+import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RequestHandler;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
-import java.util.concurrent.CompletionStage;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ConcurrentMap;
 
-public class CqlRequestProcessor
-    implements RequestProcessor<ResultSet, CompletionStage<AsyncResultSet>> {
+public class CqlPrepareSyncProcessor
+    implements RequestProcessor<PrepareRequest, PreparedStatement> {
 
-  @Override
-  public boolean canProcess(Request<?, ?> request) {
-    return request instanceof Statement;
+  private final ConcurrentMap<ByteBuffer, DefaultPreparedStatement> preparedStatementsCache;
+
+  public CqlPrepareSyncProcessor(
+      ConcurrentMap<ByteBuffer, DefaultPreparedStatement> preparedStatementsCache) {
+    this.preparedStatementsCache = preparedStatementsCache;
   }
 
   @Override
-  public RequestHandler<ResultSet, CompletionStage<AsyncResultSet>> newHandler(
-      Request<ResultSet, CompletionStage<AsyncResultSet>> request,
+  public boolean canProcess(Request request, GenericType<?> resultType) {
+    return request instanceof PrepareRequest && resultType.equals(PrepareRequest.SYNC);
+  }
+
+  @Override
+  public RequestHandler<PrepareRequest, PreparedStatement> newHandler(
+      PrepareRequest request,
       DefaultSession session,
       InternalDriverContext context,
       String sessionLogPrefix) {
-    return new CqlRequestHandler((Statement<?>) request, session, context, sessionLogPrefix);
+    return new CqlPrepareSyncHandler(
+        request, preparedStatementsCache, session, context, sessionLogPrefix);
   }
 }

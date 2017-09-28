@@ -25,6 +25,8 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.core.type.reflect.GenericType;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
@@ -98,7 +100,7 @@ public class DefaultSession implements Session {
   // its cache.
   // This is raw protocol-level data, as opposed to the actual instances returned to the client
   // (e.g. DefaultPreparedStatement) which are handled at the protocol level (e.g.
-  // CqlPrepareProcessor). We keep the two separate to avoid introducing a dependency from the
+  // CqlPrepareAsyncProcessor). We keep the two separate to avoid introducing a dependency from the
   // session to a particular processor implementation.
   private ConcurrentMap<ByteBuffer, RepreparePayload> repreparePayloads =
       new MapMaker().weakValues().makeMap();
@@ -153,24 +155,35 @@ public class DefaultSession implements Session {
   }
 
   @Override
-  public <SyncResultT, AsyncResultT> SyncResultT execute(
-      Request<SyncResultT, AsyncResultT> request) {
-    return newHandler(request).syncResult();
-  }
-
-  @Override
-  public <SyncResultT, AsyncResultT> AsyncResultT executeAsync(
-      Request<SyncResultT, AsyncResultT> request) {
-    return newHandler(request).asyncResult();
-  }
-
-  private <SyncResultT, AsyncResultT> RequestHandler<SyncResultT, AsyncResultT> newHandler(
-      Request<SyncResultT, AsyncResultT> request) {
+  public <RequestT extends Request, ResultT> ResultT execute(
+      RequestT request, GenericType<ResultT> resultType) {
     if (request.getKeyspace() != null) {
       // TODO CASSANDRA-10145
       throw new UnsupportedOperationException("Per-request keyspaces are not supported yet");
     }
-    return processorRegistry.processorFor(request).newHandler(request, this, context, logPrefix);
+    return processorRegistry
+        .processorFor(request, resultType)
+        .newHandler(request, this, context, logPrefix)
+        .handle();
+  }
+
+  public DriverChannel getChannel(Node node, String logPrefix) {
+    ChannelPool pool = pools.get(node);
+    if (pool == null) {
+      LOG.debug("[{}] No pool to {}, skipping", logPrefix, node);
+      return null;
+    } else {
+      DriverChannel channel = pool.next();
+      if (channel == null) {
+        LOG.trace("[{}] Pool returned no channel for {}, skipping", logPrefix, node);
+        return null;
+      } else if (channel.closeFuture().isDone()) {
+        LOG.trace("[{}] Pool returned closed connection to {}, skipping", logPrefix, node);
+        return null;
+      } else {
+        return channel;
+      }
+    }
   }
 
   public ConcurrentMap<ByteBuffer, RepreparePayload> getRepreparePayloads() {

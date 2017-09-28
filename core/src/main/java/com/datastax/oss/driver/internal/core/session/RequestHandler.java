@@ -15,14 +15,9 @@
  */
 package com.datastax.oss.driver.internal.core.session;
 
-/** Manages the execution of a given request. */
-public interface RequestHandler<SyncResultT, AsyncResultT> {
-  /**
-   * Immediately returns an object that represents the pending request; that object will complete
-   * when the request is done.
-   */
-  AsyncResultT asyncResult();
+import com.datastax.oss.driver.api.core.session.Request;
 
-  /** Blocks until the request is done, and returns an object representing the completed result. */
-  SyncResultT syncResult();
+/** Manages the execution of a given request. */
+public interface RequestHandler<RequestT extends Request, ResultT> {
+  ResultT handle();
 }

@@ -24,15 +24,21 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.cql.DefaultPrepareRequest;
 import java.util.concurrent.CompletionStage;
 
 /**
  * A nexus to send requests to a Cassandra cluster.
  *
- * <p>This is a high-level abstraction that can handle any kind of request (provided that you have
- * registered a custom request processor with the driver). However, for user-friendliness, we also
- * expose overrides for the standard CQL requests that are supported out of the box.
+ * <p>For CQL, it exposes simple methods that take {@link Statement} instances (such a {@link
+ * #execute(Statement)}, {@link #executeAsync(Statement)}, etc).
+ *
+ * <p>At a higher level, it is able to handle arbitrary request and result types ({@link
+ * #execute(Request, GenericType)}), that will be processed by plugins to the driver's request
+ * execution logic. This is intended for future extensions, for example a reactive API for CQL
+ * statements, or graph requests in the Datastax Enterprise driver. For more details on custom
+ * request processors, refer to the manual or the sources (in particular {@code RequestProcessor}).
  */
 public interface Session extends AsyncAutoCloseable {
 
@@ -54,101 +60,76 @@ public interface Session extends AsyncAutoCloseable {
   CqlIdentifier getKeyspace();
 
   /**
-   * Executes a request, and blocks until the result is available.
+   * Executes an arbitrary request.
    *
-   * @return a synchronous result, that provides immediate access to the data as soon as the method
-   *     returns.
+   * @param resultType the type of the result, which determines the internal request processor
+   *     (built-in or custom) that will be used to handle the request.
+   * @see Session
    */
-  <SyncResultT, AsyncResultT> SyncResultT execute(Request<SyncResultT, AsyncResultT> request);
+  <RequestT extends Request, ResultT> ResultT execute(
+      RequestT request, GenericType<ResultT> resultType);
 
   /**
-   * Executes a request, returning as soon as it has been scheduled, but generally before the result
-   * is available.
-   *
-   * @return an asynchronous result, that represents the future completion of the request. The
-   *     client either wait, or schedule a callback to be executed on completion (this is
-   *     implementation-specific).
-   */
-  <SyncResultT, AsyncResultT> AsyncResultT executeAsync(Request<SyncResultT, AsyncResultT> request);
-
-  /**
-   * Executes a CQL statement synchronously.
-   *
-   * <p>This is a convenience method that does the exact same thing as {@link #execute(Request)},
-   * but exposes a more user-friendly signature reminiscent of the 3.x API.
+   * Executes a CQL statement synchronously (the calling thread blocks until the result becomes
+   * available).
    */
   default ResultSet execute(Statement<?> statement) {
-    return execute((Request<ResultSet, CompletionStage<AsyncResultSet>>) statement);
+    return execute(statement, Statement.SYNC);
   }
 
   /**
-   * Executes a CQL statement synchronously.
-   *
-   * <p>This is a convenience method that builds a {@link SimpleStatement#newInstance(String)
-   * SimpleStatement} and passes it to {@link #execute(Request)}.
+   * Executes a CQL statement synchronously (the calling thread blocks until the result becomes
+   * available).
    */
   default ResultSet execute(String query) {
     return execute(SimpleStatement.newInstance(query));
   }
 
   /**
-   * Executes a CQL statement asynchronously.
-   *
-   * <p>This is a convenience method that does the exact same thing as {@link
-   * #executeAsync(Statement)}, but exposes a more user-friendly signature reminiscent of the 3.x
-   * API.
+   * Executes a CQL statement asynchronously (the call returns as soon as the statement was sent,
+   * generally before the result is available).
    */
   default CompletionStage<AsyncResultSet> executeAsync(Statement<?> statement) {
-    return executeAsync((Request<ResultSet, CompletionStage<AsyncResultSet>>) statement);
+    return execute(statement, Statement.ASYNC);
   }
 
   /**
-   * Executes a CQL statement asynchronously.
-   *
-   * <p>This is a convenience method that builds a {@link SimpleStatement#newInstance(String)
-   * SimpleStatement} and passes it to {@link #executeAsync(Statement)}.
+   * Executes a CQL statement asynchronously (the call returns as soon as the statement was sent,
+   * generally before the result is available).
    */
   default CompletionStage<AsyncResultSet> executeAsync(String query) {
     return executeAsync(SimpleStatement.newInstance(query));
   }
 
   /**
-   * Prepares a CQL statement synchronously.
-   *
-   * <p>This is a convenience method that builds a {@link PrepareRequest} and passes it to {@link
-   * #execute(Request)}.
+   * Prepares a CQL statement synchronously (the calling thread blocks until the statement is
+   * prepared).
    */
   default PreparedStatement prepare(SimpleStatement query) {
-    return execute(new DefaultPrepareRequest(query));
+    return execute(new DefaultPrepareRequest(query), PrepareRequest.SYNC);
   }
 
   /**
-   * Prepares a CQL statement synchronously.
-   *
-   * <p>This is a convenience method that builds a {@link PrepareRequest} and passes it to {@link
-   * #execute(Request)}.
+   * Prepares a CQL statement synchronously (the calling thread blocks until the statement is
+   * prepared).
    */
   default PreparedStatement prepare(String query) {
-    return execute(new DefaultPrepareRequest(query));
+    return execute(new DefaultPrepareRequest(query), PrepareRequest.SYNC);
   }
 
   /**
-   * Prepares a CQL statement asynchronously.
-   *
-   * <p>This is a convenience method that builds a {@link PrepareRequest} and passes it to {@link
-   * #executeAsync(Request)}.
+   * Prepares a CQL statement asynchronously (the call returns as soon as the prepare query was
+   * sent, generally before the statement is prepared).
    */
   default CompletionStage<PreparedStatement> prepareAsync(String query) {
-    return executeAsync(new DefaultPrepareRequest(query));
+    return execute(new DefaultPrepareRequest(query), PrepareRequest.ASYNC);
   }
 
   /**
-   * Prepares a CQL statement asynchronously.
-   *
-   * <p>This is a convenience method that builds a {@link PrepareRequest} and passes it to {@link
-   * #executeAsync(Request)}.
+   * Prepares a CQL statement asynchronously (the call returns as soon as the prepare query was
+   * sent, generally before the statement is prepared).
    */
   default CompletionStage<PreparedStatement> prepareAsync(SimpleStatement query) {
-    return executeAsync(new DefaultPrepareRequest(query));
+    return execute(new DefaultPrepareRequest(query), PrepareRequest.ASYNC);
   }
 }
