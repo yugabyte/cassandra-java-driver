@@ -983,6 +983,8 @@ limitations under the License.
                             </execution>
                         </executions>
                     </plugin>
+                    <!-- Disabled by YugaByte temporarily to unblock releases -->
+<!--
                     <plugin>
                         <artifactId>maven-gpg-plugin</artifactId>
                         <executions>
@@ -995,6 +997,7 @@ limitations under the License.
                             </execution>
                         </executions>
                     </plugin>
+-->
                     <plugin>
                         <groupId>org.sonatype.plugins</groupId>
                         <artifactId>nexus-staging-maven-plugin</artifactId>
@@ -1050,6 +1053,7 @@ limitations under the License.
 
     </profiles>
 
+    <!-- Disabled by YugaByte temporarily until we set up publishing to Maven Central -->
 <!--
     <distributionManagement>
         <repository>

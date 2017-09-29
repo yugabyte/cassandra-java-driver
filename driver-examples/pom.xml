@@ -110,7 +110,7 @@
         </dependency>
 
         <!-- Standard annotations -->
-        
+
         <dependency>
             <groupId>javax.inject</groupId>
             <artifactId>javax.inject</artifactId>
@@ -200,7 +200,7 @@
                 </plugins>
             </build>
         </profile>
-        
+
     </profiles>
 
 </project>
