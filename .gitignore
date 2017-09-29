@@ -15,3 +15,6 @@ notes
 /driver-core/dependency-reduced-pom.xml
 .java-version
 
+*.sw?
+*.releaseBackup
+release.properties

@@ -18,6 +18,8 @@ package com.datastax.driver.core.policies;
 import com.datastax.driver.core.AtomicMonotonicTimestampGenerator;
 import com.datastax.driver.core.TimestampGenerator;
 
+import com.yugabyte.driver.core.policies.PartitionAwarePolicy;
+
 /**
  * Policies configured for a {@link com.datastax.driver.core.Cluster} instance.
  */
@@ -61,19 +63,17 @@ public class Policies {
     /**
      * The default load balancing policy.
      * <p/>
-     * The default load balancing policy is {@link DCAwareRoundRobinPolicy} with token
-     * awareness (so {@code new TokenAwarePolicy(new DCAwareRoundRobinPolicy())}).
-     * <p/>
-     * Note that this policy shuffles the replicas when token awareness is used, see
-     * {@link TokenAwarePolicy#TokenAwarePolicy(LoadBalancingPolicy, boolean)} for an
-     * explanation of the tradeoffs.
+     * The default load balancing policy is
+     * {@link com.yugabyte.driver.core.policies.PartitionAwarePolicy PartitionAwarePolicy} with
+     * data-center awareness (so
+     * {@code new PartitionAwarePolicy(new DCAwareRoundRobinPolicy.Builder().build())}).
      *
      * @return the default load balancing policy.
      */
     public static LoadBalancingPolicy defaultLoadBalancingPolicy() {
         // Note: balancing policies are stateful, so we can't store that in a static or that would screw thing
         // up if multiple Cluster instance are started in the same JVM.
-        return new TokenAwarePolicy(DCAwareRoundRobinPolicy.builder().build());
+      return new PartitionAwarePolicy();
     }
 
     /**

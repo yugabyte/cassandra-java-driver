@@ -21,7 +21,7 @@
 
     <groupId>com.datastax.cassandra</groupId>
     <artifactId>cassandra-driver-parent</artifactId>
-    <version>3.3.0</version>
+    <version>3.3.0-yb-1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>DataStax Java Driver for Apache Cassandra</name>
     <description>
@@ -645,6 +645,7 @@
                     </dependencies>
                 </plugin>
 
+<!--
                 <plugin>
                     <groupId>com.mycila</groupId>
                     <artifactId>license-maven-plugin</artifactId>
@@ -690,7 +691,7 @@ limitations under the License.
                         </execution>
                     </executions>
                 </plugin>
-
+-->
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>animal-sniffer-maven-plugin</artifactId>
@@ -1049,12 +1050,14 @@ limitations under the License.
 
     </profiles>
 
+<!--
     <distributionManagement>
         <repository>
             <id>ossrh</id>
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
+-->
 
     <licenses>
         <license>
@@ -1066,10 +1069,10 @@ limitations under the License.
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.com:datastax/java-driver.git</connection>
-        <developerConnection>scm:git:git@github.com:datastax/java-driver.git</developerConnection>
-        <url>https://github.com/datastax/java-driver</url>
-        <tag>3.3.0</tag>
+        <connection>scm:git:git@github.com:yugabyte/datastax-cassandra-java-driver.git</connection>
+        <developerConnection>scm:git:git@github.com:yugabyte/datastax-cassandra-java-driver.git</developerConnection>
+        <url>https://github.com/yugabyte/datastax-cassandra-java-driver</url>
+        <tag>3.3.0-yb-x</tag>
     </scm>
 
     <developers>
@@ -1079,4 +1082,14 @@ limitations under the License.
         </developer>
     </developers>
 
+    <distributionManagement>
+        <repository>
+            <id>${yugabyte.releases.repository.id}</id>
+            <url>${yugabyte.releases.repository.url}</url>
+        </repository>
+        <snapshotRepository>
+            <id>${yugabyte.snapshots.repository.id}</id>
+            <url>${yugabyte.snapshots.repository.url}</url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>

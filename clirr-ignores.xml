@@ -147,4 +147,11 @@
         <justification>False positive, the enclosing class is package-private so this was never exposed</justification>
     </difference>
 
+    <difference>
+        <differenceType>7012</differenceType> <!-- method added -->
+        <className>com/datastax/driver/core/PreparedStatement</className>
+        <method>int[] getRoutingKeyIndexes()</method>
+        <justification>Introduced to access routing key indexes of a prepared statement</justification>
+    </difference>
+
 </differences>

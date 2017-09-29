@@ -132,6 +132,13 @@ public interface PreparedStatement {
     public ByteBuffer getRoutingKey();
 
     /**
+     * Returns the routing key indexes for this query.
+     *
+     * @return the routing key indexes for this query.
+     */
+    public int[] getRoutingKeyIndexes();
+
+    /**
      * Sets a default consistency level for all bound statements
      * created from this prepared statement.
      * <p/>
