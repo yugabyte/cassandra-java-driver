@@ -35,8 +35,11 @@
 
     <modules>
         <module>driver-core</module>
+<!-- Disabled by YugaByte temporarily because of Nexus uploading issues -->
+<!--
         <module>driver-mapping</module>
         <module>driver-extras</module>
+-->
         <module>driver-examples</module>
         <module>driver-tests</module>
         <module>driver-dist</module>
@@ -103,11 +106,13 @@
                 <type>test-jar</type>
             </dependency>
 
+            <!--
             <dependency>
                 <groupId>com.datastax.cassandra</groupId>
                 <artifactId>cassandra-driver-mapping</artifactId>
                 <version>${project.parent.version}</version>
             </dependency>
+            -->
 
             <dependency>
                 <groupId>com.datastax.cassandra</groupId>
