@@ -58,6 +58,10 @@
     <build>
         <finalName>cassandra-java-driver-${project.version}</finalName>
         <plugins>
+            <!-- Javadoc disabled by YugaByte to avoid build issues on JDK 9 / Maven 3.5.0
+                 See https://goo.gl/M3HkGk for the build error. -->
+
+            <!--
             <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>2.9.1</version>
@@ -74,6 +78,8 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
+
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.0.0</version>
@@ -125,4 +131,3 @@
     </build>
 
 </project>
-
