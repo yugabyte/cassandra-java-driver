@@ -26,7 +26,7 @@
 
     <groupId>com.datastax.cassandra</groupId>
     <artifactId>cassandra-driver-parent</artifactId>
-    <version>3.2.0-yb-5-SNAPSHOT</version>
+    <version>3.2.0-yb-5</version>
     <packaging>pom</packaging>
     <name>DataStax Java Driver for Apache Cassandra</name>
     <description>A driver for Apache Cassandra 1.2+ that works exclusively with the Cassandra Query Language version 3
@@ -536,7 +536,7 @@
         <connection>scm:git:git@github.com:YugaByte/datastax-cassandra-java-driver.git</connection>
         <developerConnection>scm:git:git@github.com:YugaByte/datastax-cassandra-java-driver.git</developerConnection>
         <url>https://github.com/YugaByte/datastax-cassandra-java-driver</url>
-        <tag>HEAD</tag>
+        <tag>3.2.0-yb-5</tag>
     </scm>
 
     <developers>
