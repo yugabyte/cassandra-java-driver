@@ -356,7 +356,7 @@
                 <configuration>
                     <tagNameFormat>@{project.version}</tagNameFormat>
                     <preparationGoals>clean verify -Penforce-java8</preparationGoals>
-                    <arguments>${release.arguments}</arguments>
+                    <arguments>-Psonatype-oss-release ${release.arguments}</arguments>
                 </configuration>
             </plugin>
             <plugin>
@@ -533,8 +533,8 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.org:YugaByte/datastax-cassandra-java-driver.git</connection>
-        <developerConnection>scm:git:git@github.org:YugaByte/datastax-cassandra-java-driver.git</developerConnection>
+        <connection>scm:git:git@github.com:YugaByte/datastax-cassandra-java-driver.git</connection>
+        <developerConnection>scm:git:git@github.com:YugaByte/datastax-cassandra-java-driver.git</developerConnection>
         <url>https://github.com/YugaByte/datastax-cassandra-java-driver</url>
         <tag>HEAD</tag>
     </scm>
