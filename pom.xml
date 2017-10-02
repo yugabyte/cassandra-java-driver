@@ -356,7 +356,7 @@
                 <configuration>
                     <tagNameFormat>@{project.version}</tagNameFormat>
                     <preparationGoals>clean verify -Penforce-java8</preparationGoals>
-                    <!-- do NOT specify arguments tag here as it would override the arguments tag in this plugin's definition in the parent POM -->
+                    <arguments>${release.arguments}</arguments>
                 </configuration>
             </plugin>
             <plugin>
