@@ -58,7 +58,8 @@ public class PartitionMetadata implements Host.StateListener, SchemaChangeListen
 
   // Query to load partition metadata for all tables.
   public static final String PARTITIONS_QUERY =
-      "select keyspace_name, table_name, start_key, replica_addresses from system.partitions;";
+      "select keyspace_name, table_name, start_key, replica_addresses " +
+      "from system_schema.partitions;";
 
   private static final Logger logger = LoggerFactory.getLogger(PartitionMetadata.class);
 

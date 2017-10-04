@@ -47,7 +47,7 @@ import java.util.Iterator;
  * The load-balancing policy to direct a statement to the hosts where the tablet for the partition
  * key resides, with the tablet leader host at the beginning of the host list as the preferred
  * host. The hosts are found by computing the hash key and looking them up in the partition metadata
- * from the system.partitions table.
+ * from the system_schema.partitions table.
  *
  * @see PartitionMetadata
  */
