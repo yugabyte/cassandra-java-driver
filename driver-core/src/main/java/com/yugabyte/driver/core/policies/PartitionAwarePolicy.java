@@ -25,6 +25,7 @@ import com.datastax.driver.core.PreparedId;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.TableMetadata;
+import com.datastax.driver.core.UserType;
 import com.datastax.driver.core.policies.ChainableLoadBalancingPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
@@ -42,6 +43,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * The load-balancing policy to direct a statement to the hosts where the tablet for the partition
@@ -169,88 +171,131 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       WritableByteChannel channel = Channels.newChannel(bs);
       ColumnDefinitions variables = pstmt.getVariables();
       for (int i = 0; i < hashIndexes.length; i++) {
-        DataType.Name typeName = variables.getType(hashIndexes[i]).getName();
-        ByteBuffer value = stmt.getBytesUnsafe(hashIndexes[i]);
-        switch (typeName) {
-          case TINYINT:
-          case SMALLINT:
-          case INT:
-          case BIGINT: {
-            // Flip the MSB for integer columns.
-            ByteBuffer bb = ByteBuffer.allocate(value.remaining());
-            bb.put((byte)(value.get() ^ 0x80));
-            while (value.remaining() > 0) {
-              bb.put(value.get());
-            }
-            bb.flip();
-            value = bb;
-            break;
-          }
-          case TIMESTAMP: {
-            // Multiply the timestamp's int64 value by 1000 to adjust the precision in conjunction
-            // to flipping the MSB.
-            ByteBuffer bb = ByteBuffer.allocate(8);
-            bb.putLong((value.getLong() * 1000) ^ 0x8000000000000000L);
-            bb.flip();
-            value = bb;
-            break;
-          }
-          case ASCII:
-          case TEXT:
-          case VARCHAR:
-          case BLOB:
-          case INET:
-          case UUID:
-          case TIMEUUID: {
-            // For BINARY-based columns, escape "\0x00" with "\0x00\0x01" and append "\0x00\0x00"
-            // delimiter unless it is the last column.
-            if (i != hashIndexes.length - 1) {
-              int zeroCount = 0;
-              for (int j = 0; j < value.remaining(); j++) {
-                if (value.get(j) == (byte)0x00) {
-                  zeroCount++;
-                }
-              }
-              ByteBuffer bb = ByteBuffer.allocate(value.remaining() + zeroCount + 2);
-              while (value.remaining() > 0) {
-                byte b = value.get();
-                bb.put(b);
-                if (b == (byte)0x00) {
-                  bb.put((byte)0x01);
-                }
-              }
-              bb.putShort((short)0x0000);
-              bb.flip();
-              value = bb;
-            }
-            break;
-          }
-          case BOOLEAN:
-          case COUNTER:
-          case CUSTOM:
-          case DATE:
-          case DECIMAL:
-          case DOUBLE:
-          case FLOAT:
-          case LIST:
-          case MAP:
-          case SET:
-          case TIME:
-          case TUPLE:
-          case UDT:
-          case VARINT:
-            throw new UnsupportedOperationException("Datatype " + typeName.toString() +
-                                                    " not supported in a primary key column");
-        }
-        channel.write(value);
+        int index = hashIndexes[i];
+        DataType type = variables.getType(index);
+        ByteBuffer value = stmt.getBytesUnsafe(index);
+        AppendValueToChannel(type, value, channel);
       }
       channel.close();
+
       return getKey(bs.toByteArray());
     } catch (IOException e) {
       // IOException should not happen at all given we are writing to the in-memory buffer only. So
       // if it does happen, we just want to log the error but fallback to the default set of hosts.
       logger.error("hash key encoding failed", e);
       return -1;
+    }
+  }
+
+  private static void AppendValueToChannel(DataType type,
+                                           ByteBuffer value,
+                                           WritableByteChannel channel) throws java.io.IOException {
+    DataType.Name typeName = type.getName();
+
+    switch (typeName) {
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case BIGINT:
+      case ASCII:
+      case TEXT:
+      case VARCHAR:
+      case BLOB:
+      case INET:
+      case UUID:
+      case TIMEUUID:
+        channel.write(value);
+        break;
+      case FLOAT: {
+        float float_val = value.getFloat(0);
+        value.rewind();
+        if (Float.isNaN(float_val)) {
+          // Normalize NaN byte representation.
+          value = ByteBuffer.allocate(4);
+          value.putInt(0xff << 23 | 0x1 << 22);
+          value.flip();
+        }
+        channel.write(value);
+        break;
+      }
+      case DOUBLE: {
+        double double_val = value.getDouble(0);
+        value.rewind();
+        if (Double.isNaN(double_val)) {
+          // Normalize NaN byte representation.
+          value = ByteBuffer.allocate(8);
+          value.putLong((long)0x7ff << 52 | (long)0x1 << 51);
+          value.flip();
+        }
+        channel.write(value);
+        break;
+      }
+      case TIMESTAMP: {
+        // Multiply the timestamp's int64 value by 1000 to adjust the precision.
+        ByteBuffer bb = ByteBuffer.allocate(8);
+        bb.putLong(value.getLong() * 1000);
+        bb.flip();
+        value = bb;
+        channel.write(value);
+        break;
+      }
+      case LIST:
+      case SET: {
+        List<DataType> typeArgs = type.getTypeArguments();
+        int length = value.getInt();
+        for (int j = 0; j < length; j++) {
+          // Appending each element.
+          int size = value.getInt();
+          ByteBuffer buf = value.slice();
+          buf.limit(size);
+          AppendValueToChannel(typeArgs.get(0), buf, channel);
+          value.position(value.position() + size);
+        }
+        break;
+      }
+      case MAP: {
+        List<DataType> typeArgs = type.getTypeArguments();
+        int length = value.getInt();
+        for (int j = 0; j < length; j++) {
+          // Appending the key.
+          int size = value.getInt();
+          ByteBuffer buf = value.slice();
+          buf.limit(size);
+          AppendValueToChannel(typeArgs.get(0), buf, channel);
+          value.position(value.position() + size);
+          // Appending the value.
+          size = value.getInt();
+          buf = value.slice();
+          buf.limit(size);
+          AppendValueToChannel(typeArgs.get(1), buf, channel);
+          value.position(value.position() + size);
+        }
+        break;
+      }
+      case UDT: {
+        for (UserType.Field field : (UserType) type) {
+          if (!value.hasRemaining()) {
+            // UDT serialization may omit values of last few fields if they are null.
+            break;
+          }
+          int size = value.getInt();
+          ByteBuffer buf = value.slice();
+          buf.limit(size);
+          AppendValueToChannel(field.getType(), buf, channel);
+          value.position(value.position() + size);
+        }
+        break;
+      }
+      case BOOLEAN:
+      case COUNTER:
+      case CUSTOM:
+      case DATE:
+      case DECIMAL:
+      case TIME:
+      case TUPLE:
+      case VARINT:
+        throw new UnsupportedOperationException("Datatype " + typeName.toString() +
+            " not supported in a primary key column");
     }
   }
 
