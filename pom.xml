@@ -247,6 +247,11 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>2.9</version>
+            </plugin>
+            <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.3</version>
                 <configuration>
@@ -279,12 +284,6 @@
                 </executions>
             </plugin>
 
-            <!-- Javadoc disabled by YugaByte to avoid build issues on JDK 9 / Maven 3.5.0
-                 See https://goo.gl/M3HkGk for the build error.
-                 We have to close / reopen XML comments where the original code has comments.
-            -->
-
-            <!--
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -298,17 +297,13 @@
                         <link>https://docs.oracle.com/javase/8/docs/api/</link>
                         <link>https://google.github.io/guava/releases/19.0/api/docs/</link>
                         <link>http://netty.io/4.0/api/</link>
-            -->
                         <!-- dependencies from driver-extras -->
-            <!--
                         <link>http://www.joda.org/joda-time/apidocs/</link>
                         <link>http://fasterxml.github.io/jackson-core/javadoc/2.6/</link>
                         <link>http://fasterxml.github.io/jackson-databind/javadoc/2.6/</link>
                         <link>https://javaee-spec.java.net/nonav/javadocs/</link>
                     </links>
-            -->
                     <!-- optional dependencies from other modules (must be explicitly declared here in order to be correctly resolved) -->
-            <!--
                     <additionalDependencies>
                         <additionalDependency>
                             <groupId>org.xerial.snappy</groupId>
@@ -361,7 +356,6 @@
                     </execution>
                 </executions>
             </plugin>
-            -->
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -527,9 +521,15 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>1.6</version>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <!-- Added by YugaByte for S3 artifact publishing. -->
