@@ -415,9 +415,13 @@
                     <excludes>
                         <exclude>**/src/main/config/ide/**</exclude>
                         <exclude>**/com/yugabyte/**</exclude>
-                        <exclude>src/main/java/com/datastax/driver/core/DefaultPreparedStatement.java</exclude>
                         <exclude>src/main/java/com/datastax/driver/core/Connection.java</exclude>
+                        <exclude>src/main/java/com/datastax/driver/core/ConsistencyLevel.java</exclude>
+                        <exclude>src/main/java/com/datastax/driver/core/ControlConnection.java</exclude>
+                        <exclude>src/main/java/com/datastax/driver/core/DefaultPreparedStatement.java</exclude>
                         <exclude>src/main/java/com/datastax/driver/core/DefaultResultSetFuture.java</exclude>
+                        <exclude>src/main/java/com/datastax/driver/core/KeyspaceMetadata.java</exclude>
+                        <exclude>src/main/java/com/datastax/driver/core/Metadata.java</exclude>
                         <exclude>src/main/java/com/datastax/driver/core/policies/Policies.java</exclude>
                         <exclude>src/main/java/com/datastax/driver/core/PreparedStatement.java</exclude>
                         <exclude>src/assembly/binary-tarball.xml</exclude>

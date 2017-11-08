@@ -12,12 +12,28 @@
  *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
+ *
+ *   The following only applies to changes made to this file as part of YugaByte development.
+ *
+ *      Portions Copyright (c) YugaByte, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ *   except in compliance with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software distributed under the
+ *   License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ *   either express or implied.  See the License for the specific language governing permissions
+ *   and limitations under the License.
  */
 package com.datastax.driver.core;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.yugabyte.driver.core.TableSplitMetadata;
+import com.yugabyte.driver.core.QualifiedTableName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +58,9 @@ public class Metadata {
     final ConcurrentMap<String, KeyspaceMetadata> keyspaces = new ConcurrentHashMap<String, KeyspaceMetadata>();
     private volatile TokenMap tokenMap;
 
+    // Partition split metadata for each table.
+    private volatile Map<QualifiedTableName, TableSplitMetadata> tableSplits;
+
     final ReentrantLock lock = new ReentrantLock();
 
     // See https://github.com/apache/cassandra/blob/trunk/doc/cql3/CQL.textile#appendixA
@@ -53,6 +72,31 @@ public class Metadata {
             "primary", "quorum", "rename", "revoke", "schema", "select", "set", "table", "to",
             "token", "three", "truncate", "two", "unlogged", "update", "use", "using", "where", "with"
     );
+
+    /**
+     * Set the partition splits metadata for each table. Typically called when refreshing the schema
+     * metadata or the known list of nodes.
+     *
+     * @param tableSplits the table splits map
+     */
+    void setTableSplits(Map<QualifiedTableName, TableSplitMetadata> tableSplits) {
+        this.tableSplits = tableSplits;
+    }
+
+    /**
+     * Returns the partition split metadata for a given table.
+     *
+     * @param keyspaceName the keyspace name
+     * @param tableName the table name
+     * @return the table split metadata
+     */
+    public TableSplitMetadata getTableSplitMetadata(String keyspaceName, String tableName) {
+        if (tableSplits == null) {
+            return null;
+        }
+
+        return tableSplits.get(new QualifiedTableName(keyspaceName, tableName));
+    }
 
     Metadata(Cluster.Manager cluster) {
         this.cluster = cluster;

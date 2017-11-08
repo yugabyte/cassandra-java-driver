@@ -12,16 +12,32 @@
  *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
+ *
+ *   The following only applies to changes made to this file as part of YugaByte development.
+ *
+ *      Portions Copyright (c) YugaByte, Inc.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ *   except in compliance with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software distributed under the
+ *   License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ *   either express or implied.  See the License for the specific language governing permissions
+ *   and limitations under the License.
  */
 package com.datastax.driver.core;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -35,8 +51,12 @@ public class KeyspaceMetadata {
     private static final String STRATEGY_OPTIONS = "strategy_options";
     private static final String REPLICATION = "replication";
 
+    private static final Set<String> SYSTEM_KEYSPACES = ImmutableSet.of(
+        "system", "system_auth", "system_distributed", "system_schema", "system_traces");
+
     private final String name;
     private final boolean durableWrites;
+    private final boolean isSystem;
 
     private final ReplicationStrategy strategy;
     private final Map<String, String> replication;
@@ -53,6 +73,7 @@ public class KeyspaceMetadata {
         this.durableWrites = durableWrites;
         this.replication = replication;
         this.strategy = ReplicationStrategy.create(replication);
+        this.isSystem = isSystem(name);
     }
 
     static KeyspaceMetadata build(Row row, VersionNumber cassandraVersion) {
@@ -69,6 +90,16 @@ public class KeyspaceMetadata {
             boolean durableWrites = row.getBool(DURABLE_WRITES);
             return new KeyspaceMetadata(name, durableWrites, row.getMap(REPLICATION, String.class, String.class));
         }
+    }
+
+    /**
+     * Returns whether keyspace is a system keyspace.
+     *
+     * @param keyspaceName the keyspace name
+     * @return {@code true} if keyspaceName is one of the system keyspaces, {@code false} otherwise.
+     */
+    public static boolean isSystem(String keyspaceName) {
+        return SYSTEM_KEYSPACES.contains(keyspaceName);
     }
 
     /**
@@ -240,6 +271,15 @@ public class KeyspaceMetadata {
      */
     public Collection<AggregateMetadata> getAggregates() {
         return Collections.unmodifiableCollection(aggregates.values());
+    }
+
+    /**
+     * Returns whether this keyspace is a system keyspace.
+     *
+     * @return {@code true} if this is a system keyspace, and {@code false} otherwise
+     */
+    public boolean isSystem() {
+        return isSystem;
     }
 
     AggregateMetadata removeAggregate(String fullName) {

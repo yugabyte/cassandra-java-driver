@@ -31,6 +31,7 @@ import com.datastax.driver.core.policies.ChainableLoadBalancingPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 
+import com.yugabyte.driver.core.TableSplitMetadata;
 import com.yugabyte.driver.core.PartitionMetadata;
 import com.yugabyte.driver.core.utils.Jenkins;
 
@@ -51,21 +52,14 @@ import java.util.List;
  * The load-balancing policy to direct a statement to the hosts where the tablet for the partition
  * key resides, with the tablet leader host at the beginning of the host list as the preferred
  * host. The hosts are found by computing the hash key and looking them up in the partition metadata
- * from the system_schema.partitions table.
+ * from the system.partitions table.
  *
  * @see PartitionMetadata
  */
 public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
 
-  /**
-   * Default partition metadata refresh frequency in seconds.
-   */
-  public static final int DEFAULT_REFRESH_FREQUENCY_SECONDS = 60;
-
   private final LoadBalancingPolicy childPolicy;
-  private final int refreshFrequencySeconds;
   private volatile Metadata clusterMetadata;
-  private volatile PartitionMetadata partitionMetadata;
 
   private static final Logger logger = LoggerFactory.getLogger(PartitionAwarePolicy.class);
 
@@ -73,35 +67,23 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
    * Creates a new {@code PartitionAware} policy.
    *
    * @param childPolicy  the load balancing policy to wrap with partition awareness
-   * @param refreshFrequencySeconds the refresh frequency in seconds for partition metadata
    */
-  public PartitionAwarePolicy(LoadBalancingPolicy childPolicy, int refreshFrequencySeconds) {
+  public PartitionAwarePolicy(LoadBalancingPolicy childPolicy) {
     this.childPolicy = childPolicy;
-    this.refreshFrequencySeconds = refreshFrequencySeconds;
-  }
-
-  /**
-   * Creates a new {@code PartitionAware} policy with additional default data-center awareness.
-   *
-   * @param refreshFrequencySeconds the refresh frequency in seconds for partition metadata
-   */
-  public PartitionAwarePolicy(int refreshFrequencySeconds) {
-    this(new DCAwareRoundRobinPolicy.Builder()
-        .withUsedHostsPerRemoteDc(Integer.MAX_VALUE)
-        .build(), refreshFrequencySeconds);
   }
 
   /**
    * Creates a new {@code PartitionAware} policy with additional default data-center awareness.
    */
   public PartitionAwarePolicy() {
-    this(DEFAULT_REFRESH_FREQUENCY_SECONDS);
+    this(new DCAwareRoundRobinPolicy.Builder()
+        .withUsedHostsPerRemoteDc(Integer.MAX_VALUE)
+        .build());
   }
 
   @Override
   public void init(Cluster cluster, Collection<Host> hosts) {
     clusterMetadata = cluster.getMetadata();
-    partitionMetadata = new PartitionMetadata(cluster, refreshFrequencySeconds);
     childPolicy.init(cluster, hosts);
   }
 
@@ -132,7 +114,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
    * @param cql_hash the CQL hash key
    * @return the corresponding internal YB hash key
    */
-  static int CqlToYBHashCode(long cql_hash) {
+  public static int CqlToYBHashCode(long cql_hash) {
     int hash_code = (int)(cql_hash >> 48);
     hash_code ^= 0x8000; // flip first bit so that negative values are smaller than positives.
     return hash_code;
@@ -144,7 +126,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
    * @param hash the internal YB hash key
    * @return a corresponding CQL hash key
    */
-  static long YBToCqlHashCode(int hash) {
+  public static long YBToCqlHashCode(int hash) {
     long cql_hash = hash ^ 0x8000; // undo the flipped bit
     cql_hash = cql_hash << 48;
     return cql_hash;
@@ -325,9 +307,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     public UpHostIterator(String loggedKeyspace, Statement statement, List<Host> hosts) {
       this.loggedKeyspace = loggedKeyspace;
       this.statement = statement;
-      // When CQL consistency level is set to one,
+      // When the CQL consistency level is set to YB consistent prefix (Cassandra ONE),
       // the reads would end up going only to the leader if the list of hosts are not shuffled.
-      if (statement.getConsistencyLevel() == ConsistencyLevel.ONE) {
+      if (statement.getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
         Collections.shuffle(hosts);
       }
       this.hosts = hosts;
@@ -375,8 +357,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     ColumnDefinitions variables = pstmt.getVariables();
 
     // Look up the hosts for the partition key. Skip statements that do not have bind variables.
-    // Skip also PartitionMetadata's own query to avoid infinite loop.
-    if (variables.size() == 0 || query.equals(PartitionMetadata.PARTITIONS_QUERY))
+    if (variables.size() == 0)
       return null;
     logger.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", " + "query = " + query);
     KeyspaceMetadata keyspace = clusterMetadata.getKeyspace(variables.getKeyspace(0));
@@ -389,15 +370,20 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     if (key < 0)
       return null;
 
-    List<Host> hosts = partitionMetadata.getHostsForKey(table, key);
-    return new UpHostIterator(loggedKeyspace, statement, hosts);
+
+    TableSplitMetadata tableSplitMetadata = clusterMetadata.getTableSplitMetadata(keyspace.getName(), table.getName());
+    if (tableSplitMetadata == null) {
+      return null;
+    }
+
+    return new UpHostIterator(loggedKeyspace, statement, tableSplitMetadata.getHosts(key));
   }
 
   /**
    * Gets the query plan for a {@code BatchStatement}.
    *
    * @param loggedKeyspace  the logged keyspace of the statement
-   * @param statement       the statement
+   * @param batch           the batch statement
    * @return                the query plan, or null when no plan can be determined
    */
   private Iterator<Host> getQueryPlan(String loggedKeyspace, BatchStatement batch) {
