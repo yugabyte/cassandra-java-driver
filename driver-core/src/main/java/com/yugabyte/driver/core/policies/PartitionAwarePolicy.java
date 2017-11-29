@@ -26,6 +26,7 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.TableMetadata;
 import com.datastax.driver.core.UserType;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.policies.ChainableLoadBalancingPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
@@ -41,6 +42,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
+import java.util.Collections;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -308,7 +310,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
 
     private final String loggedKeyspace;
     private final Statement statement;
-    private final Collection<Host> hosts;
+    private final List<Host> hosts;
     private final Iterator<Host> iterator;
     private Iterator<Host> childIterator;
     private Host nextHost;
@@ -320,9 +322,14 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
      * @param statement       the statement
      * @param hosts           the hosts that host the statement's partition key
      */
-    public UpHostIterator(String loggedKeyspace, Statement statement, Collection<Host> hosts) {
+    public UpHostIterator(String loggedKeyspace, Statement statement, List<Host> hosts) {
       this.loggedKeyspace = loggedKeyspace;
       this.statement = statement;
+      // When CQL consistency level is set to one,
+      // the reads would end up going only to the leader if the list of hosts are not shuffled.
+      if (statement.getConsistencyLevel() == ConsistencyLevel.ONE) {
+        Collections.shuffle(hosts);
+      }
       this.hosts = hosts;
       this.iterator = hosts.iterator();
     }
@@ -382,7 +389,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     if (key < 0)
       return null;
 
-    Collection<Host> hosts = partitionMetadata.getHostsForKey(table, key);
+    List<Host> hosts = partitionMetadata.getHostsForKey(table, key);
     return new UpHostIterator(loggedKeyspace, statement, hosts);
   }
 
