@@ -25,14 +25,14 @@ import com.google.common.util.concurrent.Futures;
 public class QueryOptions {
 
     /**
-     * The default consistency level for queries: {@link ConsistencyLevel#LOCAL_ONE}.
+     * The default consistency level for queries: {@link ConsistencyLevel#YB_STRONG}.
      */
-    public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.LOCAL_ONE;
+    public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.YB_STRONG;
 
     /**
-     * The default serial consistency level for conditional updates: {@link ConsistencyLevel#SERIAL}.
+     * The default serial consistency level for conditional updates: {@link ConsistencyLevel#YB_STRONG}.
      */
-    public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL = ConsistencyLevel.SERIAL;
+    public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL = ConsistencyLevel.YB_STRONG;
 
     /**
      * The default fetch size for SELECT queries: 5000.
