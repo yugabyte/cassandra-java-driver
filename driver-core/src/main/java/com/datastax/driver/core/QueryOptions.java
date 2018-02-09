@@ -30,9 +30,9 @@ public class QueryOptions {
     public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.YB_STRONG;
 
     /**
-     * The default serial consistency level for conditional updates: {@link ConsistencyLevel#YB_STRONG}.
+     * The default serial consistency level for conditional updates: {@link ConsistencyLevel#SERIAL}.
      */
-    public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL = ConsistencyLevel.YB_STRONG;
+    public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL = ConsistencyLevel.SERIAL;
 
     /**
      * The default fetch size for SELECT queries: 5000.
