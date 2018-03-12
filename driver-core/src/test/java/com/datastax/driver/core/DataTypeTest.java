@@ -165,6 +165,10 @@ public class DataTypeTest {
                 return new TestValue[]{
                         new TestValue(new BigInteger("12387290982347987032483422342432"), "12387290982347987032483422342432", "12387290982347987032483422342432"),
                         new TestValue(null, null, "NULL"), new TestValue(null, "null", "NULL"), new TestValue(null, "NULL", "NULL")};
+            case JSON:
+                return new TestValue[]{
+                    new TestValue("{\"a\":1}", "'{\"a\":1}'", "'{\"a\":1}'"),
+                    new TestValue(null, null, "NULL"), new TestValue(null, "null", "NULL"), new TestValue(null, "NULL", "NULL")};
             default:
                 throw new RuntimeException("Missing handling of " + dt);
         }

@@ -163,6 +163,14 @@ public abstract class AbstractGettableData extends AbstractGettableByIndexData i
      * {@inheritDoc}
      */
     @Override
+    public String getJson(String name) {
+        return getString(getIndexOf(name));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public BigInteger getVarint(String name) {
         return getVarint(getIndexOf(name));
     }

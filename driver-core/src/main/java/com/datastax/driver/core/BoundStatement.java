@@ -1114,6 +1114,14 @@ public class BoundStatement extends Statement implements SettableData<BoundState
      * {@inheritDoc}
      */
     @Override
+    public String getJson(String name) {
+        return wrapper.getString(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public BigInteger getVarint(int i) {
         return wrapper.getVarint(i);
     }

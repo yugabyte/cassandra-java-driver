@@ -233,6 +233,7 @@ public class UserTypesTest extends CCMTestsSupport {
                     alldatatypes.setInt(index, (Integer) sampleData);
                     break;
                 case TEXT:
+                case JSON:
                     alldatatypes.setString(index, (String) sampleData);
                     break;
                 case TIMESTAMP:

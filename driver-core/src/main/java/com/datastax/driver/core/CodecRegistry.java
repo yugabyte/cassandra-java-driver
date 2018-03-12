@@ -152,6 +152,7 @@ public final class CodecRegistry {
         BUILT_IN_CODECS_MAP.put(DataType.Name.INET, TypeCodec.inet());
         BUILT_IN_CODECS_MAP.put(DataType.Name.INT, TypeCodec.cint());
         BUILT_IN_CODECS_MAP.put(DataType.Name.TEXT, TypeCodec.varchar());
+        BUILT_IN_CODECS_MAP.put(DataType.Name.JSON, TypeCodec.json());
         BUILT_IN_CODECS_MAP.put(DataType.Name.TIMESTAMP, TypeCodec.timestamp());
         BUILT_IN_CODECS_MAP.put(DataType.Name.UUID, TypeCodec.uuid());
         BUILT_IN_CODECS_MAP.put(DataType.Name.VARCHAR, TypeCodec.varchar());

@@ -241,6 +241,21 @@ public interface GettableByNameData {
     public String getString(String name);
 
     /**
+     * Returns the JSON value for {@code name} as a string.
+     * <p/>
+     * This method uses the {@link CodecRegistry} to find a codec to convert the underlying JSON
+     * type to a Java string.
+     *
+     * @param name the name to retrieve.
+     * @return the value for {@code name} as a string. If the value is NULL,
+     * {@code null} is returned.
+     * @throws IllegalArgumentException if {@code name} is not valid name for this object.
+     * @throws CodecNotFoundException   if there is no registered codec to convert the underlying CQL
+     *                                  type to a string.
+     */
+    public String getJson(String name);
+
+    /**
      * Returns the value for {@code name} as a variable length integer.
      * <p/>
      * This method uses the {@link CodecRegistry} to find a codec to convert the underlying CQL type to a {@code BigInteger}

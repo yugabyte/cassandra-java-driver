@@ -238,6 +238,17 @@ public abstract class TypeCodec<T> {
     }
 
     /**
+     * Return the default codec for the CQL type {@code json}.
+     * The returned codec maps the CQL type {@code json} into the Java type {@link String}.
+     * The returned instance is a singleton.
+     *
+     * @return the default codec for CQL type {@code json}.
+     */
+    public static TypeCodec<String> json() {
+        return JsonCodec.instance;
+    }
+
+    /**
      * Return the default codec for the CQL type {@code blob}.
      * The returned codec maps the CQL type {@code blob} into the Java type {@link ByteBuffer}.
      * The returned instance is a singleton.
@@ -895,6 +906,19 @@ public abstract class TypeCodec<T> {
 
         private VarcharCodec() {
             super(DataType.varchar(), Charset.forName("UTF-8"));
+        }
+
+    }
+
+    /**
+     * This codec maps a CQL {@link DataType#json()} to a Java {@link String}.
+     */
+    private static class JsonCodec extends StringCodec {
+
+        private static final JsonCodec instance = new JsonCodec();
+
+        private JsonCodec() {
+            super(DataType.json(), Charset.forName("UTF-8"));
         }
 
     }

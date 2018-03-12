@@ -451,6 +451,7 @@ public class DataTypeIntegrationTest extends CCMTestsSupport {
                 return data.getInt(0);
             case TEXT:
             case VARCHAR:
+            case JSON:
                 return data.getString(0);
             case TIMESTAMP:
                 return data.getTimestamp(0);

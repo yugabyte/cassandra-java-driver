@@ -65,6 +65,7 @@ public abstract class DataType {
         SMALLINT(19, ProtocolVersion.V4),
         TINYINT(20, ProtocolVersion.V4),
         DURATION(21, ProtocolVersion.V5),
+        JSON(25),
         LIST(32),
         MAP(33),
         SET(34),
@@ -137,6 +138,7 @@ public abstract class DataType {
         primitiveTypeMap.put(Name.INET, new DataType.NativeType(Name.INET));
         primitiveTypeMap.put(Name.INT, new DataType.NativeType(Name.INT));
         primitiveTypeMap.put(Name.TEXT, new DataType.NativeType(Name.TEXT));
+        primitiveTypeMap.put(Name.JSON, new DataType.NativeType(Name.JSON));
         primitiveTypeMap.put(Name.TIMESTAMP, new DataType.NativeType(Name.TIMESTAMP));
         primitiveTypeMap.put(Name.UUID, new DataType.NativeType(Name.UUID));
         primitiveTypeMap.put(Name.VARCHAR, new DataType.NativeType(Name.VARCHAR));
@@ -316,6 +318,15 @@ public abstract class DataType {
      */
     public static DataType text() {
         return primitiveTypeMap.get(Name.TEXT);
+    }
+
+    /**
+     * Returns the JSON type.
+     *
+     * @return The JSON type.
+     */
+    public static DataType json() {
+        return primitiveTypeMap.get(Name.JSON);
     }
 
     /**

@@ -67,6 +67,7 @@ class DataTypeCqlNameParser {
                     .put("smallint", smallint())
                     // duration is not really a native CQL type, but appears as so in system tables
                     .put("duration", duration())
+                    .put("jsonb", json())
                     .build();
 
     /**
