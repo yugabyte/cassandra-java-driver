@@ -321,7 +321,11 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
 
       while (iterator.hasNext()) {
         nextHost = iterator.next();
-        if (nextHost.isUp() && childPolicy.distance(nextHost) == HostDistance.LOCAL)
+        // If the host is up, use it if it is local, or the statement requires strong consistency.
+        // In the latter case, we want to use the first available host since the leader is in the
+        // head of the host list.
+        if (nextHost.isUp() && (childPolicy.distance(nextHost) == HostDistance.LOCAL ||
+                                statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG))
           return true;
       }
 
