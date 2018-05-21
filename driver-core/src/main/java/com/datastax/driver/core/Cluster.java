@@ -25,6 +25,7 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.*;
 import com.google.common.util.concurrent.*;
+import com.yugabyte.driver.core.policies.PartitionAwarePolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1364,6 +1365,7 @@ public class Cluster implements Closeable {
         Metadata metadata;
         final Configuration configuration;
         Metrics metrics;
+        final boolean requiresPartitionMap;
 
         Connection.Factory connectionFactory;
         ControlConnection controlConnection;
@@ -1403,6 +1405,27 @@ public class Cluster implements Closeable {
             this.configuration = configuration;
             this.contactPoints = contactPoints;
             this.listeners = new CopyOnWriteArraySet<Host.StateListener>(listeners);
+            this.requiresPartitionMap = requiresPartitionMap(configuration.getPolicies().getLoadBalancingPolicy());
+        }
+
+        /**
+         * Checks whether this cluster's load balancing policy requires (directly or indirectly) the
+         * partition map from the system.partitions table.
+         *
+         * @param policy the load balancing policy
+         * @return true if the policy uses the partition map, false otherwise
+         */
+        private boolean requiresPartitionMap(LoadBalancingPolicy policy) {
+            if (policy instanceof PartitionAwarePolicy) {
+                return true;
+            } else if (policy instanceof ChainableLoadBalancingPolicy) {
+                return requiresPartitionMap(((ChainableLoadBalancingPolicy) policy).getChildPolicy());
+            }
+            return false;
+        }
+
+        boolean requiresPartitionMap() {
+            return requiresPartitionMap;
         }
 
         // Initialization is not too performance intensive and in practice there shouldn't be contention

@@ -712,14 +712,16 @@ class ControlConnection implements Connection.Owner {
     private static void refreshPartitionMap(Connection connection, Cluster.Manager cluster)
             throws ConnectionException, BusyConnectionException, ExecutionException, InterruptedException {
 
-        boolean metadataEnabled = cluster.configuration.getQueryOptions().isMetadataEnabled();
+
+        boolean partitionMetadataEnabled = cluster.configuration.getQueryOptions().isMetadataEnabled() &&
+            cluster.requiresPartitionMap();
 
         DefaultResultSetFuture partitionsFuture =
             new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(SELECT_PARTITIONS));
         connection.write(partitionsFuture);
 
         // Refresh partition metadata (table-specific partition splits).
-        if (metadataEnabled) {
+        if (partitionMetadataEnabled) {
             Map<QualifiedTableName, TableSplitMetadata> tableSplits = new HashMap<QualifiedTableName, TableSplitMetadata>();
 
             // Prepare the host map to look up host by the inet address.
