@@ -39,7 +39,7 @@ public class PartitionMetadata {
   public PartitionMetadata(Integer startKey, Integer endKey, List<Host> hosts) {
     this.startKey = startKey;
     this.endKey = endKey;
-    this.hosts = hosts;
+    this.hosts = (hosts != null) ? hosts : Collections.<Host>emptyList();
   }
 
   /**
@@ -63,12 +63,9 @@ public class PartitionMetadata {
   /**
    * Returns the hosts (leader and followers) of this partition.
    *
-   * @return the hosts, or the empty list if hosts is {@code null}.
+   * @return the hosts, or the empty list if host list is unavailable.
    */
   public List<Host> getHosts() {
-    if (hosts == null) {
-      return Collections.emptyList();
-    }
     return hosts;
   }
 

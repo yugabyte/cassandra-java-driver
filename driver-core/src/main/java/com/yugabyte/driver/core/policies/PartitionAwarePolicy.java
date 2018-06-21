@@ -336,7 +336,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       while (childIterator.hasNext()) {
         nextHost = childIterator.next();
         // Skip host if it is a local host that we have already returned earlier.
-        if (!hosts.contains(nextHost) || childPolicy.distance(nextHost) != HostDistance.LOCAL)
+        if (!hosts.contains(nextHost) ||
+            !(childPolicy.distance(nextHost) == HostDistance.LOCAL ||
+              statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG))
           return true;
       }
 
@@ -364,19 +366,13 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     // Look up the hosts for the partition key. Skip statements that do not have bind variables.
     if (variables.size() == 0)
       return null;
-    logger.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", " + "query = " + query);
-    KeyspaceMetadata keyspace = clusterMetadata.getKeyspace(variables.getKeyspace(0));
-    if (keyspace == null)
-      return null;
-    TableMetadata table = keyspace.getTable(variables.getTable(0));
-    if (table == null)
-      return null;
+    logger.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", query = " + query);
     int key = getKey(statement);
     if (key < 0)
       return null;
 
-
-    TableSplitMetadata tableSplitMetadata = clusterMetadata.getTableSplitMetadata(keyspace.getName(), table.getName());
+    TableSplitMetadata tableSplitMetadata =
+        clusterMetadata.getTableSplitMetadata(variables.getKeyspace(0), variables.getTable(0));
     if (tableSplitMetadata == null) {
       return null;
     }
