@@ -40,7 +40,7 @@ public class DefaultRetryPolicy implements RetryPolicy {
 
     public static final DefaultRetryPolicy INSTANCE = new DefaultRetryPolicy();
 
-    private DefaultRetryPolicy() {
+    protected DefaultRetryPolicy() {
     }
 
     /**
