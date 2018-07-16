@@ -16,6 +16,7 @@ import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ColumnDefinitions;
+import com.datastax.driver.core.Configuration;
 import com.datastax.driver.core.DataType;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
@@ -60,7 +61,8 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
 
   private final LoadBalancingPolicy childPolicy;
   private volatile Metadata clusterMetadata;
-
+  private Configuration configuration;
+  
   private static final Logger logger = LoggerFactory.getLogger(PartitionAwarePolicy.class);
 
   /**
@@ -84,6 +86,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   @Override
   public void init(Cluster cluster, Collection<Host> hosts) {
     clusterMetadata = cluster.getMetadata();
+    configuration = cluster.getConfiguration();
     childPolicy.init(cluster, hosts);
   }
 
@@ -310,11 +313,17 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       this.statement = statement;
       // When the CQL consistency level is set to YB consistent prefix (Cassandra ONE),
       // the reads would end up going only to the leader if the list of hosts are not shuffled.
-      if (statement.getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
+      if (getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
         Collections.shuffle(hosts);
       }
       this.hosts = hosts;
       this.iterator = hosts.iterator();
+    }
+    
+    private ConsistencyLevel getConsistencyLevel() {
+      return statement.getConsistencyLevel() != null ? 
+          statement.getConsistencyLevel() : 
+          configuration.getQueryOptions().getConsistencyLevel();
     }
 
     @Override
@@ -324,10 +333,11 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         nextHost = iterator.next();
         // If the host is up, use it if it is local, or the statement requires strong consistency.
         // In the latter case, we want to use the first available host since the leader is in the
-        // head of the host list.
+        // head of the host list. 
         if (nextHost.isUp() && (childPolicy.distance(nextHost) == HostDistance.LOCAL ||
-                                statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG))
+                                getConsistencyLevel().isYBStrong())) {
           return true;
+        }
       }
 
       if (childIterator == null)

@@ -83,6 +83,15 @@ public enum ConsistencyLevel {
     public boolean isDCLocal() {
         return this == LOCAL_ONE || this == LOCAL_QUORUM;
     }
+  
+    /** 
+     * Whether or not this consistency level corresponds to YB strong consistency.
+     * 
+     * @return whether this consistency level is {@code QUORUM} or {@code LOCAL_ONE}.
+     */
+    public boolean isYBStrong() {
+      return this == QUORUM || this == LOCAL_ONE;
+    }
 
     /**
      * Whether or not this consistency level is serial, that is,

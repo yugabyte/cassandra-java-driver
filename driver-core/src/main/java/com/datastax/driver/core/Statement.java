@@ -95,7 +95,7 @@ public abstract class Statement {
      */
     public ConsistencyLevel getConsistencyLevel() {
         return consistency;
-    }
+  }
 
     /**
      * Sets the serial consistency level for the query.

@@ -759,7 +759,7 @@ class ControlConnection implements Connection.Owner {
                     String role = entry.getValue();
                     if (role.equals("LEADER")) {
                         hosts.add(0, host);
-                    } else if (role.equals("FOLLOWER")) {
+                    } else if (role.equals("FOLLOWER") || role.equals("READ_REPLICA")) {
                         hosts.add(host);
                     }
                 }
