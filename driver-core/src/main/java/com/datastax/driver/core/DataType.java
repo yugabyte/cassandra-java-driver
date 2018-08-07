@@ -65,12 +65,12 @@ public abstract class DataType {
         SMALLINT(19, ProtocolVersion.V4),
         TINYINT(20, ProtocolVersion.V4),
         DURATION(21, ProtocolVersion.V5),
-        JSON(25),
         LIST(32),
         MAP(33),
         SET(34),
         UDT(48, ProtocolVersion.V3),
-        TUPLE(49, ProtocolVersion.V3);
+        TUPLE(49, ProtocolVersion.V3),
+        JSON(128); // Yugabyte specific types start here
 
         final int protocolId;
 
