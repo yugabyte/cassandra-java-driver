@@ -180,6 +180,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     DataType.Name typeName = type.getName();
 
     switch (typeName) {
+      case BOOLEAN:
       case TINYINT:
       case SMALLINT:
       case INT:
@@ -192,12 +193,14 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       case INET:
       case UUID:
       case TIMEUUID:
+      case DATE:
+      case TIME:
         channel.write(value);
         break;
       case FLOAT: {
-        float float_val = value.getFloat(0);
+        float floatValue = value.getFloat(0);
         value.rewind();
-        if (Float.isNaN(float_val)) {
+        if (Float.isNaN(floatValue)) {
           // Normalize NaN byte representation.
           value = ByteBuffer.allocate(4);
           value.putInt(0xff << 23 | 0x1 << 22);
@@ -207,9 +210,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         break;
       }
       case DOUBLE: {
-        double double_val = value.getDouble(0);
+        double doubleValue = value.getDouble(0);
         value.rewind();
-        if (Double.isNaN(double_val)) {
+        if (Double.isNaN(doubleValue)) {
           // Normalize NaN byte representation.
           value = ByteBuffer.allocate(8);
           value.putLong((long)0x7ff << 52 | (long)0x1 << 51);
@@ -274,16 +277,13 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         }
         break;
       }
-      case BOOLEAN:
       case COUNTER:
       case CUSTOM:
-      case DATE:
       case DECIMAL:
-      case TIME:
       case TUPLE:
       case VARINT:
         throw new UnsupportedOperationException("Datatype " + typeName.toString() +
-            " not supported in a primary key column");
+            " not supported in a partition key column");
     }
   }
 
