@@ -66,9 +66,9 @@ it in your application using the following Maven dependency:
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
+  <groupId>com.yugabyte</groupId>
   <artifactId>cassandra-driver-core</artifactId>
-  <version>3.2.0</version>
+  <version>3.2.0-yb-12</version>
 </dependency>
 ```
 
