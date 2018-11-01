@@ -1,4 +1,4 @@
-# Datastax Java Driver for Apache Cassandra
+# YugaByte Java Driver for YugaByte DB's Cassandra compatible YCQL API.
 
 [![Build Status](https://travis-ci.org/datastax/java-driver.svg?branch=3.x)](https://travis-ci.org/datastax/java-driver)
 
@@ -129,7 +129,7 @@ If you are having issues connecting to the cluster (seeing `NoHostAvailableConne
 
 
 ## License
-Copyright 2012-2015, DataStax
+Copyright 2018, YugaByte Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
