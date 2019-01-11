@@ -186,7 +186,8 @@ public final class CodecRegistry {
             TypeCodec.time(),
             TypeCodec.duration(),
             TypeCodec.counter(),
-            TypeCodec.ascii()
+            TypeCodec.ascii(),
+            TypeCodec.json()
     };
 
     /**
