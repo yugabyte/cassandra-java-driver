@@ -34,7 +34,7 @@
     <parent>
         <groupId>com.yugabyte</groupId>
         <artifactId>cassandra-driver-tests-parent</artifactId>
-        <version>3.2.0-yb-19</version>
+        <version>3.2.0-yb-20-SNAPSHOT</version>
     </parent>
 
     <artifactId>cassandra-driver-tests-osgi</artifactId>
@@ -320,7 +320,7 @@
         <connection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</connection>
         <developerConnection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</developerConnection>
         <url>https://github.com/yugabyte/cassandra-java-driver</url>
-        <tag>3.2.0-yb-19</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>
