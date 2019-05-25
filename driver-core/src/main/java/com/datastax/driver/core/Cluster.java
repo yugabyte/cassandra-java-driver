@@ -2241,7 +2241,7 @@ public class Cluster implements Closeable {
         }
 
         public PreparedStatement addPrepared(PreparedStatement stmt) {
-            PreparedStatement previous = preparedQueries.putIfAbsent(stmt.getPreparedId().id, stmt);
+            PreparedStatement previous = preparedQueries.put(stmt.getPreparedId().id, stmt);
             if (previous != null) {
                 logger.warn("Re-preparing already prepared query is generally an anti-pattern and will likely affect performance. "
                         + "Consider preparing the statement only once. Query='{}'", stmt.getQueryString());
