@@ -1,4 +1,4 @@
-# YugaByte Java Driver for YugaByte DB's Cassandra compatible YCQL API
+# YugabyteDB Java Driver for Yugabyte Cloud QL (YCQL) API
 
 [![Build Status](https://travis-ci.org/datastax/java-driver.svg?branch=3.x)](https://travis-ci.org/datastax/java-driver)
 
