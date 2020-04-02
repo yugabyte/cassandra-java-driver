@@ -19,7 +19,7 @@ For example, if you intend to use [Logback](http://logback.qos.ch), add the foll
 <dependency>
 	<groupId>ch.qos.logback</groupId>
 	<artifactId>logback-classic</artifactId>
-	<version>1.1.3</version>
+	<version>1.2.3</version>
 </dependency>
 ```
 
@@ -29,7 +29,7 @@ If you are using Log4J 1.2 instead, add the following dependency:
 <dependency>
   <groupId>org.slf4j</groupId>
   <artifactId>slf4j-log4j12</artifactId>
-  <version>1.7.12</version>
+  <version>1.7.25</version>
 </dependency>
 ```
 
@@ -179,10 +179,7 @@ See the `QueryLogger` [API docs][query_logger] for examples of how to truncate t
 
 Currently the `QueryLogger` can be configured to track slow queries using either 
 a constant threshold in milliseconds (which is the default behavior), or 
-a dynamic threshold based on per-host latency percentiles, as computed by `PerHostPercentileTracker`.
-
-**Dynamic thresholds are still a beta feature: they haven't been extensively 
-tested yet, and the API is still subject to change.**
+a dynamic threshold based on per-host latency percentiles, as computed by a `PercentileTracker`.
 
 Refer to the `QueryLogger` [API docs][query_logger] for an example of usage.
 
@@ -194,6 +191,47 @@ that can significantly boost latencies when writing log messages.
 * While the driver does not provide such capability, it is possible for client applications to hot-reload the log configuration
 without stopping the application. This usually involves JMX and is available for [Logback](http://logback.qos.ch/manual/jmxConfig.html);
 Log4J provides a `configureAndWatch()` method but it is not recommended to use it inside J2EE containers (see [FAQ](https://logging.apache.org/log4j/1.2/faq.html#a3.6)).
+
+### Server Side Warnings
+
+When using the driver to execute queries, it is possible that the server will generate warnings and
+return them along with the results. Consider the following query:
+
+```sql
+SELECT count(*) FROM cycling.cyclist_name;
+```
+
+Executing this query would generate a warning in Cassandra:
+
+```
+Aggregation query used without partition key
+```
+
+These
+[query warnings](http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ExecutionInfo.html#getWarnings--)
+are available programmatically from the
+[ExecutionInfo](https://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ExecutionInfo.html)
+via
+[ResultSet](https://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ResultSet.html)'s
+[getExecutionInfo()](https://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/PagingIterable.html#getExecutionInfo--)
+method. They are also logged by the driver:
+
+```
+WARN  com.datastax.driver.core.RequestHandler - Query 'SELECT count(*) FROM cycling.cyclist_name' generated server side warning(s): Aggregation query used without partition key
+```
+
+Sometimes, it is not desirable for the driver to log server-side warnings. In such cases, logging
+these warnings can be disabled in the driver by setting the system property `com.datastax.driver.DISABLE_QUERY_WARNING_LOGS`
+to "true". This can be done at application startup (`-Dcom.datastax.driver.DISABLE_QUERY_WARNING_LOGS=true`)
+or it can be toggled programmatically in application code:
+
+```java
+// disable driver logging of server-side warnings
+System.setProperty("com.datastax.driver.DISABLE_QUERY_WARNING_LOGS", "true");
+....
+// enable driver logging of server-side warnings
+System.setProperty("com.datastax.driver.DISABLE_QUERY_WARNING_LOGS", "false");
+```
 
 ### Logback Example
 
@@ -302,4 +340,4 @@ It also turns on slow query tracing as described above.
 </log4j:configuration>
 ```
 
-[query_logger]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/QueryLogger.html
+[query_logger]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/QueryLogger.html

@@ -19,18 +19,18 @@ import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import com.datastax.driver.core.policies.DefaultRetryPolicy;
 
 /**
- * Inherits behavior from DefaultRetryPolicy with one exception - rethrows request error in case it is an
- * OperationTimedOutException.
+ * Inherits behavior from DefaultRetryPolicy with one exception - rethrows request error in case it
+ * is an OperationTimedOutException.
  */
 public class NoRetryOnClientTimeoutPolicy extends DefaultRetryPolicy {
 
   public static final NoRetryOnClientTimeoutPolicy INSTANCE = new NoRetryOnClientTimeoutPolicy();
 
-  protected NoRetryOnClientTimeoutPolicy() {
-  }
+  protected NoRetryOnClientTimeoutPolicy() {}
 
   @Override
-  public RetryDecision onRequestError(Statement statement, ConsistencyLevel cl, DriverException e, int nbRetry) {
+  public RetryDecision onRequestError(
+      Statement statement, ConsistencyLevel cl, DriverException e, int nbRetry) {
     if (e instanceof OperationTimedOutException) {
       return RetryDecision.rethrow();
     } else {

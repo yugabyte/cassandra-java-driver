@@ -9,7 +9,7 @@ environment; please refer to our [OSGi examples repository].
 ### How to override Guava's version?
 
 The driver is compatible and tested with all versions of Guava in the range
-`[16.0.1,20)`.
+`[16.0.1,26.0-jre)`.
 
 If using Maven, you can force a more specific version by re-declaring
 the Guava dependency in your project, e.g.:
@@ -113,56 +113,19 @@ dependencies:
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.12</version>
+        <version>1.7.25</version>
     </dependency>
 
     <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
-        <version>1.1.2</version>
+        <version>1.2.3</version>
         <scope>runtime</scope>
     </dependency>
 
 Some OSGi containers might require additional configuration.
 Please consult their documentation for further details.
                 
-
-### I'm getting the error: "Unable to access `sun.misc.Unsafe`"
-
-Some of the driver dependencies try to access non-API packages
-such as `sun.misc`, which is usually not available in an OSGi container.
-
-Most of these libraries are smart enough to check if this package
-is available or not before actually trying to use it.
-
-However, the [metrics library](../../manual/metrics/) used by the driver
-attempts to load `sun.misc.Unsafe` without
-probing for it first, which may lead to bundle activation errors.
-
-[JAVA-1203] has been created to track this issue, which
-should be fixed in the next major release of the library.
-
-There are a few workarounds:
-
-- Add `sun.misc` to the list of system packages (i.e., packages
-exported by the system bundle), or to the list of boot delegation
-packages (i.e., defer loading of `sun.misc` to the boot classloader).
-This is the best option as it benefits to other libraries as well.
-With Felix, this can be achieved with one of the following start options:
-
-    ```
-    --bootDelegation=sun.misc
-    --systemPackages=sun.misc
-    ```
-
-- Disable metrics altogether:
-
-    ```java
-    Cluster cluster = Cluster.builder()
-            .addContactPoints(...)
-            .withoutMetrics()
-            .build();
-    ```
 
 ### I'm getting the error: "Could not load JNR C Library"
 
@@ -190,12 +153,11 @@ it is also normal to see the following log lines when starting the driver:
 
 [OSGi]:https://www.osgi.org
 [Felix]:https://cwiki.apache.org/confluence/display/FELIX/Index
-[JAVA-1203]:https://datastax-oss.atlassian.net/browse/JAVA-1203
 [JAVA-1127]:https://datastax-oss.atlassian.net/browse/JAVA-1127
-[BND]:http://www.aqute.biz/Bnd
+[BND]:http://bnd.bndtools.org/
 [Maven bundle plugin]:https://cwiki.apache.org/confluence/display/FELIX/Apache+Felix+Maven+Bundle+Plugin+%28BND%29
 [OSGi examples repository]:https://github.com/datastax/java-driver-examples-osgi
-[without metrics]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Cluster.Builder.html#withoutMetrics--
+[without metrics]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Cluster.Builder.html#withoutMetrics--
 [SLF4J]:http://www.slf4j.org/
 [Logback]:http://logback.qos.ch/
 [Tycho]:https://eclipse.org/tycho/

@@ -68,7 +68,7 @@ it in your application using the following Maven dependency:
 <dependency>
   <groupId>com.yugabyte</groupId>
   <artifactId>cassandra-driver-core</artifactId>
-  <version>3.2.0-yb-12</version>
+  <version>3.8.0-yb-1</version>
 </dependency>
 ```
 
@@ -78,7 +78,7 @@ Note that the object mapper is published as a separate artifact:
 <dependency>
   <groupId>com.datastax.cassandra</groupId>
   <artifactId>cassandra-driver-mapping</artifactId>
-  <version>3.2.0</version>
+  <version>3.8.0</version>
 </dependency>
 ```
 
@@ -88,7 +88,7 @@ The 'extras' module is also published as a separate artifact:
 <dependency>
   <groupId>com.datastax.cassandra</groupId>
   <artifactId>cassandra-driver-extras</artifactId>
-  <version>3.2.0</version>
+  <version>3.8.0</version>
 </dependency>
 ```
 
@@ -102,7 +102,7 @@ is available for download.
 
 ## Compatibility
 
-The Java client driver 3.2.0 ([branch 3.x](https://github.com/datastax/java-driver/tree/3.x)) is compatible with Apache
+The Java client driver 3.8.0 ([branch 3.x](https://github.com/datastax/java-driver/tree/3.x)) is compatible with Apache
 Cassandra 1.2, 2.0, 2.1, 2.2 and 3.0 (see [this page](http://datastax.github.io/java-driver/manual/native_protocol) for
 the most up-to-date compatibility information).
 
@@ -129,7 +129,7 @@ If you are having issues connecting to the cluster (seeing `NoHostAvailableConne
 
 
 ## License
-Copyright 2018, YugaByte Inc.
+Copyright 2020, YugaByte Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

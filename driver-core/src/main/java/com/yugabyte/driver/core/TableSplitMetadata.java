@@ -13,14 +13,13 @@
 package com.yugabyte.driver.core;
 
 import com.datastax.driver.core.Host;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The partition split for a table. It maintains a map from start key to partition metadata for each
@@ -32,9 +31,7 @@ public class TableSplitMetadata {
   // Map from start-key to partition metadata representing the partition split of a table.
   private final NavigableMap<Integer, PartitionMetadata> partitionMap;
 
-  /**
-   * Creates a new {@code TableSplitMetadata}.
-   */
+  /** Creates a new {@code TableSplitMetadata}. */
   public TableSplitMetadata() {
     this.partitionMap = new TreeMap<Integer, PartitionMetadata>();
   }
@@ -42,9 +39,9 @@ public class TableSplitMetadata {
   /**
    * Returns the partition metadata for the partition key in the given table.
    *
-   * @param key    the partition key
-   * @return       the partition metadata for the partition key, or {@code null} when there is no
-   * partition information available
+   * @param key the partition key
+   * @return the partition metadata for the partition key, or {@code null} when there is no
+   *     partition information available
    */
   public PartitionMetadata getPartitionMetadata(int key) {
     Map.Entry<Integer, PartitionMetadata> entry = partitionMap.floorEntry(key);
@@ -60,9 +57,9 @@ public class TableSplitMetadata {
   /**
    * Returns the hosts for the partition key in the given table.
    *
-   * @param key    the partition key
-   * @return       the hosts for the partition key, or an empty list when there is no hosts
-   * information available
+   * @param key the partition key
+   * @return the hosts for the partition key, or an empty list when there is no hosts information
+   *     available
    */
   public List<Host> getHosts(int key) {
     PartitionMetadata partitionMetadata = getPartitionMetadata(key);

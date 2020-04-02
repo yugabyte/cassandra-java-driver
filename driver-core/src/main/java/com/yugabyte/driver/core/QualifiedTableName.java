@@ -21,9 +21,7 @@ public class QualifiedTableName {
   private final String keyspaceName;
   private final String tableName;
 
-  /**
-   * Creates a new {@code QualifiedTableName}.
-   */
+  /** Creates a new {@code QualifiedTableName}. */
   public QualifiedTableName(String keyspaceName, String tableName) {
     this.keyspaceName = keyspaceName;
     this.tableName = tableName;
@@ -56,8 +54,8 @@ public class QualifiedTableName {
   public boolean equals(Object other) {
     if (other instanceof QualifiedTableName) {
       QualifiedTableName otherQualifiedTableName = (QualifiedTableName) other;
-      return keyspaceName.equals(otherQualifiedTableName.keyspaceName) &&
-             tableName.equals(otherQualifiedTableName.tableName);
+      return keyspaceName.equals(otherQualifiedTableName.keyspaceName)
+          && tableName.equals(otherQualifiedTableName.tableName);
     }
     return false;
   }

@@ -12,12 +12,15 @@ will likely be beneficial when you have larger payloads.
 
 Two algorithms are available:
 [LZ4](https://github.com/jpountz/lz4-java) and
-[Snappy](https://code.google.com/p/snappy/).
+[Snappy](https://code.google.com/p/snappy/).  The LZ4 implementation is a good
+first choice; it offers fallback implementations in case native libraries fail
+to load and
+[benchmarks](http://java-performance.info/performance-general-compression/)
+suggest that it offers better performance and compression ratios over Snappy.
 Both rely on third-party libraries, declared by the driver as *optional*
-dependencies. So If you use a build tool like Maven, you'll need to
-declare an explicit dependency to pull the appropriate library in your
-application's classpath. Then you configure compression at driver
-startup.
+dependencies. So if you use a build tool like Maven, you'll need to declare an
+explicit dependency to pull the appropriate library in your application's
+classpath. Then you configure compression at driver startup.
 
 ### LZ4
 
@@ -25,9 +28,9 @@ Maven dependency:
 
 ```xml
 <dependency>
-    <groupId>net.jpountz.lz4</groupId>
-    <artifactId>lz4</artifactId>
-    <version>1.3.0</version>
+    <groupId>org.lz4</groupId>
+    <artifactId>lz4-java</artifactId>
+    <version>1.4.1</version>
 </dependency>
 ```
 
@@ -53,11 +56,11 @@ LZ4-java has three internal implementations (from fastest to slowest):
 It will pick the best implementation depending on what's possible on
 your platform. To find out which one was chosen, [enable INFO
 logs](../logging/) on the category
-`com.datastax.driver.core.FrameCompressor` and look for a log similar to
+`com.datastax.driver.core.LZ4Compressor` and look for a log similar to
 this:
 
 ```
-INFO  com.datastax.driver.core.FrameCompressor  - Using LZ4Factory:JNI
+INFO  com.datastax.driver.core.LZ4Compressor  - Using LZ4Factory:JNI
 ```
 
 ### Snappy
@@ -85,4 +88,4 @@ cluster = Cluster.builder()
     .build();
 ```
 
-[pom]: https://repo1.maven.org/maven2/com/datastax/cassandra/cassandra-driver-parent/3.2.0/cassandra-driver-parent-3.2.0.pom
+[pom]: https://repo1.maven.org/maven2/com/datastax/cassandra/cassandra-driver-parent/3.8.0/cassandra-driver-parent-3.8.0.pom

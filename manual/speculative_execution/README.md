@@ -7,7 +7,10 @@ will experience bad latency.
 One thing we can do to improve that is pre-emptively start a second
 execution of the query against another node, before the first node has
 replied or errored out. If that second node replies faster, we can send
-the response back to the client (we also cancel the first query):
+the response back to the client (we also cancel the first execution --
+note that "cancelling" in this context simply means discarding the response
+when it arrives later, Cassandra does not support cancellation of in flight
+requests at this stage):
 
 ```ditaa
 client           driver          exec1  exec2
@@ -66,15 +69,15 @@ there is no way to guarantee that only one node will apply the mutation.
 ### Enabling speculative executions
 
 Speculative executions are controlled by an instance of
-[SpeculativeExecutionPolicy][sep] provided when initializing the
+[SpeculativeExecutionPolicy] provided when initializing the
 `Cluster`.  This policy defines the threshold after which a new
 speculative execution will be triggered.
 
-[sep]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/SpeculativeExecutionPolicy.html
+[SpeculativeExecutionPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/SpeculativeExecutionPolicy.html
 
 Two implementations are provided with the driver:
 
-#### [ConstantSpeculativeExecutionPolicy][csep]
+#### [ConstantSpeculativeExecutionPolicy]
 
 This simple policy uses a constant threshold:
 
@@ -98,15 +101,12 @@ way:
 * if no response has been received at t0 + 1000 milliseconds, start
   another speculative execution on a third node.
 
-[csep]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/ConstantSpeculativeExecutionPolicy.html
+[ConstantSpeculativeExecutionPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/ConstantSpeculativeExecutionPolicy.html
 
-#### [PercentileSpeculativeExecutionPolicy][psep]
+#### [PercentileSpeculativeExecutionPolicy]
 
 This policy sets the threshold at a given latency percentile for the
 current host, based on recent statistics.
-
-**As of 2.1.6, this class is provided as a beta preview: it hasn't been
-extensively tested yet, and the API is still subject to change.**
 
 First and foremost, make sure that the [HdrHistogram][hdr] library (used
 under the hood to collect latencies) is in your classpath. It's defined
@@ -117,18 +117,26 @@ explicitly depend on it:
 <dependency>
   <groupId>org.hdrhistogram</groupId>
   <artifactId>HdrHistogram</artifactId>
-  <version>2.1.9</version>
+  <version>2.1.10</version>
 </dependency>
 ```
 
-Then create an instance of [PerHostPercentileTracker][phpt] that will collect
-latency statistics for your `Cluster`:
+Then create a [PercentileTracker] that will collect latency histograms for your `Cluster`. Two
+implementations are provided out of the box:
+
+* [ClusterWidePercentileTracker]: maintains a single histogram for the whole cluster. This means
+  queries will be compared against the global performance of all the hosts in the cluster.
+* [PerHostPercentileTracker]: maintains a histogram per host. This means queries to a host will
+  only be compared against previous queries to the same host.
+  
+We recommend the cluster-wide strategy: in practice, we've found that it produces better results,
+because it does a better job at penalizing hosts that are consistently slower.
 
 ```java
 // There are more options than shown here, please refer to the API docs
 // for more information
-PerHostPercentileTracker tracker = PerHostPercentileTracker
-    .builderWithHighestTrackableLatencyMillis(15000)
+PercentileTracker tracker = ClusterWidePercentileTracker
+    .builder(15000)
     .build();
 ```
 
@@ -148,20 +156,15 @@ Cluster cluster = Cluster.builder()
     .build();
 ```
 
-Finally, don't forget to register your tracker with the cluster (the
-policy does not do this itself):
-
-```java
-cluster.register(tracker);
-```
-
-Note that `PerHostPercentileTracker` may also be used with a slow query
+Note that `PercentileTracker` may also be used with a slow query
 logger (see the [Logging](../logging/) section). In that case, you would
 create a single tracker object and share it with both components.
 
-[psep]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/PercentileSpeculativeExecutionPolicy.html
+[PercentileSpeculativeExecutionPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/PercentileSpeculativeExecutionPolicy.html
+[PercentileTracker]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/PercentileTracker.html
+[ClusterWidePercentileTracker]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ClusterWidePercentileTracker.html
+[PerHostPercentileTracker]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/PerHostPercentileTracker.html
 [hdr]: http://hdrhistogram.github.io/HdrHistogram/
-[phpt]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/PerHostPercentileTracker.html
 
 #### Using your own
 
@@ -207,7 +210,7 @@ client           driver          exec1  exec2
 The only impact is that all executions of the same query always share
 the same query plan, so each host will be used by at most one execution.
 
-[retry_policy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/RetryPolicy.html
+[retry_policy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/RetryPolicy.html
 
 ### Tuning and practical details
 
@@ -222,8 +225,8 @@ You can monitor how many speculative executions were triggered with the
 It should only be a few percents of the total number of requests
 ([cluster.getMetrics().getRequestsTimer().getCount()][request_metric]).
 
-[se_metric]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Metrics.Errors.html#getSpeculativeExecutions--
-[request_metric]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Metrics.html#getRequestsTimer--
+[se_metric]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Metrics.Errors.html#getSpeculativeExecutions--
+[request_metric]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Metrics.html#getRequestsTimer--
 
 #### Stream id exhaustion
 
@@ -252,8 +255,8 @@ sustained. If you're unsure of which native protocol version you're
 using, you can check with
 [cluster.getConfiguration().getProtocolOptions().getProtocolVersion()][protocol_version].
 
-[session_state]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Session.State.html
-[protocol_version]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/ProtocolOptions.html#getProtocolVersion--
+[session_state]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Session.State.html
+[protocol_version]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ProtocolOptions.html#getProtocolVersion--
 
 #### Request ordering and client timestamps
 

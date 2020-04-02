@@ -28,9 +28,9 @@ Mapper<User> mapper = manager.mapper(User.class);
 calling `manager#mapper` more than once for the same class will return
 the previously generated mapper.
 
-[Mapper]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/Mapper.html
-[MappingManager]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/MappingManager.html
-[Session]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Session.html
+[Mapper]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/Mapper.html
+[MappingManager]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/MappingManager.html
+[Session]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Session.html
 
 #### Basic CRUD operations
 
@@ -51,8 +51,8 @@ UUID userId = ...;
 User u = mapper.get(userId);
 ```
 
-`get`'s arguments must match the partition key components (number of
-arguments and their types).
+`get`'s arguments must match the primary key components (number of
+arguments, their types, and order).
 
 --------------
 
@@ -88,7 +88,8 @@ underlying query:
 - `saveNullFields`: if set to true, fields with value `null` in an
   instance that is to be persisted will be explicitly written as `null`
   in the query. If set to false, fields with null value won't be included
-  in the write query (thus avoiding tombstones).  If not specified, the 
+  in the write query (thus avoiding tombstones), or if using Protocol V4+ 
+  unset() will be used for null values.  If not specified, the 
   default behavior is to persist `null` fields.
 - `ifNotExists`: if set to true, adds an `IF NOT EXISTS` clause to the
   save operation (use `ifNotExists(false)` if you enabled the option by
@@ -106,13 +107,13 @@ mapper.save(new User(userId, "helloworld"),
 Some options don't apply to all operations:
 
 <table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
-    <tr> <td><b>Option</b></td>    <td><b>save/saveQuery</b></td> <td><b>get/getQuery</b></td> <td><b>delete/deleteQuery</b></td></tr>
-    <tr> <td>Ttl</td>              <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
-    <tr> <td>Timestamp</td>        <td>yes</td>                   <td>no</td>                  <td>yes</td> </tr>
-    <tr> <td>ConsistencyLevel</td> <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
-    <tr> <td>Tracing</td>          <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
-    <tr> <td>SaveNullFields</td>   <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
-    <tr> <td>IfNotExists</td>      <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+    <tr> <td><b>Option</b></td>         <td><b>save/saveQuery</b></td> <td><b>get/getQuery</b></td> <td><b>delete/deleteQuery</b></td></tr>
+    <tr> <td>Ttl</td>                   <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+    <tr> <td>Timestamp</td>             <td>yes</td>                   <td>no</td>                  <td>yes</td> </tr>
+    <tr> <td>ConsistencyLevel</td>      <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
+    <tr> <td>Tracing</td>               <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
+    <tr> <td>SaveNullFields</td>        <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+    <tr> <td>IfNotExists</td>           <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
 </table>
 
 Note that `Option.consistencyLevel` is redundant with the consistency
@@ -178,7 +179,7 @@ It provides methods `one()`, `all()`, `iterator()`, `getExecutionInfo()`
 and `isExhausted()`. Note that iterating the `Result` will consume the
 `ResultSet`, and vice-versa.
 
-[Result]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/Result.html
+[Result]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/Result.html
 
 ### Accessors
 
@@ -201,7 +202,7 @@ implementation for it:
 
 ```java
 UserAccessor userAccessor = manager.createAccessor(UserAccessor.class);
-User user = userAccessor.getOne(uuid);
+Result<User> users = userAccessor.getAll();
 ```
 
 Like mappers, accessors are cached at the manager level and thus, are
@@ -228,7 +229,7 @@ corresponds to which marker:
 ResultSet insert(@Param("u") UUID userId, @Param("n") String name);
 ```
 
-[param]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Param.html
+[param]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Param.html
 
 If a method argument is a Java enumeration, it must be annotated with
 `@Enumerated` to indicate how to convert it to a CQL type (the rules are
@@ -274,6 +275,10 @@ executed:
       <td><code>ListenableFuture&lt;Result&lt;T&gt;&gt;</code></td>
       <td><code>T</code> must be a mapped class.<br/>Asynchronous execution, returns a list of mapped objects.</td>
     </tr>
+    <tr>
+      <td><code>Statement</code></td>
+      <td>Object mapper doesn't execute query, but returns an instance of <code>BoundStatement</code> that could be executed via <code>Session</code> object. </td>
+    </tr>
 </table>
 
 Example:
@@ -296,7 +301,7 @@ query with the annotation [@QueryParameters]. Then, options like
 public ListenableFuture<Result<User>> getAllAsync();
 ```
 
-[@QueryParameters]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/QueryParameters.html
+[@QueryParameters]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/QueryParameters.html
 
 
 ### Mapping configuration
@@ -340,6 +345,6 @@ PropertyMapper propertyMapper = new DefaultPropertyMapper()
 There is more to `DefaultPropertyMapper`; see the Javadocs and implementation for details.
 
 
-[MappingConfiguration]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/MappingConfiguration.html
-[PropertyMapper]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/PropertyMapper.html
-[DefaultPropertyMapper]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/DefaultPropertyMapper.html
+[MappingConfiguration]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/MappingConfiguration.html
+[PropertyMapper]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/PropertyMapper.html
+[DefaultPropertyMapper]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/DefaultPropertyMapper.html

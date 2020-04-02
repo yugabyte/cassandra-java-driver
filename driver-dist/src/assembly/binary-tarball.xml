@@ -81,6 +81,9 @@
                             <exclude>com.yugabyte:cassandra-driver-core</exclude>
                             <exclude>com.yugabyte:cassandra-driver-mapping</exclude>
                             <exclude>com.yugabyte:cassandra-driver-extras</exclude>
+                            <!-- already included in lib/core -->
+                            <exclude>com.google.guava:guava</exclude>
+                            <exclude>org.slf4j:slf4j-api</exclude>
                         </excludes>
                         <useTransitiveFiltering>true</useTransitiveFiltering>
                     </dependencySet>
@@ -106,6 +109,7 @@
                             <exclude>com.yugabyte:cassandra-driver-extras</exclude>
                             <!-- already included in lib/core -->
                             <exclude>com.google.guava:guava</exclude>
+                            <exclude>org.slf4j:slf4j-api</exclude>
                         </excludes>
                         <useTransitiveFiltering>true</useTransitiveFiltering>
                     </dependencySet>

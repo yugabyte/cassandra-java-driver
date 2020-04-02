@@ -1,63 +1,64 @@
 /*
- *      Copyright (C) 2012-2015 DataStax Inc.
+ * Copyright DataStax, Inc.
  *
- *   Licensed under the Apache License, Version 2.0 (the "License");
- *   you may not use this file except in compliance with the License.
- *   You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.datastax.driver.core.exceptions;
 
+import com.datastax.driver.core.EndPoint;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
-/**
- * Indicates that the contacted host replied with an UNPREPARED error code.
- */
+/** Indicates that the contacted host replied with an UNPREPARED error code. */
 public class UnpreparedException extends QueryValidationException implements CoordinatorException {
 
-    private static final long serialVersionUID = 0;
+  private static final long serialVersionUID = 0;
 
-    private final InetSocketAddress address;
+  private final EndPoint endPoint;
 
-    public UnpreparedException(InetSocketAddress address, String message) {
-        super(String.format("A prepared query was submitted on %s but was not known of that node: %s", address, message));
-        this.address = address;
-    }
+  public UnpreparedException(EndPoint endPoint, String message) {
+    super(
+        String.format(
+            "A prepared query was submitted on %s but was not known of that node: %s",
+            endPoint, message));
+    this.endPoint = endPoint;
+  }
 
-    /**
-     * Private constructor used solely when copying exceptions.
-     */
-    private UnpreparedException(InetSocketAddress address, String message, UnpreparedException cause) {
-        super(message, cause);
-        this.address = address;
-    }
+  /** Private constructor used solely when copying exceptions. */
+  private UnpreparedException(EndPoint endPoint, String message, UnpreparedException cause) {
+    super(message, cause);
+    this.endPoint = endPoint;
+  }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public InetAddress getHost() {
-        return address.getAddress();
-    }
+  @Override
+  public EndPoint getEndPoint() {
+    return endPoint;
+  }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public InetSocketAddress getAddress() {
-        return address;
-    }
+  @Override
+  @Deprecated
+  public InetSocketAddress getAddress() {
+    return (endPoint == null) ? null : endPoint.resolve();
+  }
 
-    @Override
-    public UnpreparedException copy() {
-        return new UnpreparedException(address, getMessage(), this);
-    }
+  @Override
+  @Deprecated
+  public InetAddress getHost() {
+    return (endPoint == null) ? null : endPoint.resolve().getAddress();
+  }
+
+  @Override
+  public UnpreparedException copy() {
+    return new UnpreparedException(endPoint, getMessage(), this);
+  }
 }

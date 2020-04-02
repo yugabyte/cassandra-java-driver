@@ -17,43 +17,37 @@ import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Configuration;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.DataType;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
-import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
-import com.datastax.driver.core.PreparedId;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.TableMetadata;
 import com.datastax.driver.core.UserType;
-import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.policies.ChainableLoadBalancingPolicy;
-import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
-
-import com.yugabyte.driver.core.TableSplitMetadata;
+import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.yugabyte.driver.core.PartitionMetadata;
+import com.yugabyte.driver.core.TableSplitMetadata;
 import com.yugabyte.driver.core.utils.Jenkins;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
-import java.util.Collections;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The load-balancing policy to direct a statement to the hosts where the tablet for the partition
- * key resides, with the tablet leader host at the beginning of the host list as the preferred
- * host. The hosts are found by computing the hash key and looking them up in the partition metadata
- * from the system.partitions table.
+ * key resides, with the tablet leader host at the beginning of the host list as the preferred host.
+ * The hosts are found by computing the hash key and looking them up in the partition metadata from
+ * the system.partitions table.
  *
  * @see PartitionMetadata
  */
@@ -62,25 +56,21 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   private final LoadBalancingPolicy childPolicy;
   private volatile Metadata clusterMetadata;
   private Configuration configuration;
-  
+
   private static final Logger logger = LoggerFactory.getLogger(PartitionAwarePolicy.class);
 
   /**
    * Creates a new {@code PartitionAware} policy.
    *
-   * @param childPolicy  the load balancing policy to wrap with partition awareness
+   * @param childPolicy the load balancing policy to wrap with partition awareness
    */
   public PartitionAwarePolicy(LoadBalancingPolicy childPolicy) {
     this.childPolicy = childPolicy;
   }
 
-  /**
-   * Creates a new {@code PartitionAware} policy with additional default data-center awareness.
-   */
+  /** Creates a new {@code PartitionAware} policy with additional default data-center awareness. */
   public PartitionAwarePolicy() {
-    this(new DCAwareRoundRobinPolicy.Builder()
-        .withUsedHostsPerRemoteDc(Integer.MAX_VALUE)
-        .build());
+    this(new DCAwareRoundRobinPolicy.Builder().withUsedHostsPerRemoteDc(Integer.MAX_VALUE).build());
   }
 
   @Override
@@ -98,8 +88,8 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   /**
    * Returns the hash key for the given bytes. The hash key is an unsigned 16-bit number.
    *
-   * @param bytes  the bytes to calculate the hash key
-   * @return       the hash key
+   * @param bytes the bytes to calculate the hash key
+   * @return the hash key
    */
   private static int getKey(byte bytes[]) {
     final long SEED = 97;
@@ -108,17 +98,18 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     long h2 = 3 * (h >>> 32);
     long h3 = 5 * (h >>> 16);
     long h4 = 7 * (h & 0xffff);
-    return (int)((h1 ^ h2 ^ h3 ^ h4) & 0xffff);
+    return (int) ((h1 ^ h2 ^ h3 ^ h4) & 0xffff);
   }
 
   /**
    * Internally we use a unsigned 16-bit hash CQL uses signed 64-bit. This method converts from the
    * user-visible (e.g. via 'token') CQL hash to our internal representation used for partitioning.
+   *
    * @param cql_hash the CQL hash key
    * @return the corresponding internal YB hash key
    */
   public static int CqlToYBHashCode(long cql_hash) {
-    int hash_code = (int)(cql_hash >> 48);
+    int hash_code = (int) (cql_hash >> 48);
     hash_code ^= 0x8000; // flip first bit so that negative values are smaller than positives.
     return hash_code;
   }
@@ -126,6 +117,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   /**
    * Internally we use a unsigned 16-bit hash CQL uses signed 64-bit. This method converts from our
    * internal representation used for partitioning to the user-visible (e.g. via 'token') CQL hash.
+   *
    * @param hash the internal YB hash key
    * @return a corresponding CQL hash key
    */
@@ -139,8 +131,8 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
    * Returns the hash key for the given bound statement. The hash key can be determined only for
    * DMLs and when the partition key is specified in the bind variables.
    *
-   * @param stmt   the statement to calculate the hash key for
-   * @return       the hash key for the statement, or -1 when hash key cannot be determined
+   * @param stmt the statement to calculate the hash key for
+   * @return the hash key for the statement, or -1 when hash key cannot be determined
    */
   static int getKey(BoundStatement stmt) {
     PreparedStatement pstmt = stmt.preparedStatement();
@@ -174,9 +166,8 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     }
   }
 
-  private static void AppendValueToChannel(DataType type,
-                                           ByteBuffer value,
-                                           WritableByteChannel channel) throws java.io.IOException {
+  private static void AppendValueToChannel(
+      DataType type, ByteBuffer value, WritableByteChannel channel) throws java.io.IOException {
     DataType.Name typeName = type.getName();
 
     switch (typeName) {
@@ -197,93 +188,99 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       case TIME:
         channel.write(value);
         break;
-      case FLOAT: {
-        float floatValue = value.getFloat(0);
-        value.rewind();
-        if (Float.isNaN(floatValue)) {
-          // Normalize NaN byte representation.
-          value = ByteBuffer.allocate(4);
-          value.putInt(0xff << 23 | 0x1 << 22);
-          value.flip();
-        }
-        channel.write(value);
-        break;
-      }
-      case DOUBLE: {
-        double doubleValue = value.getDouble(0);
-        value.rewind();
-        if (Double.isNaN(doubleValue)) {
-          // Normalize NaN byte representation.
-          value = ByteBuffer.allocate(8);
-          value.putLong((long)0x7ff << 52 | (long)0x1 << 51);
-          value.flip();
-        }
-        channel.write(value);
-        break;
-      }
-      case TIMESTAMP: {
-        // Multiply the timestamp's int64 value by 1000 to adjust the precision.
-        ByteBuffer bb = ByteBuffer.allocate(8);
-        bb.putLong(value.getLong() * 1000);
-        bb.flip();
-        value = bb;
-        channel.write(value);
-        break;
-      }
-      case LIST:
-      case SET: {
-        List<DataType> typeArgs = type.getTypeArguments();
-        int length = value.getInt();
-        for (int j = 0; j < length; j++) {
-          // Appending each element.
-          int size = value.getInt();
-          ByteBuffer buf = value.slice();
-          buf.limit(size);
-          AppendValueToChannel(typeArgs.get(0), buf, channel);
-          value.position(value.position() + size);
-        }
-        break;
-      }
-      case MAP: {
-        List<DataType> typeArgs = type.getTypeArguments();
-        int length = value.getInt();
-        for (int j = 0; j < length; j++) {
-          // Appending the key.
-          int size = value.getInt();
-          ByteBuffer buf = value.slice();
-          buf.limit(size);
-          AppendValueToChannel(typeArgs.get(0), buf, channel);
-          value.position(value.position() + size);
-          // Appending the value.
-          size = value.getInt();
-          buf = value.slice();
-          buf.limit(size);
-          AppendValueToChannel(typeArgs.get(1), buf, channel);
-          value.position(value.position() + size);
-        }
-        break;
-      }
-      case UDT: {
-        for (UserType.Field field : (UserType) type) {
-          if (!value.hasRemaining()) {
-            // UDT serialization may omit values of last few fields if they are null.
-            break;
+      case FLOAT:
+        {
+          float floatValue = value.getFloat(0);
+          value.rewind();
+          if (Float.isNaN(floatValue)) {
+            // Normalize NaN byte representation.
+            value = ByteBuffer.allocate(4);
+            value.putInt(0xff << 23 | 0x1 << 22);
+            value.flip();
           }
-          int size = value.getInt();
-          ByteBuffer buf = value.slice();
-          buf.limit(size);
-          AppendValueToChannel(field.getType(), buf, channel);
-          value.position(value.position() + size);
+          channel.write(value);
+          break;
         }
-        break;
-      }
+      case DOUBLE:
+        {
+          double doubleValue = value.getDouble(0);
+          value.rewind();
+          if (Double.isNaN(doubleValue)) {
+            // Normalize NaN byte representation.
+            value = ByteBuffer.allocate(8);
+            value.putLong((long) 0x7ff << 52 | (long) 0x1 << 51);
+            value.flip();
+          }
+          channel.write(value);
+          break;
+        }
+      case TIMESTAMP:
+        {
+          // Multiply the timestamp's int64 value by 1000 to adjust the precision.
+          ByteBuffer bb = ByteBuffer.allocate(8);
+          bb.putLong(value.getLong() * 1000);
+          bb.flip();
+          value = bb;
+          channel.write(value);
+          break;
+        }
+      case LIST:
+      case SET:
+        {
+          List<DataType> typeArgs = type.getTypeArguments();
+          int length = value.getInt();
+          for (int j = 0; j < length; j++) {
+            // Appending each element.
+            int size = value.getInt();
+            ByteBuffer buf = value.slice();
+            buf.limit(size);
+            AppendValueToChannel(typeArgs.get(0), buf, channel);
+            value.position(value.position() + size);
+          }
+          break;
+        }
+      case MAP:
+        {
+          List<DataType> typeArgs = type.getTypeArguments();
+          int length = value.getInt();
+          for (int j = 0; j < length; j++) {
+            // Appending the key.
+            int size = value.getInt();
+            ByteBuffer buf = value.slice();
+            buf.limit(size);
+            AppendValueToChannel(typeArgs.get(0), buf, channel);
+            value.position(value.position() + size);
+            // Appending the value.
+            size = value.getInt();
+            buf = value.slice();
+            buf.limit(size);
+            AppendValueToChannel(typeArgs.get(1), buf, channel);
+            value.position(value.position() + size);
+          }
+          break;
+        }
+      case UDT:
+        {
+          for (UserType.Field field : (UserType) type) {
+            if (!value.hasRemaining()) {
+              // UDT serialization may omit values of last few fields if they are null.
+              break;
+            }
+            int size = value.getInt();
+            ByteBuffer buf = value.slice();
+            buf.limit(size);
+            AppendValueToChannel(field.getType(), buf, channel);
+            value.position(value.position() + size);
+          }
+          break;
+        }
       case COUNTER:
       case CUSTOM:
       case DECIMAL:
       case TUPLE:
       case VARINT:
-        throw new UnsupportedOperationException("Datatype " + typeName.toString() +
-            " not supported in a partition key column");
+        throw new UnsupportedOperationException(
+            "Datatype " + typeName.toString() + " not supported in a partition key column");
     }
   }
 
@@ -304,9 +301,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     /**
      * Creates a new {@code UpHostIterator}.
      *
-     * @param loggedKeyspace  the logged keyspace of the statement
-     * @param statement       the statement
-     * @param hosts           the hosts that host the statement's partition key
+     * @param loggedKeyspace the logged keyspace of the statement
+     * @param statement the statement
+     * @param hosts the hosts that host the statement's partition key
      */
     public UpHostIterator(String loggedKeyspace, Statement statement, List<Host> hosts) {
       this.loggedKeyspace = loggedKeyspace;
@@ -319,11 +316,11 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       this.hosts = hosts;
       this.iterator = hosts.iterator();
     }
-    
+
     private ConsistencyLevel getConsistencyLevel() {
-      return statement.getConsistencyLevel() != null ? 
-          statement.getConsistencyLevel() : 
-          configuration.getQueryOptions().getConsistencyLevel();
+      return statement.getConsistencyLevel() != null
+          ? statement.getConsistencyLevel()
+          : configuration.getQueryOptions().getConsistencyLevel();
     }
 
     @Override
@@ -333,9 +330,10 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         nextHost = iterator.next();
         // If the host is up, use it if it is local, or the statement requires strong consistency.
         // In the latter case, we want to use the first available host since the leader is in the
-        // head of the host list. 
-        if (nextHost.isUp() && (childPolicy.distance(nextHost) == HostDistance.LOCAL ||
-                                getConsistencyLevel().isYBStrong())) {
+        // head of the host list.
+        if (nextHost.isUp()
+            && (childPolicy.distance(nextHost) == HostDistance.LOCAL
+                || getConsistencyLevel().isYBStrong())) {
           return true;
         }
       }
@@ -346,10 +344,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       while (childIterator.hasNext()) {
         nextHost = childIterator.next();
         // Skip host if it is a local host that we have already returned earlier.
-        if (!hosts.contains(nextHost) ||
-            !(childPolicy.distance(nextHost) == HostDistance.LOCAL ||
-              statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG))
-          return true;
+        if (!hosts.contains(nextHost)
+            || !(childPolicy.distance(nextHost) == HostDistance.LOCAL
+                || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) return true;
       }
 
       return false;
@@ -364,9 +361,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   /**
    * Gets the query plan for a {@code BoundStatement}.
    *
-   * @param loggedKeyspace  the logged keyspace of the statement
-   * @param statement       the statement
-   * @return                the query plan, or null when no plan can be determined
+   * @param loggedKeyspace the logged keyspace of the statement
+   * @param statement the statement
+   * @return the query plan, or null when no plan can be determined
    */
   private Iterator<Host> getQueryPlan(String loggedKeyspace, BoundStatement statement) {
     PreparedStatement pstmt = statement.preparedStatement();
@@ -374,12 +371,10 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     ColumnDefinitions variables = pstmt.getVariables();
 
     // Look up the hosts for the partition key. Skip statements that do not have bind variables.
-    if (variables.size() == 0)
-      return null;
+    if (variables.size() == 0) return null;
     logger.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", query = " + query);
     int key = getKey(statement);
-    if (key < 0)
-      return null;
+    if (key < 0) return null;
 
     TableSplitMetadata tableSplitMetadata =
         clusterMetadata.getTableSplitMetadata(variables.getKeyspace(0), variables.getTable(0));
@@ -393,16 +388,15 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   /**
    * Gets the query plan for a {@code BatchStatement}.
    *
-   * @param loggedKeyspace  the logged keyspace of the statement
-   * @param batch           the batch statement
-   * @return                the query plan, or null when no plan can be determined
+   * @param loggedKeyspace the logged keyspace of the statement
+   * @param batch the batch statement
+   * @return the query plan, or null when no plan can be determined
    */
   private Iterator<Host> getQueryPlan(String loggedKeyspace, BatchStatement batch) {
     for (Statement statement : batch.getStatements()) {
       if (statement instanceof BoundStatement) {
-        Iterator<Host> plan = getQueryPlan(loggedKeyspace, (BoundStatement)statement);
-        if (plan != null)
-          return plan;
+        Iterator<Host> plan = getQueryPlan(loggedKeyspace, (BoundStatement) statement);
+        if (plan != null) return plan;
       }
     }
     return null;
@@ -412,9 +406,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   public Iterator<Host> newQueryPlan(String loggedKeyspace, Statement statement) {
     Iterator<Host> plan = null;
     if (statement instanceof BoundStatement) {
-      plan = getQueryPlan(loggedKeyspace, (BoundStatement)statement);
+      plan = getQueryPlan(loggedKeyspace, (BoundStatement) statement);
     } else if (statement instanceof BatchStatement) {
-      plan = getQueryPlan(loggedKeyspace, (BatchStatement)statement);
+      plan = getQueryPlan(loggedKeyspace, (BatchStatement) statement);
     }
     return (plan != null) ? plan : childPolicy.newQueryPlan(loggedKeyspace, statement);
   }

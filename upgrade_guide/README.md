@@ -3,6 +3,91 @@
 The purpose of this guide is to detail changes made by successive
 versions of the Java driver.
 
+### 3.6.0
+
+1.  `ConsistencyLevel.LOCAL_SERIAL.isDCLocal()` now returns true. In driver
+    code, `isDCLocal()` is only used when evaluating a Statement's
+    ConsistencyLevel (which does not include Serial CLs), but as a matter of
+    correctness this was updated.
+
+2.  `ReadFailureException` and `WriteFailureException` are now surfaced to
+    `RetryPolicy.onRequestError`. Consider updating custom `RetryPolicy`
+    implementations to account for this. In the general case, we recommend
+    using `RetryDecision.rethrow()`, see [JAVA-1944].
+
+[JAVA-1944]: https://datastax-oss.atlassian.net/browse/JAVA-1944
+
+
+### 3.5.0
+
+1.  The `DowngradingConsistencyRetryPolicy` is now deprecated, see [JAVA-1752]. 
+    It will also be removed in the next major release of the driver (4.0.0), 
+    see [JAVA-1376].
+
+    The main motivation is the agreement that this policy's behavior should be 
+    the application's concern, not the driver's.
+    
+    We recognize that there are use cases where downgrading is good – 
+    for instance, a dashboard application would present the latest information 
+    by reading at QUORUM, but it's acceptable for it to display stale information 
+    by reading at ONE sometimes. 
+    
+    But APIs provided by the driver should instead encourage idiomatic use of 
+    a distributed system like Apache Cassandra, and a downgrading policy works 
+    against this. It suggests that an anti-pattern such as "try to read at QUORUM, 
+    but fall back to ONE if that fails" is a good idea in general use cases, 
+    when in reality it provides no better consistency guarantees than working 
+    directly at ONE, but with higher latencies. 
+    
+    We therefore urge users to carefully choose upfront the consistency level that 
+    works best for their use cases, and should they decide that the downgrading 
+    behavior of `DowngradingConsistencyRetryPolicy` remains a good fit for certain 
+    use cases, they will now have to implement this logic themselves, either
+    at application level, or alternatively at driver level, by rolling out their 
+    own downgrading retry policy.
+    
+    To help users migrate existing applications that rely on 
+    `DowngradingConsistencyRetryPolicy`, see this [online example] that illustrates
+    how to implement a downgrading logic at application level.
+    
+[JAVA-1752]:https://datastax-oss.atlassian.net/browse/JAVA-1752
+[JAVA-1376]:https://datastax-oss.atlassian.net/browse/JAVA-1376
+[online example]:https://github.com/datastax/java-driver/blob/3.x/driver-examples/src/main/java/com/datastax/driver/examples/retry/DowngradingRetry.java
+
+2.  The `TokenAwarePolicy` now has a new constructor that takes a `ReplicaOrdering` 
+    argument, see [JAVA-1448]. 
+    
+    One of the advantages of this feature is the new `NEUTRAL` 
+    ordering strategy, which honors its child policy's ordering, i.e., replicas
+    are returned in the same relative order as in the child policy's query plan.
+    
+    For example, if the child policy returns the plan [A, B, C, D], and the replicas 
+    for the query being routed are [D, A, B], then the token aware policy would return 
+    the plan [A, B, D, C].
+
+    As a consequence, the constructor taking a boolean parameter `shuffleReplicas` 
+    is now deprecated and will be removed in the next major release.
+    
+[JAVA-1448]:https://datastax-oss.atlassian.net/browse/JAVA-1448
+
+
+### 3.4.0
+
+`QueryBuilder` methods `in`, `lt`, `lte`, `eq`, `gt`, and `gte` now accept
+`Iterable` as input rather than just `List`. This should have no impact unless
+you were accessing these methods using reflection in which case you need to
+account for these new parameter types.
+
+
+### 3.3.1
+
+Speculative executions can now be scheduled without delay: if
+`SpeculativeExecutionPlan.nextExecution()` returns 0, the next execution will be fired immediately.
+This allows aggressive policies that hit multiple replicas right away, in order to get the fastest
+response possible. Note that this may break existing policies that used 0 to mean "no execution";
+make sure you use a negative value instead.
+
+
 ### 3.2.0
 
 The `SSLOptions` interface is now deprecated in favor of

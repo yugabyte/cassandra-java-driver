@@ -1,5 +1,194 @@
 ## Changelog
 
+<!--
+  Note: the 4.x branch's changelog include a copy of this one, please copy over the changes if new
+  3.x versions get published.
+-->
+
+## 3.8.0
+
+- [new feature] JAVA-2356: Support for DataStax Cloud API.
+- [improvement] JAVA-2483: Allow to provide secure bundle via URL.
+- [improvement] JAVA-2499: Allow to read the secure bundle from an InputStream.
+- [improvement] JAVA-2457: Detect CaaS and change default consistency.
+- [improvement] JAVA-2485: Add errors for Cloud misconfiguration.
+- [documentation] JAVA-2504: Migrate Cloud "getting started" page to driver manual.
+- [improvement] JAVA-2516: Enable hostname validation with Cloud
+- [bug] JAVA-2515: NEW_NODE and REMOVED_NODE events should trigger ADDED and REMOVED.
+
+
+### 3.7.2
+
+- [bug] JAVA-2249: Stop stripping trailing zeros in ByteOrderedTokens.
+- [bug] JAVA-1492: Don't immediately reuse busy connections for another request.
+- [bug] JAVA-2198: Handle UDTs with names that clash with collection types.
+- [bug] JAVA-2204: Avoid memory leak when client holds onto a stale TableMetadata instance.
+
+
+### 3.7.1
+
+- [bug] JAVA-2174: Metadata.needsQuote should accept empty strings.
+- [bug] JAVA-2193: Fix flaky tests in WarningsTest.
+
+
+### 3.7.0
+
+- [improvement] JAVA-2025: Include exception message in Abstract\*Codec.accepts(null).
+- [improvement] JAVA-1980: Use covariant return types in RemoteEndpointAwareJdkSSLOptions.Builder methods.
+- [documentation] JAVA-2062: Document frozen collection preference with Mapper.
+- [bug] JAVA-2071: Fix NPE in ArrayBackedRow.toString().
+- [bug] JAVA-2070: Call onRemove instead of onDown when rack and/or DC information changes for a host.
+- [improvement] JAVA-1256: Log parameters of BuiltStatement in QueryLogger.
+- [documentation] JAVA-2074: Document preference for LZ4 over Snappy.
+- [bug] JAVA-1612: Include netty-common jar in binary tarball.
+- [improvement] JAVA-2003: Simplify CBUtil internal API to improve performance.
+- [improvement] JAVA-2002: Reimplement TypeCodec.accepts to improve performance.
+- [documentation] JAVA-2041: Deprecate cross-DC failover in DCAwareRoundRobinPolicy.
+- [documentation] JAVA-1159: Document workaround for using tuple with udt field in Mapper.
+- [documentation] JAVA-1964: Complete remaining "Coming Soon" sections in docs.
+- [improvement] JAVA-1950: Log server side warnings returned from a query.
+- [improvement] JAVA-2123: Allow to use QueryBuilder for building queries against Materialized Views.
+- [bug] JAVA-2082: Avoid race condition during cluster close and schema refresh.
+
+
+### 3.6.0
+
+- [improvement] JAVA-1394: Add request-queue-depth metric.
+- [improvement] JAVA-1857: Add Statement.setHost.
+- [bug] JAVA-1920: Use nanosecond precision in LocalTimeCodec#format().
+- [bug] JAVA-1794: Driver tries to create a connection array of size -1.
+- [new feature] JAVA-1899: Support virtual tables.
+- [bug] JAVA-1908: TableMetadata.asCQLQuery does not add table option 'memtable_flush_period_in_ms' in the generated query.
+- [bug] JAVA-1924: StatementWrapper setters should return the wrapping statement.
+- [new feature] JAVA-1532: Add Codec support for Java 8's LocalDateTime and ZoneId.
+- [improvement] JAVA-1786: Use Google code formatter.
+- [bug] JAVA-1871: Change LOCAL\_SERIAL.isDCLocal() to return true.
+- [documentation] JAVA-1902: Clarify unavailable & request error in DefaultRetryPolicy javadoc.
+- [new feature] JAVA-1903: Add WhiteListPolicy.ofHosts.
+- [bug] JAVA-1928: Fix GuavaCompatibility for Guava 26.
+- [bug] JAVA-1935: Add null check in QueryConsistencyException.getHost.
+- [improvement] JAVA-1771: Send driver name and version in STARTUP message.
+- [improvement] JAVA-1388: Add dynamic port discovery for system.peers\_v2.
+- [documentation] JAVA-1810: Note which setters are not propagated to PreparedStatement.
+- [bug] JAVA-1944: Surface Read and WriteFailureException to RetryPolicy.
+- [bug] JAVA-1211: Fix NPE in cluster close when cluster init fails.
+- [bug] JAVA-1220: Fail fast on cluster init if previous init failed.
+- [bug] JAVA-1929: Preempt session execute queries if session was closed.
+
+Merged from 3.5.x:
+
+- [bug] JAVA-1872: Retain table's views when processing table update.
+
+
+### 3.5.0
+
+- [improvement] JAVA-1448: TokenAwarePolicy should respect child policy ordering.
+- [bug] JAVA-1751: Include defaultTimestamp length in encodedSize for protocol version >= 3.
+- [bug] JAVA-1770: Fix message size when using Custom Payload.
+- [documentation] JAVA-1760: Add metrics documentation.
+- [improvement] JAVA-1765: Update dependencies to latest patch versions.
+- [improvement] JAVA-1752: Deprecate DowngradingConsistencyRetryPolicy.
+- [improvement] JAVA-1735: Log driver version on first use.
+- [documentation] JAVA-1380: Add FAQ entry for errors arising from incompatibilities.
+- [improvement] JAVA-1748: Support IS NOT NULL and != in query builder.
+- [documentation] JAVA-1740: Mention C*2.2/3.0 incompatibilities in paging state manual.
+- [improvement] JAVA-1725: Add a getNodeCount method to CCMAccess for easier automation.
+- [new feature] JAVA-708: Add means to measure request sizes.
+- [documentation] JAVA-1788: Add example for enabling host name verification to SSL docs.
+- [improvement] JAVA-1791: Revert "JAVA-1677: Warn if auth is configured on the client but not the server."
+- [bug] JAVA-1789: Account for flags in Prepare encodedSize.
+- [bug] JAVA-1797: Use jnr-ffi version required by jnr-posix.
+
+
+### 3.4.0
+
+- [improvement] JAVA-1671: Remove unnecessary test on prepared statement metadata.
+- [bug] JAVA-1694: Upgrade to jackson-databind 2.7.9.2 to address CVE-2015-15095.
+- [documentation] JAVA-1685: Clarify recommendation on preparing SELECT *.
+- [improvement] JAVA-1679: Improve error message on batch log write timeout.
+- [improvement] JAVA-1672: Remove schema agreement check when repreparing on up.
+- [improvement] JAVA-1677: Warn if auth is configured on the client but not the server.
+- [new feature] JAVA-1651: Add NO_COMPACT startup option.
+- [improvement] JAVA-1683: Add metrics to track writes to nodes.
+- [new feature] JAVA-1229: Allow specifying the keyspace for individual queries.
+- [improvement] JAVA-1682: Provide a way to record latencies for cancelled speculative executions.
+- [improvement] JAVA-1717: Add metrics to latency-aware policy.
+- [improvement] JAVA-1675: Remove dates from copyright headers.
+
+Merged from 3.3.x:
+
+- [bug] JAVA-1555: Include VIEW and CDC in WriteType.
+- [bug] JAVA-1599: exportAsString improvements (sort, format, clustering order)
+- [improvement] JAVA-1587: Deterministic ordering of columns used in Mapper#saveQuery
+- [improvement] JAVA-1500: Add a metric to report number of in-flight requests.
+- [bug] JAVA-1438: QueryBuilder check for empty orderings.
+- [improvement] JAVA-1490: Allow zero delay for speculative executions.
+- [documentation] JAVA-1607: Add FAQ entry for netty-transport-native-epoll.
+- [bug] JAVA-1630: Fix Metadata.addIfAbsent.
+- [improvement] JAVA-1619: Update QueryBuilder methods to support Iterable input.
+- [improvement] JAVA-1527: Expose host_id and schema_version on Host metadata.
+- [new feature] JAVA-1377: Add support for TWCS in SchemaBuilder.
+- [improvement] JAVA-1631: Publish a sources jar for driver-core-tests.
+- [improvement] JAVA-1632: Add a withIpPrefix(String) method to CCMBridge.Builder.
+- [bug] JAVA-1639: VersionNumber does not fullfill equals/hashcode contract.
+- [bug] JAVA-1613: Fix broken shaded Netty detection in NettyUtil.
+- [bug] JAVA-1666: Fix keyspace export when a UDT has case-sensitive field names.
+- [improvement] JAVA-1196: Include hash of result set metadata in prepared statement id.
+- [improvement] JAVA-1670: Support user-provided JMX ports for CCMBridge.
+- [improvement] JAVA-1661: Avoid String.toLowerCase if possible in Metadata.
+- [improvement] JAVA-1659: Expose low-level flusher tuning options.
+- [improvement] JAVA-1660: Support netty-transport-native-epoll in OSGi container.
+
+
+### 3.3.2
+
+- [bug] JAVA-1666: Fix keyspace export when a UDT has case-sensitive field names.
+- [improvement] JAVA-1196: Include hash of result set metadata in prepared statement id.
+- [improvement] JAVA-1670: Support user-provided JMX ports for CCMBridge.
+- [improvement] JAVA-1661: Avoid String.toLowerCase if possible in Metadata.
+- [improvement] JAVA-1659: Expose low-level flusher tuning options.
+- [improvement] JAVA-1660: Support netty-transport-native-epoll in OSGi container.
+
+
+### 3.3.1
+
+- [bug] JAVA-1555: Include VIEW and CDC in WriteType.
+- [bug] JAVA-1599: exportAsString improvements (sort, format, clustering order)
+- [improvement] JAVA-1587: Deterministic ordering of columns used in Mapper#saveQuery
+- [improvement] JAVA-1500: Add a metric to report number of in-flight requests.
+- [bug] JAVA-1438: QueryBuilder check for empty orderings.
+- [improvement] JAVA-1490: Allow zero delay for speculative executions.
+- [documentation] JAVA-1607: Add FAQ entry for netty-transport-native-epoll.
+- [bug] JAVA-1630: Fix Metadata.addIfAbsent.
+- [improvement] JAVA-1619: Update QueryBuilder methods to support Iterable input.
+- [improvement] JAVA-1527: Expose host_id and schema_version on Host metadata.
+- [new feature] JAVA-1377: Add support for TWCS in SchemaBuilder.
+- [improvement] JAVA-1631: Publish a sources jar for driver-core-tests.
+- [improvement] JAVA-1632: Add a withIpPrefix(String) method to CCMBridge.Builder.
+- [bug] JAVA-1639: VersionNumber does not fullfill equals/hashcode contract.
+- [bug] JAVA-1613: Fix broken shaded Netty detection in NettyUtil.
+
+
+### 3.3.0
+
+- [bug] JAVA-1469: Update LoggingRetryPolicy to deal with SLF4J-353.
+- [improvement] JAVA-1203: Upgrade Metrics to allow usage in OSGi.
+- [bug] JAVA-1407: KeyspaceMetadata exportAsString should export user types in topological sort order.
+- [bug] JAVA-1455: Mapper support using unset for null values.
+- [bug] JAVA-1464: Allow custom codecs with non public constructors in @Param.
+- [bug] JAVA-1470: Querying multiple pages overrides WrappedStatement.
+- [improvement] JAVA-1428: Upgrade logback and jackson dependencies.
+- [documentation] JAVA-1463: Revisit speculative execution docs.
+- [documentation] JAVA-1466: Revisit timestamp docs.
+- [documentation] JAVA-1445: Clarify how nodes are penalized in LatencyAwarePolicy docs.
+- [improvement] JAVA-1446: Support 'DEFAULT UNSET' in Query Builder JSON Insert.
+- [improvement] JAVA-1443: Add groupBy method to Select statement.
+- [improvement] JAVA-1458: Check thread in mapper sync methods.
+- [improvement] JAVA-1488: Upgrade Netty to 4.0.47.Final.
+- [improvement] JAVA-1460: Add speculative execution number to ExecutionInfo
+- [improvement] JAVA-1431: Improve error handling during pool initialization.
+
+
 ### 3.2.0
 
 - [new feature] JAVA-1347: Add support for duration type.

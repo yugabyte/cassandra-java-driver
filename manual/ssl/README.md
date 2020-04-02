@@ -118,7 +118,29 @@ Cluster cluster = Cluster.builder()
 
 Note that you can also extend the class and override
 [newSSLEngine(SocketChannel,InetSocketAddress)][newSSLEngine] if you need specific
-configuration on the `SSLEngine` (for example hostname verification).
+configuration on the `SSLEngine`.  For example, to enable hostname verification:
+
+```java
+SSLContext sslContext = ... // create and configure SSL context
+
+RemoteEndpointAwareJdkSSLOptions sslOptions = new RemoteEndpointAwareJdkSSLOptions(sslContext, null) {
+    protected SSLEngine newSSLEngine(SocketChannel channel, InetSocketAddress remoteEndpoint) {
+        SSLEngine engine = super.newSSLEngine(channel, remoteEndpoint);
+        SSLParameters parameters = engine.getSSLParameters();
+        // HTTPS endpoint identification includes hostname verification against certificate's common name.
+        // This API is only available for JDK7+.
+        parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        engine.setSSLParameters(parameters);
+        return engine;
+    }
+};
+
+Cluster cluster = Cluster.builder()
+  .addContactPoint("127.0.0.1")
+  .withSSL(sslOptions)
+  .build();
+```
+
 
 
 #### Netty
@@ -153,7 +175,7 @@ add it to your dependencies.
 
 There are known runtime incompatibilities between newer versions of
 netty-tcnative and the version of netty that the driver uses.  For best
-results, use version 1.1.33.Fork26.
+results, use version 2.0.7.Final.
 
 Using netty-tcnative requires JDK 1.7 or above and requires the presence of
 OpenSSL on the system.  It will not fall back to the JDK implementation.
@@ -185,8 +207,8 @@ Cluster cluster = Cluster.builder()
   .build();
 ```
 
-[RemoteEndpointAwareSSLOptions]:      http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/RemoteEndpointAwareSSLOptions.html
-[RemoteEndpointAwareJdkSSLOptions]:   http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/RemoteEndpointAwareJdkSSLOptions.html
-[newSSLEngine]:                       http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/RemoteEndpointAwareJdkSSLOptions.html#newSSLEngine-io.netty.channel.socket.SocketChannel-java.net.InetSocketAddress-
-[RemoteEndpointAwareNettySSLOptions]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/RemoteEndpointAwareNettySSLOptions.html
-[NettyOptions]:                       http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/NettyOptions.html
+[RemoteEndpointAwareSSLOptions]:      http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/RemoteEndpointAwareSSLOptions.html
+[RemoteEndpointAwareJdkSSLOptions]:   http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/RemoteEndpointAwareJdkSSLOptions.html
+[newSSLEngine]:                       http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/RemoteEndpointAwareJdkSSLOptions.html#newSSLEngine-io.netty.channel.socket.SocketChannel-java.net.InetSocketAddress-
+[RemoteEndpointAwareNettySSLOptions]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/RemoteEndpointAwareNettySSLOptions.html
+[NettyOptions]:                       http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/NettyOptions.html

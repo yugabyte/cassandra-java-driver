@@ -13,7 +13,6 @@
 package com.yugabyte.driver.core;
 
 import com.datastax.driver.core.Host;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -33,9 +32,7 @@ public class PartitionMetadata {
   // to be able to distinguish the case where the leader is missing so the hosts are all followers.
   private final List<Host> hosts;
 
-  /**
-   * Creates a new {@code PartitionMetadata}.
-   */
+  /** Creates a new {@code PartitionMetadata}. */
   public PartitionMetadata(Integer startKey, Integer endKey, List<Host> hosts) {
     this.startKey = startKey;
     this.endKey = endKey;
@@ -73,5 +70,4 @@ public class PartitionMetadata {
   public String toString() {
     return String.format("[%d, %d) -> %s", startKey, endKey, Arrays.toString(hosts.toArray()));
   }
-
 }

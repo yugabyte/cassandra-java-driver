@@ -101,14 +101,11 @@ Cluster cluster = Cluster.builder()
         .withLoadBalancingPolicy(
                 DCAwareRoundRobinPolicy.builder()
                         .withLocalDc("myLocalDC")
-                        .withUsedHostsPerRemoteDc(2)
-                        .allowRemoteDCsForLocalConsistencyLevel()
                         .build()
         ).build();
 ```
 
-This policy queries nodes of the local data-center in a round-robin fashion; optionally, it can also try a configurable
-number of hosts in remote data centers if all local hosts failed.
+This policy queries nodes of the local data-center in a round-robin fashion.
 
 Call `withLocalDc` to specify the name of your local datacenter. You can also leave it out, and the driver will use the
 datacenter of the first contact point that was reached [at initialization](../#cluster-initialization). However,
@@ -117,21 +114,6 @@ local datacenter. In general, providing the datacenter name explicitly is a safe
 
 Hosts belonging to the local datacenter are at distance `LOCAL`, and appear first in query plans (in a round-robin
 fashion).
-
-If you call `withUsedHostsPerRemoteDc`, the policy will pick that number of hosts for each remote DC, and add them at
-the end of query plans. To illustrate this, let's assume that the value is 2, there are 3 datacenters and 3 hosts in the
-local datacenter. Query plans would look like this:
-
-* query 1: localHost1, localHost2, localHost3, host1InRemoteDc1, host2InRemoteDc1, host1InRemoteDc2, host2InRemoteDc2
-* query 2: localHost2, localHost3, localHost1, host1InRemoteDc1, host2InRemoteDc1, host1InRemoteDc2, host2InRemoteDc2
-* query 3: localHost3, localHost1, localHost2, host1InRemoteDc1, host2InRemoteDc1, host1InRemoteDc2, host2InRemoteDc2
-
-Hosts selected by this option are at distance `REMOTE`. Note that they always appear in the same order.
-
-Finally, `allowRemoteDCsForLocalConsistencyLevel` controls whether remote hosts included by the previous option are
-included when the consistency level of the query is `LOCAL_ONE` or `LOCAL_QUORUM`. By default, it is off (remote hosts
-are not included for local CLs).
-
 
 ### [TokenAwarePolicy]
 
@@ -295,11 +277,11 @@ For any host, the distance returned by the policy is always the same as its chil
 Query plans are based on the child policy's, except that hosts that are currently excluded for being too slow are moved
 to the end of the plan.
 
-[withExclusionThreshold]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withExclusionThreshold-double-
-[withMininumMeasurements]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withMininumMeasurements-int-
-[withRetryPeriod]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withRetryPeriod-long-java.util.concurrent.TimeUnit-
-[withScale]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withScale-long-java.util.concurrent.TimeUnit-
-[withUpdateRate]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withUpdateRate-long-java.util.concurrent.TimeUnit-
+[withExclusionThreshold]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withExclusionThreshold-double-
+[withMininumMeasurements]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withMininumMeasurements-int-
+[withRetryPeriod]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withRetryPeriod-long-java.util.concurrent.TimeUnit-
+[withScale]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withScale-long-java.util.concurrent.TimeUnit-
+[withUpdateRate]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withUpdateRate-long-java.util.concurrent.TimeUnit-
 
 ### Filtering policies
 
@@ -317,15 +299,15 @@ studying the existing implementations first: `RoundRobinPolicy` is a good place 
 complex ones like `DCAwareRoundRobinPolicy`.
 
 
-[LoadBalancingPolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LoadBalancingPolicy.html
-[RoundRobinPolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/RoundRobinPolicy.html
-[DCAwareRoundRobinPolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/DCAwareRoundRobinPolicy.html
-[TokenAwarePolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/TokenAwarePolicy.html
-[LatencyAwarePolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/LatencyAwarePolicy.html
-[HostFilterPolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/HostFilterPolicy.html
-[WhiteListPolicy]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/policies/WhiteListPolicy.html
-[HostDistance]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/HostDistance.html
-[refreshConnectedHosts]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/PoolingOptions.html#refreshConnectedHosts--
-[setMetadataEnabled]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/QueryOptions.html#setMetadataEnabled-boolean-
-[Statement#getKeyspace]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Statement.html#getKeyspace--
-[Statement#getRoutingKey]: http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/Statement.html#getRoutingKey--
+[LoadBalancingPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LoadBalancingPolicy.html
+[RoundRobinPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/RoundRobinPolicy.html
+[DCAwareRoundRobinPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/DCAwareRoundRobinPolicy.html
+[TokenAwarePolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/TokenAwarePolicy.html
+[LatencyAwarePolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/LatencyAwarePolicy.html
+[HostFilterPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/HostFilterPolicy.html
+[WhiteListPolicy]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/policies/WhiteListPolicy.html
+[HostDistance]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/HostDistance.html
+[refreshConnectedHosts]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/PoolingOptions.html#refreshConnectedHosts--
+[setMetadataEnabled]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/QueryOptions.html#setMetadataEnabled-boolean-
+[Statement#getKeyspace]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Statement.html#getKeyspace--
+[Statement#getRoutingKey]: http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/Statement.html#getRoutingKey--

@@ -149,9 +149,9 @@ User user = new User()
     .setName("John Doe");
 ```
 
-[table]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Table.html
+[table]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Table.html
 [case-sensitive]:http://docs.datastax.com/en/cql/3.3/cql/cql_reference/ucase-lcase_r.html
-[consistency level]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/core/ConsistencyLevel.html
+[consistency level]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/core/ConsistencyLevel.html
 [java-beans]:https://docs.oracle.com/javase/tutorial/javabeans/writing/properties.html
 [set-accessible]:https://docs.oracle.com/javase/8/docs/api/java/lang/reflect/AccessibleObject.html#setAccessible-boolean-
 
@@ -189,7 +189,7 @@ CREATE TABLE users(id uuid PRIMARY KEY, "userName" text);
 private String userName;
 ```
 
-[column]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Column.html
+[column]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Column.html
 
 #### Primary key fields
 
@@ -213,15 +213,15 @@ private String areaCode;
 The order of the indices must match that of the columns in the table
 declaration.
 
-[pk]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/PartitionKey.html
-[cc]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/ClusteringColumn.html
+[pk]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/PartitionKey.html
+[cc]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/ClusteringColumn.html
 [pks]:http://thelastpickle.com/blog/2013/01/11/primary-keys-in-cql.html
 
 #### Computed fields
 
 [@Computed][computed] can be used on properties that are the result of a
 computation on the Cassandra side, typically a function call. Native
-functions in Cassandra like `writetime()` or [User Defined Functions] are
+functions in Cassandra like `writetime()` or [User-Defined Functions] are
 supported.
 
 ```java
@@ -250,7 +250,7 @@ version (see
 [JAVA-832](https://datastax-oss.atlassian.net/browse/JAVA-832)).
 
 [User Defined Functions]:http://www.planetcassandra.org/blog/user-defined-functions-in-cassandra-3-0/
-[computed]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Computed.html
+[computed]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Computed.html
 
 #### Transient properties
 
@@ -259,11 +259,11 @@ to table columns. [@Transient][transient] can be used to prevent a field or
 a Java bean property from being mapped. Like other column-level annotations, 
 it should be placed on either the field declaration or the property getter method.
 
-[transient]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Transient.html
+[transient]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Transient.html
 
 ### Mapping User Types
 
-[User Defined Types] can also be mapped by using [@UDT][udt]:
+[User-Defined Types] can also be mapped by using [@UDT][udt]:
 
 ```
 CREATE TYPE address (street text, zip_code int);
@@ -322,8 +322,8 @@ This also works with UDTs inside collections or other UDTs, with any arbitrary
 nesting level.
 
 [User Defined Types]: ../../udts/
-[udt]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/UDT.html
-[field]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Field.html
+[udt]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/UDT.html
+[field]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Field.html
 
 ### Mapping collections
 
@@ -359,10 +359,53 @@ private Map<Address, List<String>> frozenKeyValueMap;
 private Map<String, List<Address>> frozenValueMap;
 ```
 
-[frozen]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/Frozen.html
-[frozenkey]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/FrozenKey.html
-[frozenvalue]:http://docs.datastax.com/en/drivers/java/3.2/com/datastax/driver/mapping/annotations/FrozenValue.html
+With regards to tuples, these can be represented as `TupleValue` fields, i.e.:
 
+```java
+@Frozen
+private TupleValue myTupleValue;
+```
+
+Please note however that tuples are not a good fit for the mapper since it is up to the user to
+resolve the associated `TupleType` when creating and accessing `TupleValue`s and properly use the
+right types since java type information is not known.
+
+Also note that `@UDT`-annotated classes are not implicitly registered with `TupleValue` like they
+otherwise are because the mapper is not able to identify the cql type information at the time
+entities are constructed.
+
+To work around this, one may use [udtCodec] to register a `TypeCodec` that the mapper can use
+to figure out how to appropriately handle UDT conversion, i.e.:
+
+```java
+mappingManager.udtCodec(Address.class);
+```
+
+[frozen]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/Frozen.html
+[frozenkey]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/FrozenKey.html
+[frozenvalue]:http://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/annotations/FrozenValue.html
+[udtCodec]:https://docs.datastax.com/en/drivers/java/3.8/com/datastax/driver/mapping/MappingManager.html#udtCodec-java.lang.Class-
+
+#### Prefer Frozen Collections
+
+If `Mapper.save` is used to create and update entities, it is recommended to
+use frozen collections over non-frozen collections.
+
+Frozen collections in Cassandra are serialized as a single cell value where
+non-frozen collections serialize each individual element in a collection as a
+cell.
+
+Since `Mapper.save` provides the entire collection for an entity field value on
+each invocation, it is more efficient to use frozen collections as the entire
+collection is serialized as one cell.
+
+Also, when using non-frozen collections, on INSERT Cassandra must
+create a tombstone to invalidate all existing collection elements, even if
+there are none. When using frozen collections, no such tombstone is needed.
+
+See [Freezing collection types] for more information about the frozen keyword.
+
+[Freezing collection types]: https://docs.datastax.com/en/dse/6.7/cql/cql/cql_using/refCollectionType.html
 
 ### Polymorphism support
 
