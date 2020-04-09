@@ -45,10 +45,10 @@
     <description>A stress test example for Java Driver for YugaByte DB.</description>
     <url>https://github.com/yugabyte/cassandra-java-driver</url>
 
-    <properties>
+<!--     <properties>
         <main.basedir>${project.parent.parent.basedir}</main.basedir>
     </properties>
-
+ -->
     <dependencies>
 
         <dependency>
