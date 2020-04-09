@@ -36,7 +36,7 @@
     <parent>
         <groupId>com.yugabyte</groupId>
         <artifactId>cassandra-driver-parent</artifactId>
-        <version>3.8.0-yb-2-SNAPSHOT</version>
+        <version>3.8.0-yb-2.RC1.b3</version>
     </parent>
 
     <artifactId>cassandra-driver-extras</artifactId>
@@ -207,7 +207,7 @@
         <connection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</connection>
         <developerConnection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</developerConnection>
         <url>https://github.com/yugabyte/cassandra-java-driver</url>
-        <tag>3.8.0-yb-1</tag>
+        <tag>3.8.0-yb-2.RC1.b3</tag>
     </scm>
 
     <developers>
