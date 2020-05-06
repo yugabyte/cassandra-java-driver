@@ -136,10 +136,4 @@ class ArrayBackedRow extends AbstractGettableData implements Row {
     sb.append(']');
     return sb.toString();
   }
-
-  @Override
-  public String getJson(String name) {
-    // TODO Auto-generated method stub
-    return null;
-  }
 }

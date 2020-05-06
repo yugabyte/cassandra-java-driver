@@ -30,6 +30,7 @@
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.SchemaElement.KEYSPACE;
+import static com.datastax.driver.core.SchemaElement.TABLE;
 
 import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.ConnectionException;
@@ -45,9 +46,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import com.yugabyte.driver.core.PartitionMetadata;
+import com.yugabyte.driver.core.QualifiedTableName;
+import com.yugabyte.driver.core.TableSplitMetadata;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -90,6 +96,10 @@ class ControlConnection implements Connection.Owner {
       "SELECT peer, rpc_address, schema_version, host_id FROM system.peers";
   private static final String SELECT_SCHEMA_LOCAL =
       "SELECT schema_version, host_id FROM system.local WHERE key='local'";
+
+  // Query to load partition metadata for all tables.
+  private static final String SELECT_PARTITIONS =
+      "SELECT keyspace_name, table_name, start_key, end_key, replica_addresses FROM system.partitions";
 
   @VisibleForTesting
   final AtomicReference<Connection> connectionRef = new AtomicReference<Connection>();
@@ -430,6 +440,12 @@ class ControlConnection implements Connection.Owner {
         targetSignature,
         connection,
         cassandraVersion);
+
+    if (targetType == null || targetType == KEYSPACE || targetType == TABLE) {
+      // Refresh the entire partition map because one keyspace or table change may trigger
+      // re-balancing for the entire cluster.
+      refreshPartitionMap(connection, cluster);
+    } // Other change types do not affect the partition map so nothing to do.
   }
 
   void refreshNodeListAndTokenMap() {
@@ -439,6 +455,8 @@ class ControlConnection implements Connection.Owner {
 
     try {
       refreshNodeListAndTokenMap(c, cluster, false, true);
+      // Refresh the partition map for all tables.
+      refreshPartitionMap(c, cluster);
     } catch (ConnectionException e) {
       logger.debug(
           "[Control connection] Connection error while refreshing node list and token map ({})",
@@ -942,6 +960,94 @@ class ControlConnection implements Connection.Owner {
 
     if (metadataEnabled && factory != null && !tokenMap.isEmpty())
       cluster.metadata.rebuildTokenMap(factory, tokenMap);
+  }
+
+  /**
+   * Refresh the partition map for all tables.
+   *
+   * @param connection the connection object
+   * @param cluster the cluster manager
+   * @throws ConnectionException
+   * @throws BusyConnectionException
+   * @throws ExecutionException
+   * @throws InterruptedException
+   */
+  private static void refreshPartitionMap(Connection connection, Cluster.Manager cluster)
+      throws ConnectionException, BusyConnectionException, ExecutionException,
+          InterruptedException {
+
+    boolean partitionMetadataEnabled =
+        cluster.configuration.getQueryOptions().isMetadataEnabled()
+            && cluster.requiresPartitionMap();
+
+    DefaultResultSetFuture partitionsFuture =
+        new DefaultResultSetFuture(
+            null, cluster.protocolVersion(), new Requests.Query(SELECT_PARTITIONS));
+    connection.write(partitionsFuture);
+
+    // Refresh partition metadata (table-specific partition splits).
+    if (partitionMetadataEnabled) {
+      Map<QualifiedTableName, TableSplitMetadata> tableSplits =
+          new HashMap<QualifiedTableName, TableSplitMetadata>();
+
+      // Prepare the host map to look up host by the inet address.
+      Map<InetAddress, Host> hostMap = new HashMap<InetAddress, Host>();
+      for (Host host : cluster.metadata.allHosts()) {
+        hostMap.put(host.getAddress(), host);
+      }
+
+      for (Row row : partitionsFuture.get()) {
+        QualifiedTableName tableId =
+            new QualifiedTableName(row.getString("keyspace_name"), row.getString("table_name"));
+
+        TableSplitMetadata tableSplitMetadata = tableSplits.get(tableId);
+        if (tableSplitMetadata == null) {
+          tableSplitMetadata = new TableSplitMetadata();
+          tableSplits.put(tableId, tableSplitMetadata);
+        }
+
+        Map<InetAddress, String> replicaAddresses =
+            row.getMap("replica_addresses", InetAddress.class, String.class);
+
+        List<Host> hosts = new Vector<Host>();
+        for (Map.Entry<InetAddress, String> entry : replicaAddresses.entrySet()) {
+          Host host = hostMap.get(entry.getKey());
+          if (host == null) {
+            // Ignore tables in system keyspaces because they are hosted in master not tserver.
+            if (!KeyspaceMetadata.isSystem(tableId.getKeyspaceName())) {
+              logger.debug(
+                  "Host "
+                      + entry.getKey()
+                      + " not found in cluster metadata for table "
+                      + tableId.toString());
+            }
+            continue;
+          }
+          // Put the leader at the beginning and the rest after.
+          String role = entry.getValue();
+          if (role.equals("LEADER")) {
+            hosts.add(0, host);
+          } else if (role.equals("FOLLOWER") || role.equals("READ_REPLICA")) {
+            hosts.add(host);
+          }
+        }
+        int startKey = getKey(row.getBytes("start_key"));
+        int endKey = getKey(row.getBytes("end_key"));
+        tableSplitMetadata
+            .getPartitionMap()
+            .put(startKey, new PartitionMetadata(startKey, endKey, hosts));
+      }
+
+      // Set the new partition map in the cluster metadata.
+      cluster.metadata.setTableSplits(tableSplits);
+    }
+  }
+
+  /** Extracts an unsigned 16-bit number from a {@code ByteBuffer}. */
+  private static int getKey(ByteBuffer bb) {
+    int key = (bb.remaining() == 0) ? 0 : bb.getShort();
+    // Flip the negative values back to positive.
+    return (key >= 0) ? key : key + 0x10000;
   }
 
   private static Set<Token> toTokens(Token.Factory factory, Set<String> tokensStr) {
