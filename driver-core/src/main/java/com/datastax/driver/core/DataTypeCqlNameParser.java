@@ -28,6 +28,7 @@ import static com.datastax.driver.core.DataType.date;
 import static com.datastax.driver.core.DataType.decimal;
 import static com.datastax.driver.core.DataType.duration;
 import static com.datastax.driver.core.DataType.inet;
+import static com.datastax.driver.core.DataType.json;
 import static com.datastax.driver.core.DataType.list;
 import static com.datastax.driver.core.DataType.map;
 import static com.datastax.driver.core.DataType.set;
@@ -92,6 +93,7 @@ class DataTypeCqlNameParser {
           .put("smallint", smallint())
           // duration is not really a native CQL type, but appears as so in system tables
           .put("duration", duration())
+          .put("jsonb", json())
           .build();
 
   /**
