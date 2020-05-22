@@ -1,18 +1,19 @@
 /*
- * Copyright DataStax, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+
+* Copyright DataStax, Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.exceptions.DriverInternalError;
@@ -69,7 +70,7 @@ public abstract class DataType {
     SET(34),
     UDT(48, ProtocolVersion.V3),
     TUPLE(49, ProtocolVersion.V3),
-    JSON(128); // Yugabyte specific types start here
+    JSONB(128); // Yugabyte specific types start here
 
     final int protocolId;
 
@@ -135,7 +136,7 @@ public abstract class DataType {
     primitiveTypeMap.put(Name.INET, new DataType.NativeType(Name.INET));
     primitiveTypeMap.put(Name.INT, new DataType.NativeType(Name.INT));
     primitiveTypeMap.put(Name.TEXT, new DataType.NativeType(Name.TEXT));
-    primitiveTypeMap.put(Name.JSON, new DataType.NativeType(Name.JSON));
+    primitiveTypeMap.put(Name.JSONB, new DataType.NativeType(Name.JSONB));
     primitiveTypeMap.put(Name.TIMESTAMP, new DataType.NativeType(Name.TIMESTAMP));
     primitiveTypeMap.put(Name.UUID, new DataType.NativeType(Name.UUID));
     primitiveTypeMap.put(Name.VARCHAR, new DataType.NativeType(Name.VARCHAR));
@@ -325,7 +326,7 @@ public abstract class DataType {
    * @return The JSON type.
    */
   public static DataType json() {
-    return primitiveTypeMap.get(Name.JSON);
+    return primitiveTypeMap.get(Name.JSONB);
   }
 
   /**

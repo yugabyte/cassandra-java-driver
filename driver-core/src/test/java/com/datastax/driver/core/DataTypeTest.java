@@ -229,7 +229,7 @@ public class DataTypeTest {
           new TestValue(null, "null", "NULL"),
           new TestValue(null, "NULL", "NULL")
         };
-      case JSON:
+      case JSONB:
         return new TestValue[] {
           new TestValue("{\"a\":1}", "'{\"a\":1}'", "'{\"a\":1}'"),
           new TestValue(null, null, "NULL"),

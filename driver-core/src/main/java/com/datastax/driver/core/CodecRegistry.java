@@ -205,7 +205,7 @@ public final class CodecRegistry {
     BUILT_IN_CODECS_MAP.put(DataType.Name.DATE, TypeCodec.date());
     BUILT_IN_CODECS_MAP.put(DataType.Name.TIME, TypeCodec.time());
     BUILT_IN_CODECS_MAP.put(DataType.Name.DURATION, TypeCodec.duration());
-    BUILT_IN_CODECS_MAP.put(DataType.Name.JSON, TypeCodec.json());
+    BUILT_IN_CODECS_MAP.put(DataType.Name.JSONB, TypeCodec.json());
   }
 
   // roughly sorted by popularity

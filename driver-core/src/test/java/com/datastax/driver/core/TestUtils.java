@@ -405,7 +405,7 @@ public abstract class TestUtils {
           return UUID.fromString("087E9967-CCDC-4A9B-9036-05930140A41B");
         case VARCHAR:
           return "A varchar string";
-        case JSON:
+        case JSONB:
           return "{\"a\":1}";
         case VARINT:
           return new BigInteger("123456789012345678901234567890");

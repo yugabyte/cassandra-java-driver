@@ -178,7 +178,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       case BIGINT:
       case ASCII:
       case TEXT:
-      case JSON:
+      case JSONB:
       case VARCHAR:
       case BLOB:
       case INET:
