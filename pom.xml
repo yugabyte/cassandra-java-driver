@@ -35,7 +35,7 @@
 
     <groupId>com.yugabyte</groupId>
     <artifactId>cassandra-driver-parent</artifactId>
-    <version>3.8.0-yb-5-SNAPSHOT</version>
+    <version>3.8.0-yb-5</version>
     <packaging>pom</packaging>
     <name>Java Driver for YugaByte DB</name>
     <description>
@@ -1158,7 +1158,7 @@ limitations under the License.
         <connection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</connection>
         <developerConnection>scm:git:git@github.com:YugaByte/cassandra-java-driver.git</developerConnection>
         <url>https://github.com/yugabyte/cassandra-java-driver</url>
-        <tag>3.8.0-yb-1</tag>
+        <tag>3.8.0-yb-5</tag>
     </scm>
 
     <developers>
