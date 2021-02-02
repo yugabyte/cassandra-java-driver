@@ -185,6 +185,11 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       case UUID:
       case TIMEUUID:
       case DATE:
+        /*
+         * Decimal Type is supported column type for partitioned keys,
+         * However One-hop query fetch for Decimal Type is not supported as hash-code cannot be computed for Decimal types.
+         */
+      case DECIMAL:
       case TIME:
         channel.write(value);
         break;
@@ -276,7 +281,6 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         }
       case COUNTER:
       case CUSTOM:
-      case DECIMAL:
       case TUPLE:
       case VARINT:
         throw new UnsupportedOperationException(
