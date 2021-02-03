@@ -1,8 +1,8 @@
 {
   "phabricator.uri" : "https://phabricator.dev.yugabyte.com/",
   "repository.callsign": "CJD",
-  "git:arc.feature.start.default" : "origin/3.2.0-yb-x",
-  "arc.land.onto.default": "3.2.0-yb-x",
+  "git:arc.feature.start.default" : "origin/3.8.0-yb-x",
+  "arc.land.onto.default": "3.8.0-yb-x",
   "arc.land.remote.default": "origin",
-  "arc.feature.start.default" : "3.2.0-yb-x"
+  "arc.feature.start.default" : "3.8.0-yb-x"
 }
