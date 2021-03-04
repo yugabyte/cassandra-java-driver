@@ -87,8 +87,8 @@ abstract class ConvictionPolicy {
     @Override
     void signalConnectionClosed(Connection connection) {
       int remaining = openConnections.decrementAndGet();
-      assert remaining >= 0;
       Host.statesLogger.debug("[{}] {} closed, remaining = {}", host, connection, remaining);
+      assert remaining >= 0;
     }
 
     @Override
@@ -98,8 +98,8 @@ abstract class ConvictionPolicy {
         if (host.state != Host.State.DOWN) updateReconnectionTime();
 
         remaining = openConnections.decrementAndGet();
-        assert remaining >= 0;
         Host.statesLogger.debug("[{}] {} failed, remaining = {}", host, connection, remaining);
+        assert remaining >= 0;
       } else {
         remaining = openConnections.get();
       }
