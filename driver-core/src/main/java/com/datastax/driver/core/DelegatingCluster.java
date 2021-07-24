@@ -46,7 +46,7 @@ public abstract class DelegatingCluster extends Cluster {
 
     // Construct parent class with dummy parameters that will never get used (since super.init() is
     // never called).
-    super("delegating_cluster", Collections.<EndPoint>emptyList(), null);
+    super("delegating_cluster", Collections.<EndPoint>emptyList(), Configuration.builder().build());
 
     // Immediately close the parent class's internal Manager, to make sure that it will fail fast if
     // it's ever
