@@ -35,7 +35,7 @@
 
     <groupId>com.yugabyte</groupId>
     <artifactId>cassandra-driver-parent</artifactId>
-    <version>3.8.0-yb-8-SNAPSHOT</version>
+    <version>3.10.3-yb-8-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Java Driver for YugaByte DB</name>
     <description>
@@ -653,7 +653,7 @@
                         </execution>
                     </executions>
                     <configuration>
-                        <comparisonVersion>3.7.2</comparisonVersion>
+                        <comparisonVersion>3.10.1</comparisonVersion>
                         <ignoredDifferencesFile>../clirr-ignores.xml</ignoredDifferencesFile>
                         <excludes>
                             <exclude>com/datastax/shaded/**</exclude>

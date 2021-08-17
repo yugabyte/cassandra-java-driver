@@ -33,15 +33,41 @@ import static com.datastax.driver.core.Message.Response.Type.ERROR;
 import static io.netty.handler.timeout.IdleState.READER_IDLE;
 
 import com.datastax.driver.core.Responses.Result.SetKeyspace;
-import com.datastax.driver.core.exceptions.*;
+import com.datastax.driver.core.exceptions.AuthenticationException;
+import com.datastax.driver.core.exceptions.BusyConnectionException;
+import com.datastax.driver.core.exceptions.ConnectionException;
+import com.datastax.driver.core.exceptions.CrcMismatchException;
+import com.datastax.driver.core.exceptions.DriverException;
+import com.datastax.driver.core.exceptions.DriverInternalError;
+import com.datastax.driver.core.exceptions.FrameTooLongException;
+import com.datastax.driver.core.exceptions.OperationTimedOutException;
+import com.datastax.driver.core.exceptions.TransportException;
+import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.datastax.driver.core.utils.MoreObjects;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
-import com.google.common.util.concurrent.*;
+import com.google.common.util.concurrent.AbstractFuture;
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -58,7 +84,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -79,8 +110,6 @@ class Connection {
       SystemProperties.getBoolean("com.datastax.driver.DISABLE_COALESCING", false);
   private static final int FLUSHER_SCHEDULE_PERIOD_NS =
       SystemProperties.getInt("com.datastax.driver.FLUSHER_SCHEDULE_PERIOD_NS", 10000);
-  private static final int FLUSHER_RUN_WITHOUT_WORK_TIMES =
-      SystemProperties.getInt("com.datastax.driver.FLUSHER_RUN_WITHOUT_WORK_TIMES", 5);
 
   enum State {
     OPEN,
@@ -178,8 +207,10 @@ class Connection {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
               writer.decrementAndGet();
+              // Note: future.channel() can be null in some error cases, so we need to guard against
+              // it in the rest of the code below.
               channel = future.channel();
-              if (isClosed()) {
+              if (isClosed() && channel != null) {
                 channel
                     .close()
                     .addListener(
@@ -193,7 +224,9 @@ class Connection {
                           }
                         });
               } else {
-                Connection.this.factory.allChannels.add(channel);
+                if (channel != null) {
+                  Connection.this.factory.allChannels.add(channel);
+                }
                 if (!future.isSuccess()) {
                   if (logger.isDebugEnabled())
                     logger.debug(
@@ -206,6 +239,7 @@ class Connection {
                       new TransportException(
                           Connection.this.endPoint, "Cannot connect", future.cause()));
                 } else {
+                  assert channel != null;
                   logger.debug(
                       "{} Connection established, initializing transport", Connection.this);
                   channel.closeFuture().addListener(new ChannelCloseListener());
@@ -331,6 +365,11 @@ class Connection {
     return new AsyncFunction<Message.Response, Void>() {
       @Override
       public ListenableFuture<Void> apply(Message.Response response) throws Exception {
+
+        if (protocolVersion.compareTo(ProtocolVersion.V5) >= 0 && response.type != ERROR) {
+          switchToV5Framing();
+        }
+
         switch (response.type) {
           case READY:
             return checkClusterName(protocolVersion, initExecutor);
@@ -1128,7 +1167,6 @@ class Connection {
     final Queue<FlushItem> queued = new ConcurrentLinkedQueue<FlushItem>();
     final AtomicBoolean running = new AtomicBoolean(false);
     final HashSet<Channel> channels = new HashSet<Channel>();
-    int runsWithNoWork = 0;
 
     private Flusher(EventLoop eventLoop) {
       this.eventLoopRef = new WeakReference<EventLoop>(eventLoop);
@@ -1144,14 +1182,12 @@ class Connection {
     @Override
     public void run() {
 
-      boolean doneWork = false;
       FlushItem flush;
       while (null != (flush = queued.poll())) {
         Channel channel = flush.channel;
         if (channel.isActive()) {
           channels.add(channel);
           channel.write(flush.request).addListener(flush.listener);
-          doneWork = true;
         }
       }
 
@@ -1159,15 +1195,9 @@ class Connection {
       for (Channel channel : channels) channel.flush();
       channels.clear();
 
-      if (doneWork) {
-        runsWithNoWork = 0;
-      } else {
-        // either reschedule or cancel
-        if (++runsWithNoWork > FLUSHER_RUN_WITHOUT_WORK_TIMES) {
-          running.set(false);
-          if (queued.isEmpty() || !running.compareAndSet(false, true)) return;
-        }
-      }
+      // either reschedule or cancel
+      running.set(false);
+      if (queued.isEmpty() || !running.compareAndSet(false, true)) return;
 
       EventLoop eventLoop = eventLoopRef.get();
       if (eventLoop != null && !eventLoop.isShuttingDown()) {
@@ -1336,7 +1366,7 @@ class Connection {
         // Special case, if we encountered a FrameTooLongException, raise exception on handler and
         // don't defunct it since
         // the connection is in an ok state.
-        if (error != null && error instanceof FrameTooLongException) {
+        if (error instanceof FrameTooLongException) {
           FrameTooLongException ftle = (FrameTooLongException) error;
           int streamId = ftle.getStreamId();
           ResponseHandler handler = pending.remove(streamId);
@@ -1355,6 +1385,9 @@ class Connection {
           handler.callback.onException(
               Connection.this, ftle, System.nanoTime() - handler.startTime, handler.retryCount);
           return;
+        } else if (error instanceof CrcMismatchException) {
+          // Fall back to the defunct call below, but we want a clear warning in the logs
+          logger.warn("CRC mismatch while decoding a response, dropping the connection", error);
         }
       }
       defunct(
@@ -1722,7 +1755,11 @@ class Connection {
       pipeline.addLast("frameDecoder", new Frame.Decoder());
       pipeline.addLast("frameEncoder", frameEncoder);
 
-      if (compressor != null) {
+      if (compressor != null
+          // Frame-level compression is only done in legacy protocol versions. In V5 and above, it
+          // happens at a higher level ("segment" that groups multiple frames), so never install
+          // those handlers.
+          && protocolVersion.compareTo(ProtocolVersion.V5) < 0) {
         pipeline.addLast("frameDecompressor", new Frame.Decompressor(compressor));
         pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
       }
@@ -1753,6 +1790,39 @@ class Connection {
           throw new DriverInternalError("Unsupported protocol version " + protocolVersion);
       }
     }
+  }
+
+  /**
+   * Rearranges the pipeline to deal with the new framing structure in protocol v5 and above. This
+   * has to be done manually, because it only happens once we've confirmed that the server supports
+   * v5.
+   */
+  void switchToV5Framing() {
+    assert factory.protocolVersion.compareTo(ProtocolVersion.V5) >= 0;
+
+    // We want to do this on the event loop, to make sure it doesn't race with incoming requests
+    assert channel.eventLoop().inEventLoop();
+
+    ChannelPipeline pipeline = channel.pipeline();
+    SegmentCodec segmentCodec =
+        new SegmentCodec(
+            channel.alloc(), factory.configuration.getProtocolOptions().getCompression());
+
+    // Outbound: "message -> segment -> bytes" instead of "message -> frame -> bytes"
+    Message.ProtocolEncoder requestEncoder =
+        (Message.ProtocolEncoder) pipeline.get("messageEncoder");
+    pipeline.replace(
+        "messageEncoder",
+        "messageToSegmentEncoder",
+        new MessageToSegmentEncoder(channel.alloc(), requestEncoder));
+    pipeline.replace(
+        "frameEncoder", "segmentToBytesEncoder", new SegmentToBytesEncoder(segmentCodec));
+
+    // Inbound: "frame <- segment <- bytes" instead of "frame <- bytes"
+    pipeline.replace(
+        "frameDecoder", "bytesToSegmentDecoder", new BytesToSegmentDecoder(segmentCodec));
+    pipeline.addAfter(
+        "bytesToSegmentDecoder", "segmentToFrameDecoder", new SegmentToFrameDecoder());
   }
 
   /** A component that "owns" a connection, and should be notified when it dies. */
