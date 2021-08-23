@@ -15,18 +15,12 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
+import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
+
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.type.codec.DseTypeCodecs;
 import com.datastax.dse.driver.internal.core.InsightsClientLifecycleListener;
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestAsyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestSyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.reactive.ContinuousCqlRequestReactiveProcessor;
-import com.datastax.dse.driver.internal.core.cql.reactive.CqlRequestReactiveProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphRequestAsyncProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphRequestSyncProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphSupportChecker;
-import com.datastax.dse.driver.internal.core.graph.reactive.ReactiveGraphRequestProcessor;
 import com.datastax.dse.driver.internal.core.tracker.MultiplexingRequestTracker;
+import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
 import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
 import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
 import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
@@ -39,6 +33,7 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.loadbalancing.NodeDistanceEvaluator;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
@@ -60,10 +55,6 @@ import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
-import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
-import com.datastax.oss.driver.internal.core.cql.CqlPrepareSyncProcessor;
-import com.datastax.oss.driver.internal.core.cql.CqlRequestAsyncProcessor;
-import com.datastax.oss.driver.internal.core.cql.CqlRequestSyncProcessor;
 import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
@@ -77,14 +68,14 @@ import com.datastax.oss.driver.internal.core.metadata.token.DefaultReplicationSt
 import com.datastax.oss.driver.internal.core.metadata.token.DefaultTokenFactoryRegistry;
 import com.datastax.oss.driver.internal.core.metadata.token.ReplicationStrategyFactory;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactoryRegistry;
-import com.datastax.oss.driver.internal.core.metrics.DropwizardMetricsFactory;
+import com.datastax.oss.driver.internal.core.metrics.MetricIdGenerator;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.internal.core.pool.ChannelPoolFactory;
+import com.datastax.oss.driver.internal.core.protocol.BuiltInCompressors;
 import com.datastax.oss.driver.internal.core.protocol.ByteBufPrimitiveCodec;
-import com.datastax.oss.driver.internal.core.protocol.Lz4Compressor;
-import com.datastax.oss.driver.internal.core.protocol.SnappyCompressor;
 import com.datastax.oss.driver.internal.core.servererrors.DefaultWriteTypeRegistry;
 import com.datastax.oss.driver.internal.core.servererrors.WriteTypeRegistry;
+import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
 import com.datastax.oss.driver.internal.core.session.PoolManager;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
@@ -93,20 +84,21 @@ import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogFormatter;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
-import com.datastax.oss.driver.internal.core.util.DependencyCheck;
+import com.datastax.oss.driver.internal.core.util.DefaultDependencyChecker;
 import com.datastax.oss.driver.internal.core.util.Reflection;
 import com.datastax.oss.driver.internal.core.util.concurrent.CycleDetector;
 import com.datastax.oss.driver.internal.core.util.concurrent.LazyReference;
-import com.datastax.oss.driver.shaded.guava.common.base.Ticker;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.FrameCodec;
+import com.datastax.oss.protocol.internal.PrimitiveCodec;
 import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
+import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
+import com.datastax.oss.protocol.internal.SegmentCodec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -166,8 +158,12 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("eventBus", this::buildEventBus, cycleDetector);
   private final LazyReference<Compressor<ByteBuf>> compressorRef =
       new LazyReference<>("compressor", this::buildCompressor, cycleDetector);
+  private final LazyReference<PrimitiveCodec<ByteBuf>> primitiveCodecRef =
+      new LazyReference<>("primitiveCodec", this::buildPrimitiveCodec, cycleDetector);
   private final LazyReference<FrameCodec<ByteBuf>> frameCodecRef =
       new LazyReference<>("frameCodec", this::buildFrameCodec, cycleDetector);
+  private final LazyReference<SegmentCodec<ByteBuf>> segmentCodecRef =
+      new LazyReference<>("segmentCodec", this::buildSegmentCodec, cycleDetector);
   private final LazyReference<ProtocolVersionRegistry> protocolVersionRegistryRef =
       new LazyReference<>(
           "protocolVersionRegistry", this::buildProtocolVersionRegistry, cycleDetector);
@@ -209,6 +205,8 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("poolManager", this::buildPoolManager, cycleDetector);
   private final LazyReference<MetricsFactory> metricsFactoryRef =
       new LazyReference<>("metricsFactory", this::buildMetricsFactory, cycleDetector);
+  private final LazyReference<MetricIdGenerator> metricIdGeneratorRef =
+      new LazyReference<>("metricIdGenerator", this::buildMetricIdGenerator, cycleDetector);
   private final LazyReference<RequestThrottler> requestThrottlerRef =
       new LazyReference<>("requestThrottler", this::buildRequestThrottler, cycleDetector);
   private final LazyReference<Map<String, String>> startupOptionsRef =
@@ -230,6 +228,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final RequestTracker requestTrackerFromBuilder;
   private final Map<String, String> localDatacentersFromBuilder;
   private final Map<String, Predicate<Node>> nodeFiltersFromBuilder;
+  private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
   private final InetSocketAddress cloudProxyAddress;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
@@ -237,6 +236,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final UUID startupClientId;
   private final String startupApplicationName;
   private final String startupApplicationVersion;
+  private final Object metricRegistry;
   // A stack trace captured in the constructor. Used to extract information about the client
   // application.
   private final StackTraceElement[] initStackTrace;
@@ -252,8 +252,7 @@ public class DefaultDriverContext implements InternalDriverContext {
       this.sessionName = "s" + SESSION_NAME_COUNTER.getAndIncrement();
     }
     this.localDatacentersFromBuilder = programmaticArguments.getLocalDatacenters();
-    this.codecRegistry =
-        buildCodecRegistry(this.sessionName, programmaticArguments.getTypeCodecs());
+    this.codecRegistry = buildCodecRegistry(programmaticArguments);
     this.nodeStateListenerFromBuilder = programmaticArguments.getNodeStateListener();
     this.nodeStateListenerRef =
         new LazyReference<>(
@@ -281,7 +280,10 @@ public class DefaultDriverContext implements InternalDriverContext {
             "sslEngineFactory",
             () -> buildSslEngineFactory(programmaticArguments.getSslEngineFactory()),
             cycleDetector);
-    this.nodeFiltersFromBuilder = programmaticArguments.getNodeFilters();
+    @SuppressWarnings("deprecation")
+    Map<String, Predicate<Node>> nodeFilters = programmaticArguments.getNodeFilters();
+    this.nodeFiltersFromBuilder = nodeFilters;
+    this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
     this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
     this.startupClientId = programmaticArguments.getStartupClientId();
@@ -295,6 +297,7 @@ public class DefaultDriverContext implements InternalDriverContext {
       stackTrace = new StackTraceElement[] {};
     }
     this.initStackTrace = stackTrace;
+    this.metricRegistry = programmaticArguments.getMetricRegistry();
   }
 
   /**
@@ -426,30 +429,27 @@ public class DefaultDriverContext implements InternalDriverContext {
     DriverExecutionProfile defaultProfile = getConfig().getDefaultProfile();
     String name = defaultProfile.getString(DefaultDriverOption.PROTOCOL_COMPRESSION, "none");
     assert name != null : "should use default value";
-    switch (name.toLowerCase()) {
-      case "lz4":
-        return new Lz4Compressor(this);
-      case "snappy":
-        return new SnappyCompressor(this);
-      case "none":
-        return Compressor.none();
-      default:
-        throw new IllegalArgumentException(
-            String.format(
-                "Unsupported compression algorithm '%s' (from configuration option %s)",
-                name, DefaultDriverOption.PROTOCOL_COMPRESSION.getPath()));
-    }
+    return BuiltInCompressors.newInstance(name, this);
+  }
+
+  protected PrimitiveCodec<ByteBuf> buildPrimitiveCodec() {
+    return new ByteBufPrimitiveCodec(getNettyOptions().allocator());
   }
 
   protected FrameCodec<ByteBuf> buildFrameCodec() {
     return new FrameCodec<>(
-        new ByteBufPrimitiveCodec(getNettyOptions().allocator()),
+        getPrimitiveCodec(),
         getCompressor(),
         new ProtocolV3ClientCodecs(),
         new ProtocolV4ClientCodecsForDse(),
         new ProtocolV5ClientCodecs(),
+        new ProtocolV6ClientCodecs(),
         new DseProtocolV1ClientCodecs(),
         new DseProtocolV2ClientCodecs());
+  }
+
+  protected SegmentCodec<ByteBuf> buildSegmentCodec() {
+    return new SegmentCodec<>(getPrimitiveCodec(), getCompressor());
   }
 
   protected ProtocolVersionRegistry buildProtocolVersionRegistry() {
@@ -504,78 +504,19 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected RequestProcessorRegistry buildRequestProcessorRegistry() {
-    String logPrefix = getSessionName();
-
-    List<RequestProcessor<?, ?>> processors = new ArrayList<>();
-
-    // regular requests (sync and async)
-    CqlRequestAsyncProcessor cqlRequestAsyncProcessor = new CqlRequestAsyncProcessor();
-    CqlRequestSyncProcessor cqlRequestSyncProcessor =
-        new CqlRequestSyncProcessor(cqlRequestAsyncProcessor);
-    processors.add(cqlRequestAsyncProcessor);
-    processors.add(cqlRequestSyncProcessor);
-
-    // prepare requests (sync and async)
-    CqlPrepareAsyncProcessor cqlPrepareAsyncProcessor = new CqlPrepareAsyncProcessor();
-    CqlPrepareSyncProcessor cqlPrepareSyncProcessor =
-        new CqlPrepareSyncProcessor(cqlPrepareAsyncProcessor);
-    processors.add(cqlPrepareAsyncProcessor);
-    processors.add(cqlPrepareSyncProcessor);
-
-    // continuous requests (sync and async)
-    ContinuousCqlRequestAsyncProcessor continuousCqlRequestAsyncProcessor =
-        new ContinuousCqlRequestAsyncProcessor();
-    ContinuousCqlRequestSyncProcessor continuousCqlRequestSyncProcessor =
-        new ContinuousCqlRequestSyncProcessor(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestSyncProcessor);
-
-    // graph requests (sync and async)
-    GraphRequestAsyncProcessor graphRequestAsyncProcessor = null;
-    if (DependencyCheck.TINKERPOP.isPresent()) {
-      graphRequestAsyncProcessor = new GraphRequestAsyncProcessor(this, new GraphSupportChecker());
-      GraphRequestSyncProcessor graphRequestSyncProcessor =
-          new GraphRequestSyncProcessor(graphRequestAsyncProcessor);
-      processors.add(graphRequestAsyncProcessor);
-      processors.add(graphRequestSyncProcessor);
-    } else {
-      LOG.info(
-          "Could not register Graph extensions; "
-              + "this is normal if Tinkerpop was explicitly excluded from classpath");
-    }
-
-    // reactive requests (regular, continuous and graph)
-    if (DependencyCheck.REACTIVE_STREAMS.isPresent()) {
-      CqlRequestReactiveProcessor cqlRequestReactiveProcessor =
-          new CqlRequestReactiveProcessor(cqlRequestAsyncProcessor);
-      ContinuousCqlRequestReactiveProcessor continuousCqlRequestReactiveProcessor =
-          new ContinuousCqlRequestReactiveProcessor(continuousCqlRequestAsyncProcessor);
-      processors.add(cqlRequestReactiveProcessor);
-      processors.add(continuousCqlRequestReactiveProcessor);
-      if (graphRequestAsyncProcessor != null) {
-        ReactiveGraphRequestProcessor reactiveGraphRequestProcessor =
-            new ReactiveGraphRequestProcessor(graphRequestAsyncProcessor);
-        processors.add(reactiveGraphRequestProcessor);
-      }
-    } else {
-      LOG.info(
-          "Could not register Reactive extensions; "
-              + "this is normal if Reactive Streams was explicitly excluded from classpath");
-    }
-    return new RequestProcessorRegistry(logPrefix, processors.toArray(new RequestProcessor[0]));
+    List<RequestProcessor<?, ?>> processors =
+        BuiltInRequestProcessors.createDefaultProcessors(this);
+    return new RequestProcessorRegistry(
+        getSessionName(), processors.toArray(new RequestProcessor[0]));
   }
 
-  protected CodecRegistry buildCodecRegistry(String logPrefix, List<TypeCodec<?>> codecs) {
-    MutableCodecRegistry registry = new DefaultCodecRegistry(logPrefix);
-    registry.register(codecs);
-    registry.register(DseTypeCodecs.DATE_RANGE);
-    if (DependencyCheck.ESRI.isPresent()) {
-      registry.register(DseTypeCodecs.LINE_STRING, DseTypeCodecs.POINT, DseTypeCodecs.POLYGON);
-    } else {
-      LOG.info(
-          "Could not register Geo codecs; "
-              + "this is normal if ESRI was explicitly excluded from classpath");
+  protected CodecRegistry buildCodecRegistry(ProgrammaticArguments arguments) {
+    MutableCodecRegistry registry = arguments.getCodecRegistry();
+    if (registry == null) {
+      registry = new DefaultCodecRegistry(this.sessionName);
     }
+    registry.register(arguments.getTypeCodecs());
+    DseTypeCodecsRegistrar.registerDseCodecs(registry);
     return registry;
   }
 
@@ -600,7 +541,33 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected MetricsFactory buildMetricsFactory() {
-    return new DropwizardMetricsFactory(this, Ticker.systemTicker());
+    return Reflection.buildFromConfig(
+            this,
+            DefaultDriverOption.METRICS_FACTORY_CLASS,
+            MetricsFactory.class,
+            "com.datastax.oss.driver.internal.core.metrics",
+            "com.datastax.oss.driver.internal.metrics.microprofile",
+            "com.datastax.oss.driver.internal.metrics.micrometer")
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    String.format(
+                        "Missing metrics factory, check your config (%s)",
+                        DefaultDriverOption.METRICS_FACTORY_CLASS)));
+  }
+
+  protected MetricIdGenerator buildMetricIdGenerator() {
+    return Reflection.buildFromConfig(
+            this,
+            DefaultDriverOption.METRICS_ID_GENERATOR_CLASS,
+            MetricIdGenerator.class,
+            "com.datastax.oss.driver.internal.core.metrics")
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    String.format(
+                        "Missing metric descriptor, check your config (%s)",
+                        DefaultDriverOption.METRICS_ID_GENERATOR_CLASS)));
   }
 
   protected RequestThrottler buildRequestThrottler() {
@@ -691,7 +658,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected List<LifecycleListener> buildLifecycleListeners() {
-    if (DependencyCheck.JACKSON.isPresent()) {
+    if (DefaultDependencyChecker.isPresent(JACKSON)) {
       return Collections.singletonList(new InsightsClientLifecycleListener(this, initStackTrace));
     } else {
       if (config.getDefaultProfile().getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED)) {
@@ -783,8 +750,20 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   @NonNull
   @Override
+  public PrimitiveCodec<ByteBuf> getPrimitiveCodec() {
+    return primitiveCodecRef.get();
+  }
+
+  @NonNull
+  @Override
   public FrameCodec<ByteBuf> getFrameCodec() {
     return frameCodecRef.get();
+  }
+
+  @NonNull
+  @Override
+  public SegmentCodec<ByteBuf> getSegmentCodec() {
+    return segmentCodecRef.get();
   }
 
   @NonNull
@@ -903,6 +882,12 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   @NonNull
   @Override
+  public MetricIdGenerator getMetricIdGenerator() {
+    return metricIdGeneratorRef.get();
+  }
+
+  @NonNull
+  @Override
   public RequestThrottler getRequestThrottler() {
     return requestThrottlerRef.get();
   }
@@ -933,8 +918,15 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   @Nullable
   @Override
+  @Deprecated
   public Predicate<Node> getNodeFilter(@NonNull String profileName) {
     return nodeFiltersFromBuilder.get(profileName);
+  }
+
+  @Nullable
+  @Override
+  public NodeDistanceEvaluator getNodeDistanceEvaluator(@NonNull String profileName) {
+    return nodeDistanceEvaluatorsFromBuilder.get(profileName);
   }
 
   @Nullable
@@ -975,5 +967,11 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   public List<LifecycleListener> getLifecycleListeners() {
     return lifecycleListenersRef.get();
+  }
+
+  @Nullable
+  @Override
+  public Object getMetricRegistry() {
+    return metricRegistry;
   }
 }

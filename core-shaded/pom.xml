@@ -21,7 +21,7 @@
   <parent>
     <groupId>com.yugabyte</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.6.0-yb-10-SNAPSHOT</version>
+    <version>4.11.4-yb-1-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-core-shaded</artifactId>
   <name>DataStax Java driver for Apache Cassandra(R) - core with shaded deps</name>
@@ -92,18 +92,12 @@
     <dependency>
       <groupId>org.apache.tinkerpop</groupId>
       <artifactId>gremlin-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>gremlin-driver</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.tinkerpop</groupId>
       <artifactId>tinkergraph-gremlin</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.javatuples</groupId>
-      <artifactId>javatuples</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.reactivestreams</groupId>
@@ -317,17 +311,20 @@
                   not required at runtime.
                   -->!net.jcip.annotations.*, !edu.umd.cs.findbugs.annotations.*,
                   <!--
-                  3) Use resolution:=optional whenever possible in order to make it possible to use
+                  3) Don't include GraalVM.
+                  -->!org.graalvm.*, !com.oracle.svm.*,
+                  <!--
+                  4) Use resolution:=optional whenever possible in order to make it possible to use
                   the OSS driver without such dependencies in an OSGi environment, as long as the
                   application does not attempt to access their packages.
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional,org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, org.javatuples.*;resolution:=optional,
+                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional,org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, org.javatuples.*;resolution:=optional, reactor.blockhound.*;resolution:=optional,
                   <!--
-                  4) Don't import packages imported by shaded classes, if they are not used by the
+                  5) Don't import packages imported by shaded classes, if they are not used by the
                   driver bundle.
-                  -->!com.google.protobuf.*, !com.jcraft.jzlib.*, !com.ning.compress.*, !lzma.sdk.*, !net.jpountz.xxhash.*, !org.bouncycastle.*, !org.conscrypt.*, !org.apache.commons.logging.*, !org.apache.log4j.*, !org.apache.logging.log4j.*, !org.eclipse.jetty.*, !org.jboss.marshalling.*, !sun.misc.*, !sun.security.*, !com.oracle.svm.core.annotate.*,!com.barchart.udt.*, !com.fasterxml.aalto.*, !com.sun.nio.sctp.*, !gnu.io.*, !org.xml.sax.*, !org.w3c.dom.*, !reactor.blockhound.*, *
+                  -->!com.google.protobuf.*, !com.jcraft.jzlib.*, !com.ning.compress.*, !lzma.sdk.*, !net.jpountz.xxhash.*, !org.bouncycastle.*, !org.conscrypt.*, !org.apache.commons.logging.*, !org.apache.log4j.*, !org.apache.logging.log4j.*, !org.eclipse.jetty.*, !org.jboss.marshalling.*, !sun.misc.*, !sun.security.*, !com.barchart.udt.*, !com.fasterxml.aalto.*, !com.sun.nio.sctp.*, !gnu.io.*, !org.xml.sax.*, !org.w3c.dom.*, *
                 </Import-Package>
                 <!--
                 Export:
