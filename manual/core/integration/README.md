@@ -8,6 +8,91 @@
 
 -----
 
+### Which artifact(s) should I use?
+
+There are multiple driver artifacts under the group id
+[com.datastax.oss](https://search.maven.org/search?q=g:com.datastax.oss). Here's how to pick the
+right dependencies:
+
+<table>
+<tr><th>Feature</th><th>Artifact(s)</th><th>Comments</th></tr>
+<tr>
+  <td>
+    Core functionality: executing queries with <code>CqlSession.execute()</code>, processing the
+    results with <code>ResultSet</code>, etc.
+  </td>
+  <td><code>java&#8209;driver&#8209;core</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>
+    Same as the above, but without explicit dependencies to <a href="#netty">Netty</a>,
+    <a href="#jackson">Jackson</a> or <a href="#esri">ESRI</a>. 
+  </td>
+  <td><code>java&#8209;driver&#8209;core&#8209;shaded</code></td>
+  <td>
+    Replaces <code>java&#8209;driver&#8209;core</code>.<br/>
+    See <a href="../shaded_jar/">this page</a>.
+  </td>
+</tr>
+<tr>
+  <td>
+    <a href="../../query_builder">Query builder</a>: generating CQL query strings programmatically. 
+  </td>
+  <td><code>java&#8209;driver&#8209;query&#8209;builder</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>
+    <a href="../../mapper">Object mapper</a>: generating the boilerplate to execute queries and
+    convert the results into your own domain classes.
+  </td>
+  <td>
+    <code>java&#8209;driver&#8209;mapper&#8209;processor</code><br/>
+    <code>java&#8209;driver&#8209;mapper&#8209;runtime</code>
+  </td>
+  <td>
+    Both artifacts are needed.<br/>
+    See <a href="../../mapper/config/">this page</a>.
+  </td>
+</tr>
+<tr>
+  <td>
+    Instrumenting the driver and gathering metrics using the Micrometer metrics library.
+  </td>
+  <td><code>java&#8209;driver&#8209;metrics&#8209;micrometer</code></td>
+  <td>See <a href="../metrics/">this page</a>.</td>
+</tr>
+<tr>
+  <td>
+    Instrumenting the driver and gathering metrics using the MicroProfile Metrics library.
+  </td>
+  <td><code>java&#8209;driver&#8209;metrics&#8209;microprofile</code></td>
+  <td>See <a href="../metrics/">this page</a>.</td>
+</tr>
+<tr>
+  <td>
+    "Bill Of Materials": can help manage versions if you use multiple driver artifacts.
+  </td>
+  <td><code>java&#8209;driver&#8209;bom</code></td>
+  <td>See <a href="../bom/">this page</a>.</td>
+</tr>
+<tr>
+  <td>
+    Writing integration tests that run the driver against Cassandra or <a
+    href="https://github.com/datastax/simulacron">Simulacron</a>.
+  </td>
+  <td><code>java&#8209;driver&#8209;test&#8209;infra</code></td>
+  <td>
+    Those APIs are not covered in this manual, but you can look at the driver's <a
+    href="https://github.com/datastax/java-driver/blob/4.x/CONTRIBUTING.md#integration-tests">contribution
+    guidelines</a> and <a
+    href="https://github.com/datastax/java-driver/tree/4.x/integration-tests">internal tests</a> for
+    guidance.
+  </td>
+</tr>
+</table>
+
 ### Minimal project structure
 
 We publish the driver to [Maven central][central_oss]. Most modern build tools can download the
@@ -240,21 +325,6 @@ as `application.conf` and `logback.xml` in our previous examples, must be in the
 
 All the driver's artifacts are JPMS automatic modules.
 
-Note that TinkerPop cannot currently be used in a JPMS application. You will get the following
-error:
-
-```
-Error occurred during initialization of boot layer
-java.lang.module.FindException: Unable to derive module descriptor for /path/to/gremlin-shaded-3.4.5.jar
-Caused by: java.lang.module.InvalidModuleDescriptorException: Provider class com.fasterxml.jackson.core.JsonFactory not in module
-```
-
-This is a known issue that will be resolved in TinkerPop 3.4.7. The driver will upgrade as soon as
-possible, see [JAVA-2726](https://datastax-oss.atlassian.net/browse/JAVA-2726).
-
-Unfortunately, the only workaround in the meantime is to exclude TinkerPop dependencies, as
-explained [here](#tinker-pop). Graph functionality won't be available.
-
 ### Driver dependencies
 
 The driver depends on a number of third-party libraries; some of those dependencies are opt-in,
@@ -334,10 +404,11 @@ enable compression. See the [Compression](../compression/) page for more details
 #### Metrics
 
 The driver exposes [metrics](../metrics/) through the
-[Dropwizard](http://metrics.dropwizard.io/4.0.0/manual/index.html) library.
+[Dropwizard](http://metrics.dropwizard.io/4.1.2/) library.
 
-The dependency is declared as required, but metrics are optional. If you've disabled all metrics,
-and never call [Session.getMetrics] anywhere in your application, you can remove the dependency:
+The dependency is declared as required, but metrics are optional. If you've disabled all metrics, or
+if you are using a different metrics library, and you never call [Session.getMetrics] anywhere in
+your application, then you can remove the dependency:
 
 ```xml
 <dependency>
@@ -353,12 +424,14 @@ and never call [Session.getMetrics] anywhere in your application, you can remove
 </dependency>
 ```
 
-In addition, "timer" metrics use [HdrHistogram](http://hdrhistogram.github.io/HdrHistogram/) to
-record latency percentiles. At the time of writing, these metrics are: `cql-requests`,
-`throttling.delay` and `cql-messages`; you can also identify them by reading the comments in the
-[configuration reference](../configuration/reference/) (look for "exposed as a Timer").
+In addition, when using Dropwizard, "timer" metrics use
+[HdrHistogram](http://hdrhistogram.github.io/HdrHistogram/) to record latency percentiles. At the
+time of writing, these metrics are: `cql-requests`, `throttling.delay` and `cql-messages`; you can
+also identify them by reading the comments in the [configuration
+reference](../configuration/reference/) (look for "exposed as a Timer").
 
-If all of these metrics are disabled, you can remove the dependency:
+If all of these metrics are disabled, or if you use a different metrics library, you can remove the
+dependency:
 
 ```xml
 <dependency>
@@ -378,10 +451,12 @@ If all of these metrics are disabled, you can remove the dependency:
 
 [Jackson](https://github.com/FasterXML/jackson) is used:
 
-* when connecting to [Datastax Apollo](../../cloud/);
-* when Insights monitoring is enabled.
+* when connecting to [Datastax Astra](../../cloud/);
+* when Insights monitoring is enabled;
+* when [Json codecs](../custom_codecs) are being used. 
  
-If you don't use either of those features, you can safely exclude the dependency:
+Jackson is declared as a required dependency, but the driver can operate normally without it. If you
+don't use any of the above features, you can safely exclude the dependency:
 
 ```xml
 <dependency>
@@ -391,11 +466,7 @@ If you don't use either of those features, you can safely exclude the dependency
   <exclusions>
     <exclusion>
       <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-core</artifactId>
-    </exclusion>
-    <exclusion>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
+      <artifactId>*</artifactId>
     </exclusion>
   </exclusions>
 </dependency>
@@ -406,7 +477,8 @@ If you don't use either of those features, you can safely exclude the dependency
 Our [geospatial types](../dse/geotypes/) implementation is based on the [Esri Geometry
 API](https://github.com/Esri/geometry-api-java).
 
-If you don't use geospatial types anywhere in your application, you can exclude the dependency:
+Esri is declared as a required dependency, but the driver can operate normally without it. If you
+don't use geospatial types anywhere in your application, you can exclude the dependency:
 
 ```xml
 <dependency>
@@ -416,7 +488,7 @@ If you don't use geospatial types anywhere in your application, you can exclude 
   <exclusions>
    <exclusion>
      <groupId>com.esri.geometry</groupId>
-     <artifactId>esri-geometry-api</artifactId>
+     <artifactId>*</artifactId>
    </exclusion>
   </exclusions>
 </dependency>
@@ -424,9 +496,13 @@ If you don't use geospatial types anywhere in your application, you can exclude 
 
 #### TinkerPop
 
-[Apache TinkerPop™](http://tinkerpop.apache.org/) is used in our [graph API](../dse/graph/).
+[Apache TinkerPop™](http://tinkerpop.apache.org/) is used in our [graph API](../dse/graph/),
+introduced in the OSS driver in version 4.4.0 (it was previously a feature only available in the
+now-retired DSE driver).
 
-If you don't use DSE graph at all, you can exclude the dependencies:
+For driver versions ranging from 4.4.0 to 4.9.0 inclusive, TinkerPop is declared as a required
+dependency, but the driver can operate normally without it. If you don't use the graph API at all,
+you can exclude the TinkerPop dependencies:
 
 ```xml
 <dependency>
@@ -436,20 +512,68 @@ If you don't use DSE graph at all, you can exclude the dependencies:
   <exclusions>
     <exclusion>
       <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>gremlin-core</artifactId>
-    </exclusion>
-    <exclusion>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>tinkergraph-gremlin</artifactId>
+      <artifactId>*</artifactId>
     </exclusion>
   </exclusions>
 </dependency>
 ```
 
+Starting with driver 4.10 however, TinkerPop switched to an optional dependency. Excluding TinkerPop
+explicitly is not required anymore if you don't use it. _If you do use the graph API though, you now
+need to explicitly include the dependencies below in your application_:
+
+```xml
+<dependency>
+  <groupId>org.apache.tinkerpop</groupId>
+  <artifactId>gremlin-core</artifactId>
+  <version>${tinkerpop.version}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.tinkerpop</groupId>
+  <artifactId>tinkergraph-gremlin</artifactId>
+  <version>${tinkerpop.version}</version>
+</dependency>
+```
+
 If you do use graph, it is important to keep the precise TinkerPop version that the driver depends
 on: unlike the driver, TinkerPop does not follow semantic versioning, so even a patch version change
-(e.g. 3.3.0 vs 3.3.3) could introduce incompatibilities. So do not declare an explicit dependency in
-your application, let the driver pull it transitively.
+(e.g. 3.3.0 vs 3.3.3) could introduce incompatibilities.
+
+Here are the recommended TinkerPop versions for each driver version:
+
+<table>
+<tr><th>Driver version</th><th>TinkerPop version</th></tr>
+<tr><td>4.11.0</td><td>3.4.10</td></tr>
+<tr><td>4.10.0</td><td>3.4.9</td></tr>
+<tr><td>4.9.0</td><td>3.4.8</td></tr>
+<tr><td>4.8.0</td><td>3.4.5</td></tr>
+<tr><td>4.7.0</td><td>3.4.5</td></tr>
+<tr><td>4.6.0</td><td>3.4.5</td></tr>
+<tr><td>4.5.0</td><td>3.4.5</td></tr>
+<tr><td>4.4.0</td><td>3.3.3</td></tr>
+</table>
+
+#### Reactive Streams
+
+[Reactive Streams](https://www.reactive-streams.org/) types are referenced in our [reactive
+API](../reactive/).
+
+The Reactive Streams API is declared as a required dependency, but the driver can operate normally
+without it. If you never call any of the `executeReactive` methods, you can exclude the dependency:
+
+```xml
+<dependency>
+  <groupId>com.datastax.oss</groupId>
+  <artifactId>java-driver-core</artifactId>
+  <version>${driver.version}</version>
+  <exclusions>
+    <exclusion>
+      <groupId>org.reactivestreams</groupId>
+      <artifactId>reactive-streams</artifactId>
+    </exclusion>
+  </exclusions>
+</dependency>
+```
 
 #### Documenting annotations
 
@@ -517,6 +641,6 @@ The remaining core driver dependencies are the only ones that are truly mandator
 [guava]: https://github.com/google/guava/issues/2721
 [annotation processing]: https://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html#sthref65
 
-[Session.getMetrics]:             https://docs.datastax.com/en/drivers/java/4.6/com/datastax/oss/driver/api/core/session/Session.html#getMetrics--
-[SessionBuilder.addContactPoint]: https://docs.datastax.com/en/drivers/java/4.6/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addContactPoint-java.net.InetSocketAddress-
-[Uuids]:                          https://docs.datastax.com/en/drivers/java/4.6/com/datastax/oss/driver/api/core/uuid/Uuids.html
+[Session.getMetrics]:             https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/session/Session.html#getMetrics--
+[SessionBuilder.addContactPoint]: https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addContactPoint-java.net.InetSocketAddress-
+[Uuids]:                          https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/uuid/Uuids.html
