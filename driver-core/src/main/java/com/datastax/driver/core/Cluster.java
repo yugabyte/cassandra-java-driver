@@ -1805,7 +1805,8 @@ public class Cluster implements Closeable {
           // statements exist at this point, we can skip some of the steps (plus this avoids
           // scheduling concurrent pool
           // creations if a session is created right after this method returns).
-          logger.info("New Cassandra host {} added", host);
+          logger.info("ABS: New Cassandra host {} added", host);
+          System.out.println();
 
           if (!host.supports(connectionFactory.protocolVersion)) {
             logUnsupportedVersionProtocol(host, connectionFactory.protocolVersion);

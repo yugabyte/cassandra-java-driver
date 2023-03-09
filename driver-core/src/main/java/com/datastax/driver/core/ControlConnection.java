@@ -520,7 +520,7 @@ class ControlConnection implements Connection.Owner {
       }
       DefaultResultSetFuture future =
           new DefaultResultSetFuture(null, cluster.protocolVersion(), new Requests.Query(query));
-      logger.info("CC.fetchNodeInfo(): Writing {}", query);
+      logger.info("CC.fetchNodeInfo(): Writing {} to ", query, c.endPoint);
       c.write(future);
       Row row = future.get().one();
       if (row != null) {
@@ -755,7 +755,7 @@ class ControlConnection implements Connection.Owner {
       DefaultResultSetFuture peersFuture =
           new DefaultResultSetFuture(
               null, cluster.protocolVersion(), new Requests.Query(SELECT_PEERS));
-      logger.info("selectPeersFuture(): Writing {}", SELECT_PEERS);
+      logger.info("selectPeersFuture(): Writing {} to {}", SELECT_PEERS, connection.endPoint);
       connection.write(peersFuture);
       return peersFuture;
     }
@@ -778,7 +778,8 @@ class ControlConnection implements Connection.Owner {
         new DefaultResultSetFuture(
             null, cluster.protocolVersion(), new Requests.Query(SELECT_LOCAL));
     ListenableFuture<ResultSet> peersFuture = selectPeersFuture(connection);
-    logger.info("refreshNodeListAndTokenMap(): Writing {}", SELECT_LOCAL);
+    logger.info(
+        "refreshNodeListAndTokenMap(): Writing {} to {}", SELECT_LOCAL, connection.endPoint);
     connection.write(localFuture);
 
     String partitioner = null;
@@ -986,7 +987,7 @@ class ControlConnection implements Connection.Owner {
     DefaultResultSetFuture partitionsFuture =
         new DefaultResultSetFuture(
             null, cluster.protocolVersion(), new Requests.Query(SELECT_PARTITIONS));
-    logger.info("refreshPartitionMap(): Writing {}", SELECT_PARTITIONS);
+    logger.info("refreshPartitionMap(): Writing {} to {}", SELECT_PARTITIONS, connection.endPoint);
     connection.write(partitionsFuture);
 
     // Refresh partition metadata (table-specific partition splits).
