@@ -246,7 +246,7 @@ abstract class EventDebouncer<T> {
     if (toDeliver.isEmpty()) {
       logger.trace("{} debouncer: no events to deliver", name);
     } else {
-      logger.trace("{} debouncer: delivering {} events", name, toDeliver.size());
+      logger.info("{} debouncer: delivering {} events", name, toDeliver.size());
       ListenableFuture<?> delivered = callback.deliver(toDeliver);
       GuavaCompatibility.INSTANCE.addCallback(
           delivered,

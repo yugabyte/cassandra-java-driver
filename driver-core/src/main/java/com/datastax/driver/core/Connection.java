@@ -1262,6 +1262,7 @@ class Connection {
             "{}, stream {}, received: {}", Connection.this, streamId, asDebugString(response));
 
       if (streamId < 0) {
+        logger.info("Event from {}", Connection.this.endPoint);
         factory.defaultHandler.handle(response);
         return;
       }

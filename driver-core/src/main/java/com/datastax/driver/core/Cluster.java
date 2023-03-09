@@ -2756,6 +2756,7 @@ public class Cluster implements Closeable {
       final ProtocolEvent event = ((Responses.Event) response).event;
 
       logger.debug("Received event {}, scheduling delivery", response);
+      logger.info("Received response {} and event {}, scheduling delivery", response, event);
 
       switch (event.type) {
         case TOPOLOGY_CHANGE:
@@ -3054,6 +3055,7 @@ public class Cluster implements Closeable {
             new ExceptionCatchingRunnable() {
               @Override
               public void runMayThrow() throws InterruptedException, ExecutionException {
+                logger.info("SchemaRefreshRequestDeliveryCallback.runMayThrow()");
                 SchemaRefreshRequest coalesced = null;
                 for (SchemaRefreshRequest request : events) {
                   coalesced = coalesced == null ? request : coalesced.coalesce(request);
@@ -3092,6 +3094,7 @@ public class Cluster implements Closeable {
 
       @Override
       public ListenableFuture<?> deliver(List<NodeRefreshRequest> events) {
+        logger.info("NodeRefreshRequestDeliveryCallback.deliver()");
         Map<InetSocketAddress, HostEvent> hosts = new HashMap<InetSocketAddress, HostEvent>();
         // only keep the last event for each host
         for (NodeRefreshRequest req : events) {
@@ -3239,6 +3242,7 @@ public class Cluster implements Closeable {
             new ExceptionCatchingRunnable() {
               @Override
               public void runMayThrow() throws InterruptedException, ExecutionException {
+                logger.info("NodeListRefreshRequestDeliveryCallback.runMayThrow()");
                 controlConnection.refreshNodeListAndTokenMap();
               }
             });
