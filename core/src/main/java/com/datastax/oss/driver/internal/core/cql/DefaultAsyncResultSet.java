@@ -44,6 +44,7 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
   private final CqlSession session;
   private final CountingIterator<Row> iterator;
   private final Iterable<Row> currentPage;
+  private long startTime;
 
   public DefaultAsyncResultSet(
       ColumnDefinitions definitions,
@@ -69,6 +70,16 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
   @Override
   public ColumnDefinitions getColumnDefinitions() {
     return definitions;
+  }
+
+  @Override
+  public long getStartTime() {
+    return startTime;
+  }
+
+  @Override
+  public void setStartTime(long start) {
+    this.startTime = start;
   }
 
   @NonNull
@@ -126,6 +137,14 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
 
   static AsyncResultSet empty(final ExecutionInfo executionInfo) {
     return new AsyncResultSet() {
+      @Override
+      public void setStartTime(long start) {}
+
+      @Override
+      public long getStartTime() {
+        return 0;
+      }
+
       @NonNull
       @Override
       public ColumnDefinitions getColumnDefinitions() {
