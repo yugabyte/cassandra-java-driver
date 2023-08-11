@@ -76,8 +76,8 @@ public class CqlIdentifier implements Serializable {
       internal = Strings.unDoubleQuote(cql);
     } else {
       internal = cql.toLowerCase();
-      Preconditions.checkArgument(
-          !Strings.needsDoubleQuotes(internal), "Invalid CQL form [%s]: needs double quotes", cql);
+      // Preconditions.checkArgument(
+      // !Strings.needsDoubleQuotes(internal), "Invalid CQL form [%s]: needs double quotes", cql);
     }
     return fromInternal(internal);
   }
