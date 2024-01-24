@@ -46,8 +46,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +111,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
     String queryTable = variables.get(0).getTable().asInternal();
 
-//    LOG.debug("getQueryPlan: keyspace = " + queryKeySpace + ", query = " + query);
+    //    LOG.debug("getQueryPlan: keyspace = " + queryKeySpace + ", query = " + query);
 
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
@@ -130,8 +128,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // Get all the applicable nodes for LoadBalancing from the base class
     Queue<Node> bNodes = super.newQueryPlan((Request) statement, session);
     Object[] baseNodes = bNodes.toArray();
-    Iterator<Node> nodesFromBasePolicy =
-        bNodes.iterator();
+    Iterator<Node> nodesFromBasePolicy = bNodes.iterator();
 
     // This needs to manipulate the local copy of the hosts instead of the actual reference
     List<Node> nodes = tableSplitMetadata.getHosts(key);
@@ -144,10 +141,16 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         bSize = baseNodes.length;
         bHost = bSize > 0 ? baseNodes[0].toString() : "";
       }
-      LOG.info("Keyspace: {}, query: {}, Primary node(0): {}, Primary node(1): {}, baseNodesCount: {}, baseNode(0): {}", queryKeySpace, query, leader, next, bSize);
+      LOG.info(
+          "Keyspace: {}, query: {}, Primary node(0): {}, Primary node(1): {}, baseNodesCount: {}, baseNode(0): {}",
+          queryKeySpace,
+          query,
+          leader,
+          next,
+          bSize,
+          bHost);
     }
-    return new UpHostIterator(
-        statement, new ArrayList(nodes), nodesFromBasePolicy);
+    return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
   }
 
   /**
