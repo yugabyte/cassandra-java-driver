@@ -38,7 +38,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.*;
-
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +83,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
             ? new SimpleQueryPlan(partitionAwareNodes.toArray())
             : super.newQueryPlan(request, session);
 
-    LOG.debug("newQueryPlan: nodes returned by PartitionAwarePolicy = {} hashCode = {}", temp, System.identityHashCode(temp));
+    LOG.debug(
+        "newQueryPlan: nodes returned by PartitionAwarePolicy = {} hashCode = {}",
+        temp,
+        System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic
@@ -217,8 +219,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
-      LOG.info(
-          "hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
+      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
 
       while (iterator.hasNext()) {
         nextHost = iterator.next();
@@ -228,7 +229,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // is in the
         // head of the host list.
         LOG.info(
-            "hasNext(): inside while nextHost = {} distance = {}", nextHost, nextHost.getDistance());
+            "hasNext(): inside while nextHost = {} distance = {}",
+            nextHost,
+            nextHost.getDistance());
 
         if (nextHost.getState() == NodeState.UP
             && (nextHost.getDistance() == NodeDistance.LOCAL
