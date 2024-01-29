@@ -84,7 +84,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
             ? new SimpleQueryPlan(partitionAwareNodes.toArray())
             : super.newQueryPlan(request, session);
 
-    LOG.debug("newQueryPlan: nodes returned by PartitionAwarePolicy = {} ", temp);
+    LOG.debug("newQueryPlan: nodes returned by PartitionAwarePolicy = {} hashCode = {}", temp, System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic

@@ -160,7 +160,6 @@ public class YugabyteDefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy
 
   private void addToLiveNodeLists(@NonNull Node node) {
 
-    LOG.debug("YugabyteDefaultLoadBalancingPolicy localDc = {}", localDc);
     // For YCQL, when localDC is provided, use the DefaultNodeFilterHelper to find
     // out the local nodes and also maintain list of all the live nodes in every DC.
     if (!(localDc == null || localDc.trim().isEmpty())) {
