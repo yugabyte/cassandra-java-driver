@@ -251,6 +251,11 @@ public class CqlRequestHandler implements Throttled {
       while (!result.isDone() && (node = queryPlan.poll()) != null) {
         channel = session.getChannel(node, logPrefix);
         if (channel != null) {
+          LOG.info(
+              "sendRequest(): node polled {} from queryPlan hash code = {} queryPlan = {}",
+              node,
+              System.identityHashCode(queryPlan),
+              queryPlan);
           break;
         } else {
           recordError(node, new NodeUnavailableException(node));

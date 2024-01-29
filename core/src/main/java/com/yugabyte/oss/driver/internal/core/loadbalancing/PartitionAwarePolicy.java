@@ -37,15 +37,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.UUID;
+import java.util.*;
+
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,15 +74,21 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       while (partitionAwareNodeIterator.hasNext()) {
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
-      LOG.debug("newQueryPlan: Number of Nodes = " + partitionAwareNodes.size());
+      LOG.debug(
+          "newQueryPlan: partitionAwareNodes in order = {}",
+          Arrays.toString(partitionAwareNodes.toArray()));
     }
 
+    Queue<Node> temp =
+        !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
+            ? new SimpleQueryPlan(partitionAwareNodes.toArray())
+            : super.newQueryPlan(request, session);
+
+    LOG.debug("newQueryPlan: nodes returned by PartitionAwarePolicy = {} ", temp);
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic
-    return !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
-        ? new SimpleQueryPlan(partitionAwareNodes.toArray())
-        : super.newQueryPlan(request, session);
+    return temp;
   }
 
   /**
@@ -218,6 +217,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
+      LOG.info(
+          "hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
+
       while (iterator.hasNext()) {
         nextHost = iterator.next();
         // If the host is up, use it if it is local, or the statement requires strong
@@ -225,10 +227,16 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // In the latter case, we want to use the first available host since the leader
         // is in the
         // head of the host list.
+        LOG.info(
+            "hasNext(): inside while nextHost = {} distance = {}", nextHost, nextHost.getDistance());
 
         if (nextHost.getState() == NodeState.UP
             && (nextHost.getDistance() == NodeDistance.LOCAL
                 || getConsistencyLevel().isYBStrong())) {
+          LOG.info(
+              "hasNext(): returning true inside while nextHost = {} distance = {}",
+              nextHost,
+              nextHost.getDistance());
           return true;
         }
       }
@@ -239,10 +247,17 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
           // Skip host if it is a local host that we have already returned earlier.
           if (!hosts.contains(nextHost)
               || !(nextHost.getDistance() == NodeDistance.LOCAL
-                  || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) return true;
+                  || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) {
+            LOG.info(
+                "hasNext(): returning true inside while 2 nextHost = {} distance = {}",
+                nextHost,
+                nextHost.getDistance());
+            return true;
+          }
         }
       }
 
+      LOG.info("hasNext(): returning false");
       return false;
     }
 
