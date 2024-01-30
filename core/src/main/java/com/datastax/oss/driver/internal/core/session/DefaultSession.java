@@ -146,13 +146,30 @@ public class DefaultSession implements CqlSession {
       if (profiles != null) {
         for (Map.Entry e : profiles.entrySet()) {
           DriverExecutionProfile dep = (DriverExecutionProfile) e.getValue();
+          String cl =
+              dep.isDefined(DefaultDriverOption.REQUEST_CONSISTENCY)
+                  ? dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY)
+                  : "UNDEFINED";
+          String localDC =
+              dep.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
+                  ? dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
+                  : "UNDEFINED";
+          String lbClass =
+              dep.isDefined(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
+                  ? dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
+                  : "UNDEFINED";
+          String rpClass =
+              dep.isDefined(DefaultDriverOption.RETRY_POLICY_CLASS)
+                  ? dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS)
+                  : "UNDEFINED";
           LOG.info(
               "Driver Setting for profile {}, CL = {}, localDC = {}, LB class = {}, retry policy class = {}",
               e.getKey(),
-              dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY),
-              dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER),
-              dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS),
-              dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS));
+              cl,
+              localDC,
+              lbClass,
+              rpClass);
+          LOG.info("localDC from context = {}", context.getLocalDatacenter((String) e.getKey()));
         }
       }
     }
