@@ -13,7 +13,6 @@
 package com.yugabyte.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
-import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchableStatement;
@@ -207,7 +206,11 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       // shuffled.
       if (getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
         // this is to be performed in the local copy
-        LOG.info("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX");
+        String q =
+            statement.getPreparedStatement() == null
+                ? ""
+                : statement.getPreparedStatement().getQuery();
+        LOG.trace("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
         Collections.shuffle(hosts);
       }
     }

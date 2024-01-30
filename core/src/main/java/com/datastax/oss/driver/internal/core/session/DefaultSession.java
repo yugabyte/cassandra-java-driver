@@ -143,13 +143,17 @@ public class DefaultSession implements CqlSession {
     }
     if (context.getConfig() != null) {
       Map<String, ?> profiles = context.getConfig().getProfiles();
-      for (Map.Entry e : profiles.entrySet()) {
-        DriverExecutionProfile dep = (DriverExecutionProfile)e.getValue();
-        LOG.info("Driver Setting for profile {}, CL = {}, localDC = {}, LB class = {}, retry policy class = {}", e.getKey(),
-                dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY),
-                dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER),
-                dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS),
-                dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS));
+      if (profiles != null) {
+        for (Map.Entry e : profiles.entrySet()) {
+          DriverExecutionProfile dep = (DriverExecutionProfile) e.getValue();
+          LOG.info(
+              "Driver Setting for profile {}, CL = {}, localDC = {}, LB class = {}, retry policy class = {}",
+              e.getKey(),
+              dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY),
+              dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER),
+              dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS),
+              dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS));
+        }
       }
     }
   }
