@@ -216,6 +216,14 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
 
     private ConsistencyLevel getConsistencyLevel() {
+      String q =
+          statement.getPreparedStatement() == null
+              ? "null"
+              : statement.getPreparedStatement().getQuery();
+      LOG.info(
+          "CL = {} for statement {}",
+          (statement.getConsistencyLevel() == null ? "null" : statement.getConsistencyLevel()),
+          q);
       return statement.getConsistencyLevel() != null
           ? statement.getConsistencyLevel()
           : ConsistencyLevel.YB_STRONG;

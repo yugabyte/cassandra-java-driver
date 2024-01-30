@@ -163,7 +163,7 @@ public class DefaultSession implements CqlSession {
                   ? dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS)
                   : "UNDEFINED";
           LOG.info(
-              "Driver Setting for profile {}, CL = {}, localDC = {}, LB class = {}, retry policy class = {}",
+              "Driver Setting for profile {}, global CL = {}, localDC = {}, LB class = {}, retry policy class = {}",
               e.getKey(),
               cl,
               localDC,
