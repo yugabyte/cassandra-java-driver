@@ -188,6 +188,13 @@ public class CqlPrepareHandler implements Throttled {
       while (!result.isDone() && (node = queryPlan.poll()) != null) {
         channel = session.getChannel(node, logPrefix);
         if (channel != null) {
+          String qp = queryPlan.toString();
+          qp = qp.substring(0, Math.min(300, qp.length() - 1));
+          LOG.info(
+              "sendRequest(): Polled node {} from queryPlan = {}, hashCode = {}",
+              node,
+              qp,
+              System.identityHashCode(queryPlan));
           break;
         } else {
           recordError(node, new NodeUnavailableException(node));
