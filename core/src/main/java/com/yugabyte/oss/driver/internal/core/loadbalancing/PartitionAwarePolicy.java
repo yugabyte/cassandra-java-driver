@@ -74,7 +74,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
       LOG.debug(
-          "newQueryPlan: partitionAwareNodes in order = {}",
+          "newQueryPlan(): partitionAwareNodes in order = {}",
           Arrays.toString(partitionAwareNodes.toArray()));
     }
 
@@ -84,7 +84,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
             : super.newQueryPlan(request, session);
 
     LOG.debug(
-        "newQueryPlan: nodes returned by PartitionAwarePolicy = {} hashCode = {}",
+        "newQueryPlan(): nodes returned by PartitionAwarePolicy = {} hashCode = {}",
         temp,
         System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
@@ -216,14 +216,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
 
     private ConsistencyLevel getConsistencyLevel() {
-      String q =
-          statement.getPreparedStatement() == null
-              ? "null"
-              : statement.getPreparedStatement().getQuery();
-      LOG.info(
-          "CL = {} for statement {}",
-          (statement.getConsistencyLevel() == null ? "null" : statement.getConsistencyLevel()),
-          q);
+      PreparedStatement ps = statement.getPreparedStatement();
+      String q = ps == null ? "null" : ps.getQuery();
+      ConsistencyLevel cl = statement.getConsistencyLevel();
+      LOG.info("Driver Setting for statement {}: CL = {}", q, (cl == null ? "null" : cl));
       return statement.getConsistencyLevel() != null
           ? statement.getConsistencyLevel()
           : ConsistencyLevel.YB_STRONG;

@@ -162,14 +162,19 @@ public class DefaultSession implements CqlSession {
               dep.isDefined(DefaultDriverOption.RETRY_POLICY_CLASS)
                   ? dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS)
                   : "UNDEFINED";
+          String localDCViaAPI =
+              context.getLocalDatacenter((String) e.getKey()) != null
+                  ? context.getLocalDatacenter((String) e.getKey())
+                  : "UNDEFINED";
           LOG.info(
-              "Driver Setting for profile {}, global CL = {}, localDC = {}, LB class = {}, retry policy class = {}",
+              "Driver Setting for profile {}: global CL = {}, localDC (conf) = {}, localDC (API) = {}, LB class = {},"
+                  + " RetryPolicy class = {}",
               e.getKey(),
               cl,
               localDC,
+              localDCViaAPI,
               lbClass,
               rpClass);
-          LOG.info("localDC from context = {}", context.getLocalDatacenter((String) e.getKey()));
         }
       }
     }
