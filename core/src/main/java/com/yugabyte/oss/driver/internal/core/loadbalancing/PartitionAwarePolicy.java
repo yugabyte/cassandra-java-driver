@@ -73,9 +73,17 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       while (partitionAwareNodeIterator.hasNext()) {
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
-      LOG.debug(
-          "newQueryPlan(): partitionAwareNodes in order = {}",
-          Arrays.toString(partitionAwareNodes.toArray()));
+      Object[] nodes = partitionAwareNodes.toArray();
+      String nodeInfo = "";
+      if (nodes != null) {
+        if (nodes.length > 0) {
+          nodeInfo = nodes[0].toString();
+        }
+        if (nodes.length > 1) {
+          nodeInfo += ", " + nodes[1].toString();
+        }
+        LOG.debug("newQueryPlan(): partitionAwareNodes in order = {}", nodeInfo);
+      }
     }
 
     Queue<Node> temp =
@@ -83,9 +91,12 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
             ? new SimpleQueryPlan(partitionAwareNodes.toArray())
             : super.newQueryPlan(request, session);
 
-    LOG.debug(
+    String qp = temp.toString();
+    qp = qp.substring(0, Math.min(300, qp.length() - 1));
+
+    LOG.info(
         "newQueryPlan(): nodes returned by PartitionAwarePolicy = {} hashCode = {}",
-        temp,
+        qp,
         System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
@@ -107,12 +118,12 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
     if (variables.size() == 0) {
-      LOG.info("variables size is 0 for {}", pstmt.getQuery());
+      LOG.info("getQueryPlan(): variables.size=0 for {}", pstmt.getQuery());
       return null;
     }
     int key = getKey(statement);
     if (key < 0) {
-      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
+//      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
       return null;
     }
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
@@ -123,14 +134,14 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
     if (!partitionMetadata.isPresent()) {
-      LOG.info("partitionMetadata is not present for query {}", pstmt.getQuery());
+      LOG.info("getQueryPlan(): partitionMetadata not present for {}", pstmt.getQuery());
       return null;
     }
 
     TableSplitMetadata tableSplitMetadata =
         partitionMetadata.get().getTableSplitMetadata(queryKeySpace, queryTable);
     if (tableSplitMetadata == null) {
-      LOG.info("tableSplitMetadata is null for query {}", pstmt.getQuery());
+      LOG.info("getQueryPlan(): tableSplitMetadata=null for {}", pstmt.getQuery());
       return null;
     }
 
@@ -151,13 +162,14 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         bHost = bSize > 0 ? baseNodes[0].toString() : "";
       }
       LOG.info(
-          "Keyspace: {}, query: {}, Primary node(0): {}, Primary node(1): {}, baseNodesCount: {}, baseNode(0): {}",
+          "ks: {}, q: {}, leader(0): {}, next(1): {}, baseNodes: {}, bNode(0): {}, kHash: {}",
           queryKeySpace,
           query,
           leader,
           next,
           bSize,
-          bHost);
+          bHost,
+          key);
     }
     return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
   }
@@ -228,7 +240,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       PreparedStatement ps = statement.getPreparedStatement();
       String q = ps == null ? "null" : ps.getQuery();
       ConsistencyLevel cl = statement.getConsistencyLevel();
-      LOG.info("Driver Setting for statement {}: CL = {}", q, (cl == null ? "null" : cl));
+      LOG.trace("Driver Setting for statement {}: CL = {}", q, (cl == null ? "null" : cl));
       return statement.getConsistencyLevel() != null
           ? statement.getConsistencyLevel()
           : ConsistencyLevel.YB_STRONG;
@@ -237,7 +249,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
-      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
+//      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
 
       while (iterator.hasNext()) {
         nextHost = iterator.next();
@@ -246,7 +258,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // In the latter case, we want to use the first available host since the leader
         // is in the
         // head of the host list.
-        LOG.info(
+        LOG.trace(
             "hasNext(): inside while nextHost = {} distance = {}",
             nextHost,
             nextHost.getDistance());
@@ -254,7 +266,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         if (nextHost.getState() == NodeState.UP
             && (nextHost.getDistance() == NodeDistance.LOCAL
                 || getConsistencyLevel().isYBStrong())) {
-          LOG.info(
+          LOG.trace(
               "hasNext(): returning true inside while nextHost = {} distance = {}",
               nextHost,
               nextHost.getDistance());
@@ -278,7 +290,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         }
       }
 
-      LOG.info("hasNext(): returning false");
+//      LOG.info("hasNext(): returning false");
       return false;
     }
 
@@ -345,7 +357,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // are literal
     // constants.
     if (hashIndexes == null || hashIndexes.isEmpty()) {
-      LOG.info("PartitionKeyIndices are null or empty for {}", pstmt.getQuery());
+      LOG.info("getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}", pstmt.getQuery());
       return -1;
     }
 
@@ -362,13 +374,17 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       }
       channel.close();
 
-      return getKey(bs.toByteArray());
+      int returnValue = getKey(bs.toByteArray());
+      if (returnValue < 0) {
+        LOG.info("getKey(): Returning negative hash {} for {}", returnValue, pstmt.getQuery());
+      }
+      return returnValue;
     } catch (IOException e) {
       // IOException should not happen at all given we are writing to the in-memory
       // buffer only. So
       // if it does happen, we just want to log the error but fallback to the default
       // set of hosts.
-      LOG.error("hash key encoding failed", e);
+      LOG.error("getKey(): Returning negative hash. hash key encoding failed", e);
       return -1;
     }
   }
