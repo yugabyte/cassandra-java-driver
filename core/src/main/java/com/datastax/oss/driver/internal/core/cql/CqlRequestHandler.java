@@ -542,7 +542,7 @@ public class CqlRequestHandler implements Throttled {
               scheduleNextExecution); // try next node
         }
       } else {
-        LOG.trace(
+        LOG.info(
             "[{}] Request sent on {} for a queryPlan with hashCode = {}",
             logPrefix,
             channel,
