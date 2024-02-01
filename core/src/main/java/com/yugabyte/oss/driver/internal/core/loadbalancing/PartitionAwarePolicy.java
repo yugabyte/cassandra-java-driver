@@ -106,9 +106,15 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     ColumnDefinitions variables = pstmt.getVariableDefinitions();
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
-    if (variables.size() == 0) return null;
+    if (variables.size() == 0) {
+      LOG.info("variables size is 0 for {}", pstmt.getQuery());
+      return null;
+    }
     int key = getKey(statement);
-    if (key < 0) return null;
+    if (key < 0) {
+      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
+      return null;
+    }
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
     String queryTable = variables.get(0).getTable().asInternal();
 
@@ -117,12 +123,14 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
     if (!partitionMetadata.isPresent()) {
+      LOG.info("partitionMetadata is not present for query {}", pstmt.getQuery());
       return null;
     }
 
     TableSplitMetadata tableSplitMetadata =
         partitionMetadata.get().getTableSplitMetadata(queryKeySpace, queryTable);
     if (tableSplitMetadata == null) {
+      LOG.info("tableSplitMetadata is null for query {}", pstmt.getQuery());
       return null;
     }
 
@@ -171,6 +179,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         if (plan != null) return plan;
       }
     }
+    LOG.info("getQueryPlan(BatchStatement): Returning null");
     return null;
   }
 
@@ -336,6 +345,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // are literal
     // constants.
     if (hashIndexes == null || hashIndexes.isEmpty()) {
+      LOG.info("PartitionKeyIndices are null or empty for {}", pstmt.getQuery());
       return -1;
     }
 
