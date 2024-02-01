@@ -123,7 +123,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
     int key = getKey(statement);
     if (key < 0) {
-//      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
+      //      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
       return null;
     }
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
@@ -249,7 +249,8 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
-//      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
+      //      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost,
+      // getConsistencyLevel());
 
       while (iterator.hasNext()) {
         nextHost = iterator.next();
@@ -290,7 +291,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         }
       }
 
-//      LOG.info("hasNext(): returning false");
+      //      LOG.info("hasNext(): returning false");
       return false;
     }
 
@@ -357,7 +358,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // are literal
     // constants.
     if (hashIndexes == null || hashIndexes.isEmpty()) {
-      LOG.info("getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}", pstmt.getQuery());
+      LOG.info(
+          "getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}",
+          pstmt.getQuery());
       return -1;
     }
 
