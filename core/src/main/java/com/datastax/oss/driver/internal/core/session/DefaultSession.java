@@ -167,15 +167,25 @@ public class DefaultSession implements CqlSession {
                 context.getLocalDatacenter((String) e.getKey()) != null
                     ? context.getLocalDatacenter((String) e.getKey())
                     : "UNDEFINED";
+            String remotePoolSize =
+                dep.isDefined(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE)
+                    ? String.valueOf(dep.getInt(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE))
+                    : "UNDEFINED";
+            String localPoolSize =
+                dep.isDefined(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)
+                    ? String.valueOf(dep.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE))
+                    : "UNDEFINED";
             LOG.info(
                 "Driver Setting for profile {}: global CL = {}, localDC (conf) = {}, localDC (API) = {}, LB class = {},"
-                    + " RetryPolicy class = {}",
+                    + " RetryPolicy class = {}, remote pool size = {}, local pool size = {}",
                 e.getKey(),
                 cl,
                 localDC,
                 localDCViaAPI,
                 lbClass,
-                rpClass);
+                rpClass,
+                remotePoolSize,
+                localPoolSize);
           }
         }
       }

@@ -370,8 +370,8 @@ public class CqlPrepareHandler implements Throttled {
           // Might happen if the timeout just fired
           cancel();
         } else {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace(
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
                 "[{}] Request sent to {} for a queryPlan with hashCode = {}",
                 logPrefix,
                 node.getEndPoint(),
