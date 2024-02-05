@@ -255,7 +255,7 @@ public class CqlRequestHandler implements Throttled {
             LOG.trace(
                 "[{}] Polled node {} from queryPlan with hashCode = {}",
                 logPrefix,
-                node,
+                node.getEndPoint(),
                 System.identityHashCode(queryPlan));
           }
           break;
@@ -546,7 +546,7 @@ public class CqlRequestHandler implements Throttled {
           LOG.trace(
               "[{}] Request sent on {} for a queryPlan with hashCode = {}",
               logPrefix,
-              channel,
+              channel.getEndPoint(),
               System.identityHashCode(queryPlan));
         }
         if (result.isDone()) {
