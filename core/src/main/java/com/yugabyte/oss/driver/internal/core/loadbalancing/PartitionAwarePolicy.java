@@ -129,7 +129,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
    */
   private Iterator<Node> getQueryPlan(Session session, BoundStatement statement) {
     PreparedStatement pstmt = statement.getPreparedStatement();
-    String query = pstmt.getQuery();
     ColumnDefinitions variables = pstmt.getVariableDefinitions();
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
