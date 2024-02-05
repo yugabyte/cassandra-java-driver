@@ -14,11 +14,7 @@ package com.yugabyte.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.BatchStatement;
-import com.datastax.oss.driver.api.core.cql.BatchableStatement;
-import com.datastax.oss.driver.api.core.cql.BoundStatement;
-import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
-import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.*;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -70,6 +66,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     if (LOG.isDebugEnabled()) {
       msg = new StringBuilder("Stmt: ");
       msg.append(request.getClass().getSimpleName());
+      if (request instanceof Statement) {
+        msg.append(", CL: " + ((Statement) request).getConsistencyLevel());
+      }
     }
 
     LinkedHashSet<Node> partitionAwareNodes = null;
@@ -111,10 +110,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     String nodeInfo = "";
     if (nodes != null) {
       if (nodes.length > 0) {
-        nodeInfo = nodes[0].toString();
+        nodeInfo = ((Node) nodes[0]).getEndPoint().toString();
       }
       if (nodes.length > 1) {
-        nodeInfo += ", " + nodes[1].toString();
+        nodeInfo += ", " + ((Node) nodes[1]).getEndPoint();
       }
     }
     return nodeInfo;
@@ -163,9 +162,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // This needs to manipulate the local copy of the hosts instead of the actual reference
     List<Node> nodes = tableSplitMetadata.getHosts(key);
     if (nodes.isEmpty()) {
-      LOG.debug("getQueryPlan(): tableSplitMetadata.getHosts(key) is empty");
+      LOG.debug(
+          "getQueryPlan(): tableSplitMetadata.getHosts(key) is empty for query {}",
+          pstmt.getQuery());
     }
-    LOG.debug("getQueryPlan(): statement CL {}", statement.getConsistencyLevel());
     return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
   }
 
