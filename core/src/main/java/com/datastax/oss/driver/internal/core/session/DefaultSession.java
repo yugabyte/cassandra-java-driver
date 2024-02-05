@@ -141,40 +141,42 @@ public class DefaultSession implements CqlSession {
       }
       throw t;
     }
-    if (context.getConfig() != null) {
-      Map<String, ?> profiles = context.getConfig().getProfiles();
-      if (profiles != null) {
-        for (Map.Entry e : profiles.entrySet()) {
-          DriverExecutionProfile dep = (DriverExecutionProfile) e.getValue();
-          String cl =
-              dep.isDefined(DefaultDriverOption.REQUEST_CONSISTENCY)
-                  ? dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY)
-                  : "UNDEFINED";
-          String localDC =
-              dep.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
-                  ? dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
-                  : "UNDEFINED";
-          String lbClass =
-              dep.isDefined(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
-                  ? dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
-                  : "UNDEFINED";
-          String rpClass =
-              dep.isDefined(DefaultDriverOption.RETRY_POLICY_CLASS)
-                  ? dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS)
-                  : "UNDEFINED";
-          String localDCViaAPI =
-              context.getLocalDatacenter((String) e.getKey()) != null
-                  ? context.getLocalDatacenter((String) e.getKey())
-                  : "UNDEFINED";
-          LOG.info(
-              "Driver Setting for profile {}: global CL = {}, localDC (conf) = {}, localDC (API) = {}, LB class = {},"
-                  + " RetryPolicy class = {}",
-              e.getKey(),
-              cl,
-              localDC,
-              localDCViaAPI,
-              lbClass,
-              rpClass);
+    if (LOG.isInfoEnabled()) {
+      if (context.getConfig() != null) {
+        Map<String, ?> profiles = context.getConfig().getProfiles();
+        if (profiles != null) {
+          for (Map.Entry e : profiles.entrySet()) {
+            DriverExecutionProfile dep = (DriverExecutionProfile) e.getValue();
+            String cl =
+                dep.isDefined(DefaultDriverOption.REQUEST_CONSISTENCY)
+                    ? dep.getString(DefaultDriverOption.REQUEST_CONSISTENCY)
+                    : "UNDEFINED";
+            String localDC =
+                dep.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
+                    ? dep.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
+                    : "UNDEFINED";
+            String lbClass =
+                dep.isDefined(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
+                    ? dep.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS)
+                    : "UNDEFINED";
+            String rpClass =
+                dep.isDefined(DefaultDriverOption.RETRY_POLICY_CLASS)
+                    ? dep.getString(DefaultDriverOption.RETRY_POLICY_CLASS)
+                    : "UNDEFINED";
+            String localDCViaAPI =
+                context.getLocalDatacenter((String) e.getKey()) != null
+                    ? context.getLocalDatacenter((String) e.getKey())
+                    : "UNDEFINED";
+            LOG.info(
+                "Driver Setting for profile {}: global CL = {}, localDC (conf) = {}, localDC (API) = {}, LB class = {},"
+                    + " RetryPolicy class = {}",
+                e.getKey(),
+                cl,
+                localDC,
+                localDCViaAPI,
+                lbClass,
+                rpClass);
+          }
         }
       }
     }

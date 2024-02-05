@@ -73,24 +73,14 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       while (partitionAwareNodeIterator.hasNext()) {
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
-      LOG.debug(
-          "newQueryPlan(): partitionAwareNodes in order = {}",
-          Arrays.toString(partitionAwareNodes.toArray()));
     }
 
-    Queue<Node> temp =
-        !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
-            ? new SimpleQueryPlan(partitionAwareNodes.toArray())
-            : super.newQueryPlan(request, session);
-
-    LOG.debug(
-        "newQueryPlan(): nodes returned by PartitionAwarePolicy = {} hashCode = {}",
-        temp,
-        System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic
-    return temp;
+    return !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
+        ? new SimpleQueryPlan(partitionAwareNodes.toArray())
+        : super.newQueryPlan(request, session);
   }
 
   /**
@@ -102,7 +92,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
    */
   private Iterator<Node> getQueryPlan(Session session, BoundStatement statement) {
     PreparedStatement pstmt = statement.getPreparedStatement();
-    String query = pstmt.getQuery();
     ColumnDefinitions variables = pstmt.getVariableDefinitions();
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
@@ -111,8 +100,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     if (key < 0) return null;
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
     String queryTable = variables.get(0).getTable().asInternal();
-
-    //    LOG.debug("getQueryPlan: keyspace = " + queryKeySpace + ", query = " + query);
 
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
@@ -127,31 +114,12 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
 
     // Get all the applicable nodes for LoadBalancing from the base class
-    Queue<Node> bNodes = super.newQueryPlan((Request) statement, session);
-    Object[] baseNodes = bNodes.toArray();
-    Iterator<Node> nodesFromBasePolicy = bNodes.iterator();
+    Iterator<Node> nodesFromBasePolicy =
+        super.newQueryPlan((Request) statement, session).iterator();
 
     // This needs to manipulate the local copy of the hosts instead of the actual reference
-    List<Node> nodes = tableSplitMetadata.getHosts(key);
-    if (!nodes.isEmpty()) {
-      Node leader = nodes.get(0);
-      String next = nodes.size() > 1 ? nodes.get(1).getEndPoint().toString() : "";
-      int bSize = 0;
-      String bHost = "";
-      if (baseNodes != null) {
-        bSize = baseNodes.length;
-        bHost = bSize > 0 ? baseNodes[0].toString() : "";
-      }
-      LOG.info(
-          "Keyspace: {}, query: {}, Primary node(0): {}, Primary node(1): {}, baseNodesCount: {}, baseNode(0): {}",
-          queryKeySpace,
-          query,
-          leader,
-          next,
-          bSize,
-          bHost);
-    }
-    return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
+    return new UpHostIterator(
+        statement, new ArrayList(tableSplitMetadata.getHosts(key)), nodesFromBasePolicy);
   }
 
   /**
@@ -216,10 +184,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
 
     private ConsistencyLevel getConsistencyLevel() {
-      PreparedStatement ps = statement.getPreparedStatement();
-      String q = ps == null ? "null" : ps.getQuery();
-      ConsistencyLevel cl = statement.getConsistencyLevel();
-      LOG.info("Driver Setting for statement {}: CL = {}", q, (cl == null ? "null" : cl));
       return statement.getConsistencyLevel() != null
           ? statement.getConsistencyLevel()
           : ConsistencyLevel.YB_STRONG;
@@ -228,8 +192,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
-      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost, getConsistencyLevel());
-
       while (iterator.hasNext()) {
         nextHost = iterator.next();
         // If the host is up, use it if it is local, or the statement requires strong
@@ -237,18 +199,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // In the latter case, we want to use the first available host since the leader
         // is in the
         // head of the host list.
-        LOG.info(
-            "hasNext(): inside while nextHost = {} distance = {}",
-            nextHost,
-            nextHost.getDistance());
 
         if (nextHost.getState() == NodeState.UP
             && (nextHost.getDistance() == NodeDistance.LOCAL
                 || getConsistencyLevel().isYBStrong())) {
-          LOG.info(
-              "hasNext(): returning true inside while nextHost = {} distance = {}",
-              nextHost,
-              nextHost.getDistance());
           return true;
         }
       }
@@ -259,17 +213,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
           // Skip host if it is a local host that we have already returned earlier.
           if (!hosts.contains(nextHost)
               || !(nextHost.getDistance() == NodeDistance.LOCAL
-                  || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) {
-            LOG.info(
-                "hasNext(): returning true inside while 2 nextHost = {} distance = {}",
-                nextHost,
-                nextHost.getDistance());
-            return true;
-          }
+                  || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) return true;
         }
       }
 
-      LOG.info("hasNext(): returning false");
       return false;
     }
 
