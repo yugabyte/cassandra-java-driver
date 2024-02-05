@@ -138,14 +138,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       return null;
     }
     int key = getKey(statement);
-    if (key < 0) {
-      //      LOG.info("Hash key is {} for query {}", key, pstmt.getQuery());
-      return null;
-    }
+    if (key < 0) return null;
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
     String queryTable = variables.get(0).getTable().asInternal();
-
-    //    LOG.debug("getQueryPlan: keyspace = " + queryKeySpace + ", query = " + query);
 
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
@@ -227,10 +222,8 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       // shuffled.
       if (getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
         // this is to be performed in the local copy
-        String q =
-            statement.getPreparedStatement() == null
-                ? ""
-                : statement.getPreparedStatement().getQuery();
+        PreparedStatement ps = statement.getPreparedStatement();
+        String q = ps == null ? "" : ps.getQuery();
         LOG.trace("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
         Collections.shuffle(hosts);
       }
