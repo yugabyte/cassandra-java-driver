@@ -60,11 +60,16 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
   @Override
   public Queue<Node> newQueryPlan(Request request, Session session) {
 
+    StringBuilder msg = null;
     Iterator<Node> partitionAwareNodeIterator = null;
     if (request instanceof BoundStatement) {
       partitionAwareNodeIterator = getQueryPlan(session, (BoundStatement) request);
     } else if (request instanceof BatchStatement) {
       partitionAwareNodeIterator = getQueryPlan(session, (BatchStatement) request);
+    }
+    if (LOG.isDebugEnabled()) {
+      msg = new StringBuilder("Stmt: ");
+      msg.append(request.getClass().getSimpleName());
     }
 
     LinkedHashSet<Node> partitionAwareNodes = null;
@@ -73,35 +78,46 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       while (partitionAwareNodeIterator.hasNext()) {
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
-      Object[] nodes = partitionAwareNodes.toArray();
-      String nodeInfo = "";
-      if (nodes != null) {
-        if (nodes.length > 0) {
-          nodeInfo = nodes[0].toString();
-        }
-        if (nodes.length > 1) {
-          nodeInfo += ", " + nodes[1].toString();
-        }
-        LOG.debug("newQueryPlan(): partitionAwareNodes in order = {}", nodeInfo);
-      }
     }
 
-    Queue<Node> temp =
-        !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
-            ? new SimpleQueryPlan(partitionAwareNodes.toArray())
-            : super.newQueryPlan(request, session);
-
-    String qp = temp.toString();
-    qp = qp.substring(0, Math.min(300, qp.length() - 1));
-
-    LOG.info(
-        "newQueryPlan(): nodes returned by PartitionAwarePolicy = {} hashCode = {}",
-        qp,
-        System.identityHashCode(temp));
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic
-    return temp;
+    Queue<Node> plan;
+    if (partitionAwareNodes == null || partitionAwareNodes.isEmpty()) {
+      plan = super.newQueryPlan(request, session);
+      if (LOG.isDebugEnabled()) {
+        msg.append(", LB: YugabyteDefault");
+      }
+    } else {
+      plan = new SimpleQueryPlan(partitionAwareNodes.toArray());
+      if (LOG.isDebugEnabled()) {
+        msg.append(", LB: PartitionAware");
+      }
+    }
+    if (LOG.isDebugEnabled()) {
+      msg.append(
+          ", first nodes: "
+              + getInitialNodes(plan)
+              + ", plan-hash: "
+              + System.identityHashCode(plan));
+      LOG.debug(msg.toString());
+    }
+    return plan;
+  }
+
+  private String getInitialNodes(Queue<Node> plan) {
+    Object[] nodes = plan.toArray();
+    String nodeInfo = "";
+    if (nodes != null) {
+      if (nodes.length > 0) {
+        nodeInfo = nodes[0].toString();
+      }
+      if (nodes.length > 1) {
+        nodeInfo += ", " + nodes[1].toString();
+      }
+    }
+    return nodeInfo;
   }
 
   /**
@@ -118,7 +134,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
     if (variables.size() == 0) {
-      LOG.info("getQueryPlan(): variables.size=0 for {}", pstmt.getQuery());
+      LOG.debug("getQueryPlan(): variables.size=0 for {}", pstmt.getQuery());
       return null;
     }
     int key = getKey(statement);
@@ -134,43 +150,27 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
     if (!partitionMetadata.isPresent()) {
-      LOG.info("getQueryPlan(): partitionMetadata not present for {}", pstmt.getQuery());
+      LOG.debug("getQueryPlan(): partitionMetadata not present for {}", pstmt.getQuery());
       return null;
     }
 
     TableSplitMetadata tableSplitMetadata =
         partitionMetadata.get().getTableSplitMetadata(queryKeySpace, queryTable);
     if (tableSplitMetadata == null) {
-      LOG.info("getQueryPlan(): tableSplitMetadata=null for {}", pstmt.getQuery());
+      LOG.debug("getQueryPlan(): tableSplitMetadata=null for {}", pstmt.getQuery());
       return null;
     }
 
     // Get all the applicable nodes for LoadBalancing from the base class
-    Queue<Node> bNodes = super.newQueryPlan((Request) statement, session);
-    Object[] baseNodes = bNodes.toArray();
-    Iterator<Node> nodesFromBasePolicy = bNodes.iterator();
+    Iterator<Node> nodesFromBasePolicy =
+        super.newQueryPlan((Request) statement, session).iterator();
 
     // This needs to manipulate the local copy of the hosts instead of the actual reference
     List<Node> nodes = tableSplitMetadata.getHosts(key);
-    if (!nodes.isEmpty()) {
-      Node leader = nodes.get(0);
-      String next = nodes.size() > 1 ? nodes.get(1).getEndPoint().toString() : "";
-      int bSize = 0;
-      String bHost = "";
-      if (baseNodes != null) {
-        bSize = baseNodes.length;
-        bHost = bSize > 0 ? baseNodes[0].toString() : "";
-      }
-      LOG.info(
-          "ks: {}, q: {}, leader(0): {}, next(1): {}, baseNodes: {}, bNode(0): {}, kHash: {}",
-          queryKeySpace,
-          query,
-          leader,
-          next,
-          bSize,
-          bHost,
-          key);
+    if (nodes.isEmpty()) {
+      LOG.debug("getQueryPlan(): tableSplitMetadata.getHosts(key) is empty");
     }
+    LOG.debug("getQueryPlan(): statement CL {}", statement.getConsistencyLevel());
     return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
   }
 
@@ -191,7 +191,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         if (plan != null) return plan;
       }
     }
-    LOG.info("getQueryPlan(BatchStatement): Returning null");
+    LOG.debug("getQueryPlan(BatchStatement): Returning null");
     return null;
   }
 
@@ -237,10 +237,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     }
 
     private ConsistencyLevel getConsistencyLevel() {
-      PreparedStatement ps = statement.getPreparedStatement();
-      String q = ps == null ? "null" : ps.getQuery();
-      ConsistencyLevel cl = statement.getConsistencyLevel();
-      LOG.trace("Driver Setting for statement {}: CL = {}", q, (cl == null ? "null" : cl));
       return statement.getConsistencyLevel() != null
           ? statement.getConsistencyLevel()
           : ConsistencyLevel.YB_STRONG;
@@ -249,9 +245,6 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     @Override
     public boolean hasNext() {
 
-      //      LOG.info("hasNext(): before while nextHost = {} CL = {}", nextHost,
-      // getConsistencyLevel());
-
       while (iterator.hasNext()) {
         nextHost = iterator.next();
         // If the host is up, use it if it is local, or the statement requires strong
@@ -259,18 +252,10 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // In the latter case, we want to use the first available host since the leader
         // is in the
         // head of the host list.
-        LOG.trace(
-            "hasNext(): inside while nextHost = {} distance = {}",
-            nextHost,
-            nextHost.getDistance());
 
         if (nextHost.getState() == NodeState.UP
             && (nextHost.getDistance() == NodeDistance.LOCAL
                 || getConsistencyLevel().isYBStrong())) {
-          LOG.trace(
-              "hasNext(): returning true inside while nextHost = {} distance = {}",
-              nextHost,
-              nextHost.getDistance());
           return true;
         }
       }
@@ -282,16 +267,11 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
           if (!hosts.contains(nextHost)
               || !(nextHost.getDistance() == NodeDistance.LOCAL
                   || statement.getConsistencyLevel() == ConsistencyLevel.YB_STRONG)) {
-            LOG.info(
-                "hasNext(): returning true inside while 2 nextHost = {} distance = {}",
-                nextHost,
-                nextHost.getDistance());
             return true;
           }
         }
       }
 
-      //      LOG.info("hasNext(): returning false");
       return false;
     }
 

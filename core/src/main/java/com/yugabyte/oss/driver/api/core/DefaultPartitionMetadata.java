@@ -156,6 +156,7 @@ public class DefaultPartitionMetadata {
       Map<InetAddress, String> replicaAddresses =
           row.getMapOfInetAddressToString("replica_addresses");
 
+      boolean leaderFound = false;
       List<Node> hosts = new ArrayList<Node>();
       for (Map.Entry<InetAddress, String> entry : replicaAddresses.entrySet()) {
 
@@ -175,6 +176,7 @@ public class DefaultPartitionMetadata {
         // Put the leader at the beginning and the rest after.
         String role = entry.getValue();
         if (role.equals("LEADER")) {
+          leaderFound = true;
           hosts.add(0, host);
         } else if (role.equals("FOLLOWER") || role.equals("READ_REPLICA")) {
           hosts.add(host);
@@ -182,6 +184,13 @@ public class DefaultPartitionMetadata {
       }
       int startKey = getKey(row.getByteBuffer("start_key"));
       int endKey = getKey(row.getByteBuffer("end_key"));
+      if (!leaderFound) {
+        LOG.info(
+            "No leader for startKey: {}, table: {}.{}",
+            startKey,
+            tableId.getKeyspaceName(),
+            tableId.getTableName());
+      }
       tableSplitMetadata
           .getPartitionMap()
           .put(startKey, new PartitionMetadata(startKey, endKey, hosts));
