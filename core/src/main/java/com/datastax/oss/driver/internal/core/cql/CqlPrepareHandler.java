@@ -188,6 +188,13 @@ public class CqlPrepareHandler implements Throttled {
       while (!result.isDone() && (node = queryPlan.poll()) != null) {
         channel = session.getChannel(node, logPrefix);
         if (channel != null) {
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(
+                "[{}] Polled node {} from queryPlan with hashCode = {}",
+                logPrefix,
+                node.getEndPoint(),
+                System.identityHashCode(queryPlan));
+          }
           break;
         } else {
           recordError(node, new NodeUnavailableException(node));
@@ -363,7 +370,13 @@ public class CqlPrepareHandler implements Throttled {
           // Might happen if the timeout just fired
           cancel();
         } else {
-          LOG.trace("[{}] Request sent to {}", logPrefix, node);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "[{}] Request sent to {} for a queryPlan with hashCode = {}",
+                logPrefix,
+                node.getEndPoint(),
+                System.identityHashCode(queryPlan));
+          }
           initialCallback = this;
         }
       }

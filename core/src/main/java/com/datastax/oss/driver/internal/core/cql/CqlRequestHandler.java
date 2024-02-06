@@ -251,6 +251,13 @@ public class CqlRequestHandler implements Throttled {
       while (!result.isDone() && (node = queryPlan.poll()) != null) {
         channel = session.getChannel(node, logPrefix);
         if (channel != null) {
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(
+                "[{}] Polled node {} from queryPlan with hashCode = {}",
+                logPrefix,
+                node.getEndPoint(),
+                System.identityHashCode(queryPlan));
+          }
           break;
         } else {
           recordError(node, new NodeUnavailableException(node));
@@ -535,7 +542,13 @@ public class CqlRequestHandler implements Throttled {
               scheduleNextExecution); // try next node
         }
       } else {
-        LOG.trace("[{}] Request sent on {}", logPrefix, channel);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(
+              "[{}] Request sent on {} for a queryPlan with hashCode = {}",
+              logPrefix,
+              channel.getEndPoint(),
+              System.identityHashCode(queryPlan));
+        }
         if (result.isDone()) {
           // If the handler completed since the last time we checked, cancel directly because we
           // don't know if cancelScheduledTasks() has run yet

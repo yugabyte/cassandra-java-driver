@@ -44,9 +44,6 @@ public class YugabyteDefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy
   private static final Logger LOG =
       LoggerFactory.getLogger(YugabyteDefaultLoadBalancingPolicy.class);
 
-  private volatile DistanceReporter distanceReporter;
-  private volatile String localDc;
-
   protected final CopyOnWriteArraySet<Node> liveNodesInLocalDc = new CopyOnWriteArraySet<>();
   protected final CopyOnWriteArraySet<Node> liveNodesInAllDC = new CopyOnWriteArraySet<>();
   protected final Map<Node, AtomicLongArray> responseTimes = new ConcurrentHashMap<>();

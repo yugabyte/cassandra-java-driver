@@ -14,11 +14,7 @@ package com.yugabyte.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.BatchStatement;
-import com.datastax.oss.driver.api.core.cql.BatchableStatement;
-import com.datastax.oss.driver.api.core.cql.BoundStatement;
-import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
-import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.*;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -37,15 +33,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.UUID;
+import java.util.*;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,11 +56,19 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
   @Override
   public Queue<Node> newQueryPlan(Request request, Session session) {
 
+    StringBuilder msg = null;
     Iterator<Node> partitionAwareNodeIterator = null;
     if (request instanceof BoundStatement) {
       partitionAwareNodeIterator = getQueryPlan(session, (BoundStatement) request);
     } else if (request instanceof BatchStatement) {
       partitionAwareNodeIterator = getQueryPlan(session, (BatchStatement) request);
+    }
+    if (LOG.isDebugEnabled()) {
+      msg = new StringBuilder("Stmt: ");
+      msg.append(request.getClass().getSimpleName());
+      if (request instanceof Statement) {
+        msg.append(", CL: " + ((Statement) request).getConsistencyLevel());
+      }
     }
 
     LinkedHashSet<Node> partitionAwareNodes = null;
@@ -81,15 +77,46 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       while (partitionAwareNodeIterator.hasNext()) {
         partitionAwareNodes.add(partitionAwareNodeIterator.next());
       }
-      LOG.debug("newQueryPlan: Number of Nodes = " + partitionAwareNodes.size());
     }
 
     // It so happens that the partition aware nodes could be non-empty, but the state of the nodes
     // could be down.
     // In such cases fallback to the inherited load-balancing logic
-    return !(partitionAwareNodes == null || partitionAwareNodes.isEmpty())
-        ? new SimpleQueryPlan(partitionAwareNodes.toArray())
-        : super.newQueryPlan(request, session);
+    Queue<Node> plan;
+    if (partitionAwareNodes == null || partitionAwareNodes.isEmpty()) {
+      plan = super.newQueryPlan(request, session);
+      if (LOG.isDebugEnabled()) {
+        msg.append(", LB: YugabyteDefault");
+      }
+    } else {
+      plan = new SimpleQueryPlan(partitionAwareNodes.toArray());
+      if (LOG.isDebugEnabled()) {
+        msg.append(", LB: PartitionAware");
+      }
+    }
+    if (LOG.isDebugEnabled()) {
+      msg.append(
+          ", first nodes: "
+              + getInitialNodes(plan)
+              + ", plan-hash: "
+              + System.identityHashCode(plan));
+      LOG.debug(msg.toString());
+    }
+    return plan;
+  }
+
+  private String getInitialNodes(Queue<Node> plan) {
+    Object[] nodes = plan.toArray();
+    String nodeInfo = "";
+    if (nodes != null) {
+      if (nodes.length > 0) {
+        nodeInfo = ((Node) nodes[0]).getEndPoint().toString();
+      }
+      if (nodes.length > 1) {
+        nodeInfo += ", " + ((Node) nodes[1]).getEndPoint();
+      }
+    }
+    return nodeInfo;
   }
 
   /**
@@ -105,23 +132,26 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     ColumnDefinitions variables = pstmt.getVariableDefinitions();
     // Look up the hosts for the partition key. Skip statements that do not have
     // bind variables.
-    if (variables.size() == 0) return null;
+    if (variables.size() == 0) {
+      LOG.debug("getQueryPlan(): variables.size=0 for {}", query);
+      return null;
+    }
     int key = getKey(statement);
     if (key < 0) return null;
     String queryKeySpace = variables.get(0).getKeyspace().asInternal();
     String queryTable = variables.get(0).getTable().asInternal();
 
-    LOG.debug("getQueryPlan: keyspace = " + queryKeySpace + ", query = " + query);
-
     Optional<DefaultPartitionMetadata> partitionMetadata =
         session.getMetadata().getDefaultPartitionMetadata();
     if (!partitionMetadata.isPresent()) {
+      LOG.debug("getQueryPlan(): partitionMetadata not present for {}", query);
       return null;
     }
 
     TableSplitMetadata tableSplitMetadata =
         partitionMetadata.get().getTableSplitMetadata(queryKeySpace, queryTable);
     if (tableSplitMetadata == null) {
+      LOG.debug("getQueryPlan(): tableSplitMetadata=null for {}", query);
       return null;
     }
 
@@ -130,8 +160,13 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         super.newQueryPlan((Request) statement, session).iterator();
 
     // This needs to manipulate the local copy of the hosts instead of the actual reference
-    return new UpHostIterator(
-        statement, new ArrayList(tableSplitMetadata.getHosts(key)), nodesFromBasePolicy);
+    List<Node> nodes = tableSplitMetadata.getHosts(key);
+    if (nodes.isEmpty()) {
+      LOG.debug(
+          "getQueryPlan(): tableSplitMetadata.getHosts(key) is empty for query {}",
+          pstmt.getQuery());
+    }
+    return new UpHostIterator(statement, new ArrayList(nodes), nodesFromBasePolicy);
   }
 
   /**
@@ -151,6 +186,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         if (plan != null) return plan;
       }
     }
+    LOG.debug("getQueryPlan(BatchStatement): Returning null");
     return null;
   }
 
@@ -186,6 +222,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       // shuffled.
       if (getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
         // this is to be performed in the local copy
+        PreparedStatement ps = statement.getPreparedStatement();
+        String q = ps == null ? "" : ps.getQuery();
+        LOG.debug("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
         Collections.shuffle(hosts);
       }
     }
@@ -290,6 +329,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // are literal
     // constants.
     if (hashIndexes == null || hashIndexes.isEmpty()) {
+      LOG.debug(
+          "getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}",
+          pstmt.getQuery());
       return -1;
     }
 
@@ -306,13 +348,17 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       }
       channel.close();
 
-      return getKey(bs.toByteArray());
+      int returnValue = getKey(bs.toByteArray());
+      if (returnValue < 0) {
+        LOG.warn("getKey(): Returning negative hash {} for {}", returnValue, pstmt.getQuery());
+      }
+      return returnValue;
     } catch (IOException e) {
       // IOException should not happen at all given we are writing to the in-memory
       // buffer only. So
       // if it does happen, we just want to log the error but fallback to the default
       // set of hosts.
-      LOG.error("hash key encoding failed", e);
+      LOG.error("getKey(): Returning negative hash. hash key encoding failed", e);
       return -1;
     }
   }
@@ -382,20 +428,21 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
           channel.write(value);
           break;
         }
-      case ProtocolConstants.DataType.LIST:{
-        ListType listType = (ListType) type;
-        DataType dataTypeOfListValue = listType.getElementType();
-        int length = value.getInt();
-        for (int j = 0; j < length; j++) {
-          // Appending each element.
-          int size = value.getInt();
-          ByteBuffer buf = value.slice();
-          buf.limit(size);
-          AppendValueToChannel(dataTypeOfListValue, buf, channel);
-          value.position(value.position() + size);
+      case ProtocolConstants.DataType.LIST:
+        {
+          ListType listType = (ListType) type;
+          DataType dataTypeOfListValue = listType.getElementType();
+          int length = value.getInt();
+          for (int j = 0; j < length; j++) {
+            // Appending each element.
+            int size = value.getInt();
+            ByteBuffer buf = value.slice();
+            buf.limit(size);
+            AppendValueToChannel(dataTypeOfListValue, buf, channel);
+            value.position(value.position() + size);
+          }
+          break;
         }
-        break;
-      }
       case ProtocolConstants.DataType.SET:
         {
           SetType setType = (SetType) type;
