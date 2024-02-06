@@ -542,8 +542,8 @@ public class CqlRequestHandler implements Throttled {
               scheduleNextExecution); // try next node
         }
       } else {
-        if (LOG.isTraceEnabled()) {
-          LOG.trace(
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(
               "[{}] Request sent on {} for a queryPlan with hashCode = {}",
               logPrefix,
               channel.getEndPoint(),

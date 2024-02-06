@@ -142,6 +142,7 @@ public class DefaultPartitionMetadata {
 
     Map<QualifiedTableName, TableSplitMetadata> tableSplits =
         new HashMap<QualifiedTableName, TableSplitMetadata>();
+    StringBuilder msg = new StringBuilder();
 
     for (AdminRow row : result) {
 
@@ -184,17 +185,15 @@ public class DefaultPartitionMetadata {
       }
       int startKey = getKey(row.getByteBuffer("start_key"));
       int endKey = getKey(row.getByteBuffer("end_key"));
-      if (!leaderFound) {
-        LOG.info(
-            "No leader for startKey: {}, table: {}.{}",
-            startKey,
-            tableId.getKeyspaceName(),
-            tableId.getTableName());
+      if (!leaderFound && LOG.isDebugEnabled()) {
+        msg.append(
+            tableId.getKeyspaceName() + "." + tableId.getTableName() + ": " + startKey + ", ");
       }
       tableSplitMetadata
           .getPartitionMap()
           .put(startKey, new PartitionMetadata(startKey, endKey, hosts));
     }
+    LOG.debug("Created partition map. Tablets without leaders: {}", msg);
     return Optional.ofNullable(tableSplits);
   }
 
