@@ -224,7 +224,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
         // this is to be performed in the local copy
         PreparedStatement ps = statement.getPreparedStatement();
         String q = ps == null ? "" : ps.getQuery();
-        LOG.trace("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
+        LOG.debug("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
         Collections.shuffle(hosts);
       }
     }
@@ -329,7 +329,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     // are literal
     // constants.
     if (hashIndexes == null || hashIndexes.isEmpty()) {
-      LOG.info(
+      LOG.debug(
           "getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}",
           pstmt.getQuery());
       return -1;
@@ -350,7 +350,7 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
 
       int returnValue = getKey(bs.toByteArray());
       if (returnValue < 0) {
-        LOG.info("getKey(): Returning negative hash {} for {}", returnValue, pstmt.getQuery());
+        LOG.warn("getKey(): Returning negative hash {} for {}", returnValue, pstmt.getQuery());
       }
       return returnValue;
     } catch (IOException e) {
