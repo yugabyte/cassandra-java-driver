@@ -51,6 +51,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
@@ -108,6 +109,7 @@ public class CqlRequestHandler implements Throttled {
   protected final CompletableFuture<AsyncResultSet> result;
   private final Message message;
   private final Timer timer;
+  private Boolean retryFailedSend = true;
   /**
    * How many speculative executions are currently running (including the initial execution). We
    * track this in order to know when to fail the request if all executions have reached the end of
@@ -505,17 +507,28 @@ public class CqlRequestHandler implements Throttled {
           setFinalError(error.getCause(), node, execution);
         } else {
           LOG.trace(
-              "[{}] Failed to send request on {}, trying next node (cause: {})",
+              "[{}] Failed to send request on {}, trying next node (cause: {}), queryPlan: {}, retryFailedSend: {}",
               logPrefix,
               channel,
-              error);
+              error,
+              queryPlan,
+              retryFailedSend);
+          Node retriedNode = null;
+          if (queryPlan.size() == 0 && retryFailedSend) {
+            retryFailedSend = false;
+            // No nodes left, but checking if any connections still available
+            ChannelPool p = session.getPools().get(node);
+            if (p != null && p.size() > 0) {
+              LOG.trace("Trying node {} one more time since it still has few connections", node);
+              retriedNode = node;
+            }
+          }
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
           ((DefaultNode) node)
               .getMetricUpdater()
               .incrementCounter(DefaultNodeMetric.UNSENT_REQUESTS, executionProfile.getName());
-          sendRequest(
-              null, queryPlan, execution, retryCount, scheduleNextExecution); // try next node
+          sendRequest(retriedNode, queryPlan, execution, retryCount, scheduleNextExecution);
         }
       } else {
         LOG.trace("[{}] Request sent on {}", logPrefix, channel);
