@@ -148,6 +148,9 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
     while (batchIterator.hasNext()) {
       BatchableStatement<?> nextStatement = batchIterator.next();
       if (nextStatement instanceof BoundStatement) {
+        if (batch.getConsistencyLevel() != null && nextStatement.getConsistencyLevel() == null) {
+          nextStatement = nextStatement.setConsistencyLevel(batch.getConsistencyLevel());
+        }
         Iterator<Node> plan = getQueryPlan(session, (BoundStatement) nextStatement);
         if (plan != null) return plan;
       }
