@@ -40,4 +40,14 @@ public interface AsyncResultSet extends AsyncPagingIterable<Row, AsyncResultSet>
    */
   @Override
   boolean wasApplied();
+
+  /*
+   * This method returns the time at which request processing started.
+   */
+  long getStartTime();
+
+  /*
+   * This method sets the time at which request processing started.
+   */
+  void setStartTime(long start);
 }

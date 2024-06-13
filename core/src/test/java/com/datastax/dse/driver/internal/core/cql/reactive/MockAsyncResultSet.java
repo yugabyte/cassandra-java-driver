@@ -50,6 +50,14 @@ public class MockAsyncResultSet implements AsyncResultSet {
   }
 
   @Override
+  public void setStartTime(long start) {}
+
+  @Override
+  public long getStartTime() {
+    return 0;
+  }
+
+  @Override
   public Row one() {
     Row next = iterator.next();
     remaining--;
