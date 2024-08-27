@@ -356,6 +356,13 @@ class RequestHandler {
         while (!isDone.get()
             && (host = queryPlan.next()) != null
             && !queryStateRef.get().isCancelled()) {
+          if (logger.isTraceEnabled()) {
+            logger.trace(
+                "[{}] host received {} from queryPlan with hashCode = {}",
+                id,
+                host.getEndPoint(),
+                System.identityHashCode(queryPlan));
+          }
           if (query(host)) {
             if (hostMetricsEnabled()) {
               metrics().getRegistry().counter(MetricsUtil.hostMetricName("writes.", host)).inc();
