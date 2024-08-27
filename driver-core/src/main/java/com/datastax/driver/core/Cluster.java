@@ -191,9 +191,9 @@ public class Cluster implements Closeable {
           configuration.getPolicies().getLoadBalancingPolicy().getClass().getSimpleName(),
           configuration.getPolicies().getRetryPolicy().getClass().getSimpleName(),
           configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.LOCAL),
-          configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.LOCAL),
+          configuration.getPoolingOptions().getMaxConnectionsPerHost(HostDistance.LOCAL),
           configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.REMOTE),
-          configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.REMOTE));
+          configuration.getPoolingOptions().getMaxConnectionsPerHost(HostDistance.REMOTE));
     }
     this.manager = new Manager(name, contactPoints, configuration, listeners);
   }
