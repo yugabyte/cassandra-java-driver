@@ -361,7 +361,7 @@ class RequestHandler {
                 "[{}] host received {} from queryPlan with hashCode = {}",
                 id,
                 host.getEndPoint(),
-                System.identityHashCode(queryPlan));
+                queryPlan.getIteratorHash());
           }
           if (query(host)) {
             if (hostMetricsEnabled()) {
@@ -1072,9 +1072,17 @@ class RequestHandler {
    */
   static class QueryPlan {
     private final Iterator<Host> iterator;
+    private int iteratorHash;
 
     QueryPlan(Iterator<Host> iterator) {
       this.iterator = iterator;
+    }
+
+    public int getIteratorHash() {
+      if (this.iteratorHash == 0) {
+        this.iteratorHash = System.identityHashCode(this.iterator);
+      }
+      return this.iteratorHash;
     }
 
     /** @return null if there are no more hosts */
