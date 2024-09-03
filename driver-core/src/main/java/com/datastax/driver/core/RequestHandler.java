@@ -356,6 +356,13 @@ class RequestHandler {
         while (!isDone.get()
             && (host = queryPlan.next()) != null
             && !queryStateRef.get().isCancelled()) {
+          if (logger.isTraceEnabled()) {
+            logger.trace(
+                "[{}] received host {} from queryPlan with hashCode = {}",
+                id,
+                host.getEndPoint(),
+                queryPlan.getIteratorHash());
+          }
           if (query(host)) {
             if (hostMetricsEnabled()) {
               metrics().getRegistry().counter(MetricsUtil.hostMetricName("writes.", host)).inc();
@@ -1065,9 +1072,17 @@ class RequestHandler {
    */
   static class QueryPlan {
     private final Iterator<Host> iterator;
+    private Integer iteratorHash = null;
 
     QueryPlan(Iterator<Host> iterator) {
       this.iterator = iterator;
+    }
+
+    public int getIteratorHash() {
+      if (this.iteratorHash == null) {
+        this.iteratorHash = System.identityHashCode(this.iterator);
+      }
+      return this.iteratorHash;
     }
 
     /** @return null if there are no more hosts */
