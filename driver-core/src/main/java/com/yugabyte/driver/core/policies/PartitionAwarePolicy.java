@@ -142,7 +142,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     // constants.
     if (hashIndexes == null || hashIndexes.length == 0) {
       LOG.debug(
-          "getKey(): Returning negative hash (-1) PartitionKeyIndices are null or empty for {}",
+          "getKey(): Returning negative hash (-1). PartitionKeyIndices are null or empty for {}",
           pstmt.getQueryString());
       return -1;
     }
@@ -448,18 +448,12 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       if (statement instanceof Statement) {
         msg.append(", CL: " + ((Statement) statement).getConsistencyLevel());
       }
-    }
-    if (plan == null) {
-      plan = childPolicy.newQueryPlan(loggedKeyspace, statement);
-      if (LOG.isDebugEnabled()) {
+      if (plan == null) {
+        plan = childPolicy.newQueryPlan(loggedKeyspace, statement);
         msg.append(", LB: " + childPolicy.getClass().getSimpleName());
-      }
-    } else {
-      if (LOG.isDebugEnabled()) {
+      } else {
         msg.append(", LB: PartitionAware");
       }
-    }
-    if (LOG.isDebugEnabled()) {
       msg.append(", plan-hash: " + System.identityHashCode(plan));
       LOG.debug(msg.toString());
     }
