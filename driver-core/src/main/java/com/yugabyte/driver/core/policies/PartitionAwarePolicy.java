@@ -57,7 +57,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
   private volatile Metadata clusterMetadata;
   private Configuration configuration;
 
-  private static final Logger logger = LoggerFactory.getLogger(PartitionAwarePolicy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PartitionAwarePolicy.class);
 
   /**
    * Creates a new {@code PartitionAware} policy.
@@ -141,6 +141,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     // Return if no hash key indexes are found, such as when the hash column values are literal
     // constants.
     if (hashIndexes == null || hashIndexes.length == 0) {
+      LOG.debug(
+          "getKey(): Returning negative hash (-1). PartitionKeyIndices are null or empty for {}",
+          pstmt.getQueryString());
       return -1;
     }
 
@@ -157,11 +160,16 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       }
       channel.close();
 
-      return getKey(bs.toByteArray());
+      int returnValue = getKey(bs.toByteArray());
+      if (returnValue < 0) {
+        LOG.warn(
+            "getKey(): Returning negative hash {} for {}", returnValue, pstmt.getQueryString());
+      }
+      return returnValue;
     } catch (IOException e) {
       // IOException should not happen at all given we are writing to the in-memory buffer only. So
       // if it does happen, we just want to log the error but fallback to the default set of hosts.
-      logger.error("hash key encoding failed", e);
+      LOG.error("getKey(): Returning negative hash. hash key encoding failed", e);
       return -1;
     }
   }
@@ -315,6 +323,9 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
       // When the CQL consistency level is set to YB consistent prefix (Cassandra ONE),
       // the reads would end up going only to the leader if the list of hosts are not shuffled.
       if (getConsistencyLevel() == ConsistencyLevel.YB_CONSISTENT_PREFIX) {
+        PreparedStatement ps = ((BoundStatement) statement).preparedStatement();
+        String q = ps == null ? "" : ps.getQueryString();
+        LOG.debug("Shuffling the nodes since CL is YB_CONSISTENT_PREFIX for query = {}", q);
         Collections.shuffle(hosts);
       }
       this.hosts = hosts;
@@ -375,18 +386,33 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
     ColumnDefinitions variables = pstmt.getVariables();
 
     // Look up the hosts for the partition key. Skip statements that do not have bind variables.
-    if (variables.size() == 0) return null;
-    logger.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", query = " + query);
+    if (variables.size() == 0) {
+      LOG.debug("getQueryPlan(): variables.size=0 for {}", query);
+      return null;
+    }
+    LOG.debug("getQueryPlan: keyspace = " + loggedKeyspace + ", query = " + query);
     int key = getKey(statement);
     if (key < 0) return null;
 
     TableSplitMetadata tableSplitMetadata =
         clusterMetadata.getTableSplitMetadata(variables.getKeyspace(0), variables.getTable(0));
     if (tableSplitMetadata == null) {
+      LOG.debug("getQueryPlan(): tableSplitMetadata=null for {}", query);
       return null;
     }
 
-    return new UpHostIterator(loggedKeyspace, statement, tableSplitMetadata.getHosts(key));
+    List<Host> nodes = tableSplitMetadata.getHosts(key);
+    if (nodes.isEmpty()) {
+      LOG.debug(
+          "getQueryPlan(): tableSplitMetadata.getHosts(key) is empty for query {}",
+          pstmt.getQueryString());
+    } else {
+      LOG.debug(
+          "getQueryPlan(): tableSplitMetadata.getHosts(key) is {} for query {}",
+          nodes,
+          pstmt.getQueryString());
+    }
+    return new UpHostIterator(loggedKeyspace, statement, nodes);
   }
 
   /**
@@ -403,16 +429,33 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
         if (plan != null) return plan;
       }
     }
+    LOG.debug("getQueryPlan(BatchStatement): Returning null");
     return null;
   }
 
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, Statement statement) {
+    StringBuilder msg = null;
     Iterator<Host> plan = null;
     if (statement instanceof BoundStatement) {
       plan = getQueryPlan(loggedKeyspace, (BoundStatement) statement);
     } else if (statement instanceof BatchStatement) {
       plan = getQueryPlan(loggedKeyspace, (BatchStatement) statement);
+    }
+    if (LOG.isDebugEnabled()) {
+      msg = new StringBuilder("Stmt: ");
+      msg.append(statement.getClass().getSimpleName());
+      if (statement instanceof Statement) {
+        msg.append(", CL: " + ((Statement) statement).getConsistencyLevel());
+      }
+      if (plan == null) {
+        plan = childPolicy.newQueryPlan(loggedKeyspace, statement);
+        msg.append(", LB: " + childPolicy.getClass().getSimpleName());
+      } else {
+        msg.append(", LB: PartitionAware");
+      }
+      msg.append(", plan-hash: " + System.identityHashCode(plan));
+      LOG.debug(msg.toString());
     }
     return (plan != null) ? plan : childPolicy.newQueryPlan(loggedKeyspace, statement);
   }

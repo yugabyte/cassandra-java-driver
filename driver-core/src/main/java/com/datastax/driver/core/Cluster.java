@@ -183,6 +183,18 @@ public class Cluster implements Closeable {
       List<EndPoint> contactPoints,
       Configuration configuration,
       Collection<Host.StateListener> listeners) {
+    if (logger.isInfoEnabled()) {
+      logger.info(
+          "Driver Setting for cluster {}: CL = {}, LB class = {}, RetryPolicy class = {}, local core pool size = {}, local max pool size = {}, remote core pool size = {}, remote max pool size = {}",
+          name,
+          configuration.getQueryOptions().getConsistencyLevel(),
+          configuration.getPolicies().getLoadBalancingPolicy().getClass().getSimpleName(),
+          configuration.getPolicies().getRetryPolicy().getClass().getSimpleName(),
+          configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.LOCAL),
+          configuration.getPoolingOptions().getMaxConnectionsPerHost(HostDistance.LOCAL),
+          configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.REMOTE),
+          configuration.getPoolingOptions().getMaxConnectionsPerHost(HostDistance.REMOTE));
+    }
     this.manager = new Manager(name, contactPoints, configuration, listeners);
   }
 
