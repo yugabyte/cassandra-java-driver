@@ -36,7 +36,7 @@
     <parent>
         <groupId>com.yugabyte</groupId>
         <artifactId>cassandra-driver-tests-shading</artifactId>
-        <version>3.10.3-yb-3-SNAPSHOT</version>
+        <version>3.10.3-yb-3</version>
     </parent>
 
     <artifactId>cassandra-driver-tests-shading-unshaded</artifactId>
