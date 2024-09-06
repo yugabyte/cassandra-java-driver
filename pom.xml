@@ -836,6 +836,15 @@ limitations under the License.
                 <plugin>
                     <artifactId>maven-gpg-plugin</artifactId>
                     <version>1.5</version>
+                    <executions>
+                        <execution>
+                            <id>sign-artifacts</id>
+                            <goals>
+                                <goal>sign</goal>
+                            </goals>
+                            <phase>verify</phase>
+                        </execution>
+                    </executions>
                 </plugin>
 
                 <plugin>
