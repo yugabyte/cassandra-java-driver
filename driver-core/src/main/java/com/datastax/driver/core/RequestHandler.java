@@ -276,7 +276,7 @@ class RequestHandler {
                 while (!isDone.get() && (host = queryPlan.next()) != null && !queryStateRef.get().isCancelled()) {
                     if (logger.isTraceEnabled()) {
                       logger.trace(
-                      "[{}] received host {} from queryPlan with hashCode = {}",
+                      "[{}] host received {} from queryPlan with hashCode = {}",
                       id,
                       host.getAddress(),
                       queryPlan.getIteratorHash());
@@ -293,8 +293,11 @@ class RequestHandler {
 
         private boolean query(final Host host) {
             HostConnectionPool pool = manager.pools.get(host);
-            if (pool == null || pool.isClosed())
+            if (pool == null || pool.isClosed()){
+                logger.trace("[{}] pool is closed for host {}", id, host);
+                Thread.currentThread().getStackTrace();
                 return false;
+            }
 
             if (logger.isTraceEnabled())
                 logger.trace("[{}] Querying node {}", id, host);
@@ -440,6 +443,12 @@ class RequestHandler {
         }
 
         private void retry(final boolean retryCurrent, ConsistencyLevel newConsistencyLevel) {
+            logger.trace(
+             "[{}] retry() retryCurrent: {} newConsistencyLevel: {}",
+             id,
+             retryCurrent,
+             newConsistencyLevel);
+            Thread.currentThread().getStackTrace();
             final Host h = current;
             if (newConsistencyLevel != null)
                 this.retryConsistencyLevel = newConsistencyLevel;
@@ -447,8 +456,10 @@ class RequestHandler {
             if (queryStateRef.get().isCancelled())
                 return;
 
-            if (!retryCurrent || !query(h))
+            if (!retryCurrent || !query(h)) {
+                logger.trace("[{}] retry() calling findNextHostAndQuery()", id);
                 findNextHostAndQuery();
+            }
         }
 
         private void logError(InetSocketAddress address, Throwable exception) {
@@ -522,6 +533,7 @@ class RequestHandler {
                                 connection.release();
                                 assert err.infos instanceof ReadTimeoutException;
                                 ReadTimeoutException rte = (ReadTimeoutException) err.infos;
+                                logger.trace("[{}] OnSet() Read_timeout", id);
                                 retry = retryPolicy.onReadTimeout(statement,
                                         rte.getConsistencyLevel(),
                                         rte.getRequiredAcknowledgements(),
@@ -530,38 +542,50 @@ class RequestHandler {
                                         retriesByPolicy);
                                 if (metricsEnabled()) {
                                     metrics().getErrorMetrics().getReadTimeouts().inc();
-                                    if (retry.getType() == Type.RETRY)
+                                    if (retry.getType() == Type.RETRY) {
+                                        logger.trace("[{}] OnSet() Read_timeout: retry", id);
                                         metrics().getErrorMetrics().getRetriesOnReadTimeout().inc();
-                                    if (retry.getType() == Type.IGNORE)
+                                    }
+                                    if (retry.getType() == Type.IGNORE) {
+                                      logger.trace("[{}] OnSet() Read_timeout: ignore", id);
                                         metrics().getErrorMetrics().getIgnoresOnReadTimeout().inc();
+                                    }
                                 }
                                 break;
                             case WRITE_TIMEOUT:
                                 connection.release();
                                 assert err.infos instanceof WriteTimeoutException;
                                 WriteTimeoutException wte = (WriteTimeoutException) err.infos;
-                                if (statement.isIdempotentWithDefault(manager.cluster.getConfiguration().getQueryOptions()))
+                                logger.trace("[{}] OnSet() Write_timeout", id);
+                                if (statement.isIdempotentWithDefault(manager.cluster.getConfiguration().getQueryOptions())){
+                                    logger.trace("[{}] OnSet() Write_timeout: statement is idempotent", id);
                                     retry = retryPolicy.onWriteTimeout(statement,
                                             wte.getConsistencyLevel(),
                                             wte.getWriteType(),
                                             wte.getRequiredAcknowledgements(),
                                             wte.getReceivedAcknowledgements(),
                                             retriesByPolicy);
-                                else {
+                                } else {
+                                    logger.trace("[{}] OnSet() Write_timeout: statement not idempotent rethrow", id);
                                     retry = RetryPolicy.RetryDecision.rethrow();
                                 }
                                 if (metricsEnabled()) {
                                     metrics().getErrorMetrics().getWriteTimeouts().inc();
-                                    if (retry.getType() == Type.RETRY)
+                                    if (retry.getType() == Type.RETRY){
+                                        logger.trace("[{}] OnSet() Write_timeout: retry", id);
                                         metrics().getErrorMetrics().getRetriesOnWriteTimeout().inc();
-                                    if (retry.getType() == Type.IGNORE)
+                                    }
+                                    if (retry.getType() == Type.IGNORE){
+                                        logger.trace("[{}] OnSet() Write_timeout: ignore", id);
                                         metrics().getErrorMetrics().getIgnoresOnWriteTimeout().inc();
+                                    }
                                 }
                                 break;
                             case UNAVAILABLE:
                                 connection.release();
                                 assert err.infos instanceof UnavailableException;
                                 UnavailableException ue = (UnavailableException) err.infos;
+                                logger.trace("[{}] OnSet() Unavailable", id);
                                 retry = retryPolicy.onUnavailable(statement,
                                         ue.getConsistencyLevel(),
                                         ue.getRequiredReplicas(),
@@ -569,10 +593,14 @@ class RequestHandler {
                                         retriesByPolicy);
                                 if (metricsEnabled()) {
                                     metrics().getErrorMetrics().getUnavailables().inc();
-                                    if (retry.getType() == Type.RETRY)
+                                    if (retry.getType() == Type.RETRY) {
+                                        logger.trace("[{}] OnSet() Unavailable: retry", id);
                                         metrics().getErrorMetrics().getRetriesOnUnavailable().inc();
-                                    if (retry.getType() == Type.IGNORE)
+                                    }
+                                    if (retry.getType() == Type.IGNORE) {
+                                        logger.trace("[{}] OnSet() Unavailable: ignore", id);
                                         metrics().getErrorMetrics().getIgnoresOnUnavailable().inc();
+                                    }
                                 }
                                 break;
                             case OVERLOADED:
@@ -580,6 +608,7 @@ class RequestHandler {
                                 assert exceptionToReport instanceof OverloadedException;
                                 logger.warn("Host {} is overloaded.", connection.address);
                                 retry = computeRetryDecisionOnRequestError((OverloadedException) exceptionToReport);
+                                logger.trace("[{}] OnSet() OVERLOADED {}", id, retry.getType());
                                 break;
                             case SERVER_ERROR:
                                 connection.release();
@@ -588,6 +617,7 @@ class RequestHandler {
                                 // Defunct connection
                                 connection.defunct(exceptionToReport);
                                 retry = computeRetryDecisionOnRequestError((ServerError) exceptionToReport);
+                                logger.trace("[{}] OnSet() SERVER_ERROR {}", id, retry.getType());
                                 break;
                             case IS_BOOTSTRAPPING:
                                 connection.release();
@@ -597,9 +627,11 @@ class RequestHandler {
                                     metrics().getErrorMetrics().getOthers().inc();
                                 }
                                 logError(connection.address, exceptionToReport);
+                                logger.trace("[{}] OnSet() IS_BOOTSTRAPPING", id);
                                 retry(false, null);
                                 return;
                             case UNPREPARED:
+                                logger.trace("[{}] OnSet() UNPREPARED", id);
                                 // Do not release connection yet, because we might reuse it to send the PREPARE message (see write() call below)
                                 assert err.infos instanceof MD5Digest;
                                 MD5Digest id = (MD5Digest) err.infos;
@@ -636,6 +668,7 @@ class RequestHandler {
                                 connection.release();
                                 if (metricsEnabled())
                                     metrics().getErrorMetrics().getOthers().inc();
+                                logger.trace("[{}] OnSet() default", this.id);
                                 break;
                         }
 
