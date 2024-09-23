@@ -684,12 +684,14 @@ class RequestHandler {
                         retriesByPolicy);
                 if (metricsEnabled()) {
                   metrics().getErrorMetrics().getReadTimeouts().inc();
-                  if (retry.getType() == Type.RETRY)
+                  if (retry.getType() == Type.RETRY) {
                     logger.trace("[{}] OnSet() Read_timeout: retry", id);
-                  metrics().getErrorMetrics().getRetriesOnReadTimeout().inc();
-                  if (retry.getType() == Type.IGNORE)
+                    metrics().getErrorMetrics().getRetriesOnReadTimeout().inc();
+                  }
+                  if (retry.getType() == Type.IGNORE) {
                     logger.trace("[{}] OnSet() Read_timeout: ignore", id);
-                  metrics().getErrorMetrics().getIgnoresOnReadTimeout().inc();
+                    metrics().getErrorMetrics().getIgnoresOnReadTimeout().inc();
+                  }
                 }
                 break;
               case WRITE_TIMEOUT:
@@ -714,12 +716,14 @@ class RequestHandler {
                 }
                 if (metricsEnabled()) {
                   metrics().getErrorMetrics().getWriteTimeouts().inc();
-                  if (retry.getType() == Type.RETRY)
+                  if (retry.getType() == Type.RETRY) {
                     logger.trace("[{}] OnSet() Write_timeout: retry", id);
-                  metrics().getErrorMetrics().getRetriesOnWriteTimeout().inc();
-                  if (retry.getType() == Type.IGNORE)
+                    metrics().getErrorMetrics().getRetriesOnWriteTimeout().inc();
+                  }
+                  if (retry.getType() == Type.IGNORE) {
                     logger.trace("[{}] OnSet() Write_timeout: ignore", id);
-                  metrics().getErrorMetrics().getIgnoresOnWriteTimeout().inc();
+                    metrics().getErrorMetrics().getIgnoresOnWriteTimeout().inc();
+                  }
                 }
                 break;
               case UNAVAILABLE:
@@ -736,12 +740,14 @@ class RequestHandler {
                         retriesByPolicy);
                 if (metricsEnabled()) {
                   metrics().getErrorMetrics().getUnavailables().inc();
-                  if (retry.getType() == Type.RETRY)
+                  if (retry.getType() == Type.RETRY) {
                     logger.trace("[{}] OnSet() Unavailable: retry", id);
-                  metrics().getErrorMetrics().getRetriesOnUnavailable().inc();
-                  if (retry.getType() == Type.IGNORE)
+                    metrics().getErrorMetrics().getRetriesOnUnavailable().inc();
+                  }
+                  if (retry.getType() == Type.IGNORE) {
                     logger.trace("[{}] OnSet() Unavailable: ignore", id);
-                  metrics().getErrorMetrics().getIgnoresOnUnavailable().inc();
+                    metrics().getErrorMetrics().getIgnoresOnUnavailable().inc();
+                  }
                 }
                 break;
               case OVERLOADED:
