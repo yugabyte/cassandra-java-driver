@@ -278,7 +278,7 @@ class RequestHandler {
                       logger.trace(
                       "[{}] received host {} from queryPlan with hashCode = {}",
                       id,
-                      host.getEndPoint(),
+                      host.getAddress(),
                       queryPlan.getIteratorHash());
                     }
                     if (query(host))
