@@ -712,7 +712,8 @@ class ControlConnection implements Connection.Owner {
     private static void refreshPartitionMap(Connection connection, Cluster.Manager cluster)
             throws ConnectionException, BusyConnectionException, ExecutionException, InterruptedException {
 
-
+        StringBuilder msg = new StringBuilder();
+        
         boolean partitionMetadataEnabled = cluster.configuration.getQueryOptions().isMetadataEnabled() &&
             cluster.requiresPartitionMap();
 
@@ -744,6 +745,7 @@ class ControlConnection implements Connection.Owner {
                                                                        InetAddress.class,
                                                                        String.class);
 
+                boolean leaderFound = false;
                 List<Host> hosts = new Vector<Host>();
                 for (Map.Entry<InetAddress, String> entry : replicaAddresses.entrySet()) {
                     Host host = hostMap.get(entry.getKey());
@@ -758,6 +760,7 @@ class ControlConnection implements Connection.Owner {
                     // Put the leader at the beginning and the rest after.
                     String role = entry.getValue();
                     if (role.equals("LEADER")) {
+                        leaderFound = true;
                         hosts.add(0, host);
                     } else if (role.equals("FOLLOWER") || role.equals("READ_REPLICA")) {
                         hosts.add(host);
@@ -765,9 +768,14 @@ class ControlConnection implements Connection.Owner {
                 }
                 int startKey = getKey(row.getBytes("start_key"));
                 int endKey = getKey(row.getBytes("end_key"));
+                if (!leaderFound && logger.isDebugEnabled()) {
+                    msg.append(
+                        tableId.getKeyspaceName() + "." + tableId.getTableName() + ": " + startKey + ", ");
+                }
                 tableSplitMetadata.getPartitionMap().put(startKey, new PartitionMetadata(startKey, endKey, hosts));
             }
 
+            logger.debug("Created partition map. Tablets without leaders: {}", msg);
             // Set the new partition map in the cluster metadata.
             cluster.metadata.setTableSplits(tableSplits);
         }
