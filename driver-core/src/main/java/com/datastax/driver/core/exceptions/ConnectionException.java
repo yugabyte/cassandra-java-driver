@@ -34,16 +34,16 @@ public class ConnectionException extends DriverException implements CoordinatorE
     private static final Logger logger = LoggerFactory.getLogger(ConnectionException.class);
 
     public ConnectionException(InetSocketAddress address, String msg, Throwable cause) {
+        super(msg, cause);
         logger.debug("ConnectionException() constructor 1 InetSocketAddress: {}, msg {}, cause {}", address.getAddress(), msg, cause.getClass().getName());
         Thread.currentThread().getStackTrace();
-        super(msg, cause);
         this.address = address;
     }
 
     public ConnectionException(InetSocketAddress address, String msg) {
+        super(msg);
         logger.debug("ConnectionException() constructor 2 InetSocketAddress: {}, msg {}", address.getAddress(), msg);
         Thread.currentThread().getStackTrace();
-        super(msg);
         this.address = address;
     }
 

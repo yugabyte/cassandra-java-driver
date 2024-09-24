@@ -52,21 +52,21 @@ public class BusyPoolException extends DriverException implements CoordinatorExc
     private final InetSocketAddress address;
 
     public BusyPoolException(InetSocketAddress address, int queueSize) {
-        logger.debug("BusyPoolException() constructor 1 InetSocketAddress: {}, queueSize {}", address.getAddress(), queueSize);
-        Thread.currentThread().getStackTrace();
         this(address, buildMessage(address, queueSize), null);
+        logger.debug("BusyPoolException() constructor 1 InetSocketAddress: {}, queueSize {}", address.getAddress(), queueSize);
+        Thread.currentThread().getStackTrace(); 
     }
 
     public BusyPoolException(InetSocketAddress address, long timeout, TimeUnit unit) {
+        this(address, buildMessage(address, timeout, unit), null);
         logger.debug("BusyPoolException() constructor 2 InetSocketAddress: {}, timeout {} unit {}", address.getAddress(), timeout, unit.getClass().getName());
         Thread.currentThread().getStackTrace();
-        this(address, buildMessage(address, timeout, unit), null);
     }
 
     private BusyPoolException(InetSocketAddress address, String message, Throwable cause) {
+        super(message, cause);
         logger.debug("BusyPoolException() constructor 3 InetSocketAddress: {}, message {} Throwable {}", address.getAddress(), message, cause.getClass().getName());
         Thread.currentThread().getStackTrace();
-        super(message, cause);
         this.address = address;
     }
 

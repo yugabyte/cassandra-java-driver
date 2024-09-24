@@ -33,21 +33,21 @@ public class OperationTimedOutException extends ConnectionException {
     private static final long serialVersionUID = 0;
 
     public OperationTimedOutException(InetSocketAddress address) {
+        super(address, "Operation timed out");
         logger.debug("OperationTimedOutException() constructor 1 InetSocketAddress: {}", address.getAddress());
         Thread.currentThread().getStackTrace();
-        super(address, "Operation timed out");
     }
 
     public OperationTimedOutException(InetSocketAddress address, String msg) {
+        super(address, msg);
         logger.debug("OperationTimedOutException() constructor 2 InetSocketAddress: {}, msg {}", address.getAddress(), msg);
         Thread.currentThread().getStackTrace();
-        super(address, msg);
     }
 
     public OperationTimedOutException(InetSocketAddress address, String msg, Throwable cause) {
-        logger.debug("OperationTimedOutException() constructor 3 InetSocketAddress: {}, message {} Throwable {}", address.getAddress(), message, cause.getClass().getName());
-        Thread.currentThread().getStackTrace();
         super(address, msg, cause);
+        logger.debug("OperationTimedOutException() constructor 3 InetSocketAddress: {}, message {} Throwable {}", address.getAddress(), msg, cause.getClass().getName());
+        Thread.currentThread().getStackTrace();
     }
 
     @Override

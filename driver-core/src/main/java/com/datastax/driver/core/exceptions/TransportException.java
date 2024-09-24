@@ -31,15 +31,15 @@ public class TransportException extends ConnectionException {
     private static final Logger logger = LoggerFactory.getLogger(TransportException.class);
 
     public TransportException(InetSocketAddress address, String msg, Throwable cause) {
-        logger.debug("TransportException() constructor 1 InetSocketAddress: {}, msg {}, cause {}", address.getAddress(), msg, cause.getClass().getName());
-        Thread.currentThread().getStackTrace();
         super(address, msg, cause);
+        logger.debug("TransportException() constructor 1 InetSocketAddress: {}, msg {}, cause {}", address.getAddress(), msg, cause.getClass().getName());
+        Thread.currentThread().getStackTrace(); 
     }
 
     public TransportException(InetSocketAddress address, String msg) {
+        super(address, msg);
         logger.debug("TransportException() constructor 2 InetSocketAddress: {}, msg {}", address.getAddress(), msg);
         Thread.currentThread().getStackTrace();
-        super(address, msg);
     }
 
     @Override

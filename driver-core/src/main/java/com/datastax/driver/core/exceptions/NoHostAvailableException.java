@@ -48,16 +48,16 @@ public class NoHostAvailableException extends DriverException {
     private static final Logger logger = LoggerFactory.getLogger(NoHostAvailableException.class);
 
     public NoHostAvailableException(Map<InetSocketAddress, Throwable> errors) {
+        super(makeMessage(errors, MAX_ERRORS_IN_DEFAULT_MESSAGE, false, false));
         logger.debug("NoHostAvailableException() constructor 1 Map<InetSocketAddress, Throwable>: {}", errors.toString());
         Thread.currentThread().getStackTrace();
-        super(makeMessage(errors, MAX_ERRORS_IN_DEFAULT_MESSAGE, false, false));
         this.errors = errors;
     }
 
     private NoHostAvailableException(String message, Throwable cause, Map<InetSocketAddress, Throwable> errors) {
+        super(message, cause);
         logger.debug("NoHostAvailableException() constructor 2 message {}, cause {}, Map<InetSocketAddress, Throwable>: {}", message, cause.getClass().getName(), errors.toString());
         Thread.currentThread().getStackTrace();
-        super(message, cause);
         this.errors = errors;
     }
 
