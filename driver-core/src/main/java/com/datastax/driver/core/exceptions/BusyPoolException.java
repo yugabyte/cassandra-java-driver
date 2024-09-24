@@ -22,6 +22,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Indicates that a connection pool has run out of available connections.
  * <p/>
@@ -42,19 +45,27 @@ import java.util.concurrent.TimeUnit;
  */
 public class BusyPoolException extends DriverException implements CoordinatorException {
 
+    private static final Logger logger = LoggerFactory.getLogger(BusyPoolException.class);
+
     private static final long serialVersionUID = 0;
 
     private final InetSocketAddress address;
 
     public BusyPoolException(InetSocketAddress address, int queueSize) {
+        logger.debug("BusyPoolException() constructor 1 InetSocketAddress: {}, queueSize {}", address.getAddress(), queueSize);
+        Thread.currentThread().getStackTrace();
         this(address, buildMessage(address, queueSize), null);
     }
 
     public BusyPoolException(InetSocketAddress address, long timeout, TimeUnit unit) {
+        logger.debug("BusyPoolException() constructor 2 InetSocketAddress: {}, timeout {} unit {}", address.getAddress(), timeout, unit.getClass().getName());
+        Thread.currentThread().getStackTrace();
         this(address, buildMessage(address, timeout, unit), null);
     }
 
     private BusyPoolException(InetSocketAddress address, String message, Throwable cause) {
+        logger.debug("BusyPoolException() constructor 3 InetSocketAddress: {}, message {} Throwable {}", address.getAddress(), message, cause.getClass().getName());
+        Thread.currentThread().getStackTrace();
         super(message, cause);
         this.address = address;
     }

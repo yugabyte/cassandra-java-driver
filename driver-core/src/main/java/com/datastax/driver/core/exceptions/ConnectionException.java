@@ -18,6 +18,9 @@ package com.datastax.driver.core.exceptions;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Indicates that a connection to a host has encountered a problem
  * and that it should be closed.
@@ -28,12 +31,18 @@ public class ConnectionException extends DriverException implements CoordinatorE
 
     public final InetSocketAddress address;
 
+    private static final Logger logger = LoggerFactory.getLogger(ConnectionException.class);
+
     public ConnectionException(InetSocketAddress address, String msg, Throwable cause) {
+        logger.debug("ConnectionException() constructor 1 InetSocketAddress: {}, msg {}, cause {}", address.getAddress(), msg, cause.getClass().getName());
+        Thread.currentThread().getStackTrace();
         super(msg, cause);
         this.address = address;
     }
 
     public ConnectionException(InetSocketAddress address, String msg) {
+        logger.debug("ConnectionException() constructor 2 InetSocketAddress: {}, msg {}", address.getAddress(), msg);
+        Thread.currentThread().getStackTrace();
         super(msg);
         this.address = address;
     }

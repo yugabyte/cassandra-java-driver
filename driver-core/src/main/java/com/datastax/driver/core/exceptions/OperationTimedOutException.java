@@ -19,23 +19,34 @@ import com.datastax.driver.core.SocketOptions;
 
 import java.net.InetSocketAddress;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Thrown on a client-side timeout, i.e. when the client didn't hear back from the server within
  * {@link SocketOptions#getReadTimeoutMillis()}.
  */
 public class OperationTimedOutException extends ConnectionException {
 
+    private static final Logger logger = LoggerFactory.getLogger(OperationTimedOutException.class);
+
     private static final long serialVersionUID = 0;
 
     public OperationTimedOutException(InetSocketAddress address) {
+        logger.debug("OperationTimedOutException() constructor 1 InetSocketAddress: {}", address.getAddress());
+        Thread.currentThread().getStackTrace();
         super(address, "Operation timed out");
     }
 
     public OperationTimedOutException(InetSocketAddress address, String msg) {
+        logger.debug("OperationTimedOutException() constructor 2 InetSocketAddress: {}, msg {}", address.getAddress(), msg);
+        Thread.currentThread().getStackTrace();
         super(address, msg);
     }
 
     public OperationTimedOutException(InetSocketAddress address, String msg, Throwable cause) {
+        logger.debug("OperationTimedOutException() constructor 3 InetSocketAddress: {}, message {} Throwable {}", address.getAddress(), message, cause.getClass().getName());
+        Thread.currentThread().getStackTrace();
         super(address, msg, cause);
     }
 
