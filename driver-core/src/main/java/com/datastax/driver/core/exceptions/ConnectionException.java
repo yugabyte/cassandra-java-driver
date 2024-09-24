@@ -33,7 +33,11 @@ public class ConnectionException extends DriverException implements CoordinatorE
   public ConnectionException(EndPoint endPoint, String msg, Throwable cause) {
     super(msg, cause);
     this.endPoint = endPoint;
-    logger.debug("ConnectionException() constructor 1 EndPoint: {}, msg {}, cause {}", endPoint, msg, cause.getClass().getName());
+    logger.debug(
+        "ConnectionException() constructor 1 EndPoint: {}, msg {}, cause {}",
+        endPoint,
+        msg,
+        cause.getClass().getName());
     Thread.currentThread().getStackTrace();
   }
 

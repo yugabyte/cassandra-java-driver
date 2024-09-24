@@ -21,7 +21,6 @@ import com.datastax.driver.core.Statement;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,28 +48,37 @@ import org.slf4j.LoggerFactory;
  */
 public class BusyPoolException extends DriverException implements CoordinatorException {
 
-    private static final Logger logger = LoggerFactory.getLogger(BusyPoolException.class);
+  private static final Logger logger = LoggerFactory.getLogger(BusyPoolException.class);
 
-    private static final long serialVersionUID = 0;
+  private static final long serialVersionUID = 0;
 
   private final EndPoint endPoint;
 
   public BusyPoolException(EndPoint endPoint, int queueSize) {
     this(endPoint, buildMessage(endPoint, queueSize), null);
-    logger.debug("BusyPoolException() constructor 1 EndPoint: {}, queueSize {}", endPoint, queueSize);
+    logger.debug(
+        "BusyPoolException() constructor 1 EndPoint: {}, queueSize {}", endPoint, queueSize);
     Thread.currentThread().getStackTrace();
   }
 
   public BusyPoolException(EndPoint endPoint, long timeout, TimeUnit unit) {
     this(endPoint, buildMessage(endPoint, timeout, unit), null);
-    logger.debug("BusyPoolException() constructor 2 EndPoint: {}, timeout {} unit {}", endPoint, timeout, unit.getClass().getName());
+    logger.debug(
+        "BusyPoolException() constructor 2 EndPoint: {}, timeout {} unit {}",
+        endPoint,
+        timeout,
+        unit.getClass().getName());
     Thread.currentThread().getStackTrace();
   }
 
   private BusyPoolException(EndPoint endPoint, String message, Throwable cause) {
     super(message, cause);
     this.endPoint = endPoint;
-    logger.debug("BusyPoolException() constructor 3 EndPoint: {}, message {} Throwable {}", endPoint, message, cause.getClass().getName());
+    logger.debug(
+        "BusyPoolException() constructor 3 EndPoint: {}, message {} Throwable {}",
+        endPoint,
+        message,
+        cause.getClass().getName());
     Thread.currentThread().getStackTrace();
   }
 

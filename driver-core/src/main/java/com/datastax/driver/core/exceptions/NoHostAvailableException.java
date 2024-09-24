@@ -20,7 +20,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,9 @@ public class NoHostAvailableException extends DriverException {
   public NoHostAvailableException(Map<EndPoint, Throwable> errors) {
     super(makeMessage(errors, MAX_ERRORS_IN_DEFAULT_MESSAGE, false, false));
     this.errors = errors;
-    logger.debug("NoHostAvailableException() constructor 1 Map<InetSocketAddress, Throwable>: {}", errors.toString());
+    logger.debug(
+        "NoHostAvailableException() constructor 1 Map<InetSocketAddress, Throwable>: {}",
+        errors.toString());
     Thread.currentThread().getStackTrace();
   }
 
@@ -58,7 +59,11 @@ public class NoHostAvailableException extends DriverException {
       String message, Throwable cause, Map<EndPoint, Throwable> errors) {
     super(message, cause);
     this.errors = errors;
-    logger.debug("NoHostAvailableException() constructor 2 message {}, cause {}, Map<InetSocketAddress, Throwable>: {}", message, cause.getClass().getName(), errors.toString());
+    logger.debug(
+        "NoHostAvailableException() constructor 2 message {}, cause {}, Map<InetSocketAddress, Throwable>: {}",
+        message,
+        cause.getClass().getName(),
+        errors.toString());
     Thread.currentThread().getStackTrace();
   }
 

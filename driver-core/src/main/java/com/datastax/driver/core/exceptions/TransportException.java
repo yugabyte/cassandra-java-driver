@@ -16,7 +16,6 @@
 package com.datastax.driver.core.exceptions;
 
 import com.datastax.driver.core.EndPoint;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,10 +29,13 @@ public class TransportException extends ConnectionException {
 
   private static final Logger logger = LoggerFactory.getLogger(TransportException.class);
 
-<<<<<<< HEAD
   public TransportException(EndPoint endPoint, String msg, Throwable cause) {
     super(endPoint, msg, cause);
-    logger.debug("TransportException() constructor 1 EndPoint: {}, msg {}, cause {}", endPoint, msg, cause.getClass().getName());
+    logger.debug(
+        "TransportException() constructor 1 EndPoint: {}, msg {}, cause {}",
+        endPoint,
+        msg,
+        cause.getClass().getName());
     Thread.currentThread().getStackTrace();
   }
 

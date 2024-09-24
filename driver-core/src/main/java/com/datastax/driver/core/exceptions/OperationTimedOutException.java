@@ -17,7 +17,6 @@ package com.datastax.driver.core.exceptions;
 
 import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.SocketOptions;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +28,6 @@ public class OperationTimedOutException extends ConnectionException {
 
   private static final Logger logger = LoggerFactory.getLogger(OperationTimedOutException.class);
 
-<<<<<<< HEAD
   private static final long serialVersionUID = 0;
 
   public OperationTimedOutException(EndPoint endPoint) {
@@ -46,7 +44,11 @@ public class OperationTimedOutException extends ConnectionException {
 
   public OperationTimedOutException(EndPoint endPoint, String msg, Throwable cause) {
     super(endPoint, msg, cause);
-    logger.debug("OperationTimedOutException() constructor 3 EndPoint: {}, message {} Throwable {}", endPoint, message, cause.getClass().getName());
+    logger.debug(
+        "OperationTimedOutException() constructor 3 EndPoint: {}, message {} Throwable {}",
+        endPoint,
+        msg,
+        cause.getClass().getName());
     Thread.currentThread().getStackTrace();
   }
 
