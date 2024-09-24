@@ -351,6 +351,7 @@ public class PartitionAwarePolicy implements ChainableLoadBalancingPolicy {
                 || getConsistencyLevel().isYBStrong())) {
           return true;
         }
+        LOG.trace("UpHostIterator: hasNext(), skipping host {}", nextHost.getAddress());
       }
 
       if (childIterator == null)

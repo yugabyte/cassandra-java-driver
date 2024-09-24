@@ -21,6 +21,9 @@ import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Exception thrown when a query cannot be performed because no host is available.
  *
@@ -42,15 +45,21 @@ public class NoHostAvailableException extends DriverException {
 
   private final Map<EndPoint, Throwable> errors;
 
+  private static final Logger logger = LoggerFactory.getLogger(NoHostAvailableException.class);
+
   public NoHostAvailableException(Map<EndPoint, Throwable> errors) {
     super(makeMessage(errors, MAX_ERRORS_IN_DEFAULT_MESSAGE, false, false));
     this.errors = errors;
+    logger.debug("NoHostAvailableException() constructor 1 Map<InetSocketAddress, Throwable>: {}", errors.toString());
+    Thread.currentThread().getStackTrace();
   }
 
   private NoHostAvailableException(
       String message, Throwable cause, Map<EndPoint, Throwable> errors) {
     super(message, cause);
     this.errors = errors;
+    logger.debug("NoHostAvailableException() constructor 2 message {}, cause {}, Map<InetSocketAddress, Throwable>: {}", message, cause.getClass().getName(), errors.toString());
+    Thread.currentThread().getStackTrace();
   }
 
   /**

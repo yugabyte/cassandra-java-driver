@@ -18,6 +18,8 @@ package com.datastax.driver.core.exceptions;
 import com.datastax.driver.core.EndPoint;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Indicates that a connection to a host has encountered a problem and that it should be closed. */
 public class ConnectionException extends DriverException implements CoordinatorException {
@@ -26,14 +28,20 @@ public class ConnectionException extends DriverException implements CoordinatorE
 
   private final EndPoint endPoint;
 
+  private static final Logger logger = LoggerFactory.getLogger(ConnectionException.class);
+
   public ConnectionException(EndPoint endPoint, String msg, Throwable cause) {
     super(msg, cause);
     this.endPoint = endPoint;
+    logger.debug("ConnectionException() constructor 1 EndPoint: {}, msg {}, cause {}", endPoint, msg, cause.getClass().getName());
+    Thread.currentThread().getStackTrace();
   }
 
   public ConnectionException(EndPoint endPoint, String msg) {
     super(msg);
     this.endPoint = endPoint;
+    logger.debug("ConnectionException() constructor 2 EndPoint: {}, msg {}", endPoint, msg);
+    Thread.currentThread().getStackTrace();
   }
 
   @Override

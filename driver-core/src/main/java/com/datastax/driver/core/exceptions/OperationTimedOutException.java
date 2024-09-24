@@ -18,24 +18,36 @@ package com.datastax.driver.core.exceptions;
 import com.datastax.driver.core.EndPoint;
 import com.datastax.driver.core.SocketOptions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Thrown on a client-side timeout, i.e. when the client didn't hear back from the server within
  * {@link SocketOptions#getReadTimeoutMillis()}.
  */
 public class OperationTimedOutException extends ConnectionException {
 
+  private static final Logger logger = LoggerFactory.getLogger(OperationTimedOutException.class);
+
+<<<<<<< HEAD
   private static final long serialVersionUID = 0;
 
   public OperationTimedOutException(EndPoint endPoint) {
     super(endPoint, "Operation timed out");
+    logger.debug("OperationTimedOutException() constructor 1 EndPoint: {}", endPoint);
+    Thread.currentThread().getStackTrace();
   }
 
   public OperationTimedOutException(EndPoint endPoint, String msg) {
     super(endPoint, msg);
+    logger.debug("OperationTimedOutException() constructor 2 EndPoint: {}, msg {}", endPoint, msg);
+    Thread.currentThread().getStackTrace();
   }
 
   public OperationTimedOutException(EndPoint endPoint, String msg, Throwable cause) {
     super(endPoint, msg, cause);
+    logger.debug("OperationTimedOutException() constructor 3 EndPoint: {}, message {} Throwable {}", endPoint, message, cause.getClass().getName());
+    Thread.currentThread().getStackTrace();
   }
 
   @Override
