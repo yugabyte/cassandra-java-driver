@@ -60,6 +60,7 @@ import org.slf4j.LoggerFactory;
  */
 class RequestHandler {
   private static final Logger logger = LoggerFactory.getLogger(RequestHandler.class);
+  private static final Logger ybLogger = LoggerFactory.getLogger("YB_SPECIAL_LOGGER");
 
   private static final boolean HOST_METRICS_ENABLED =
       Boolean.getBoolean("com.datastax.driver.HOST_METRICS_ENABLED");
@@ -260,7 +261,7 @@ class RequestHandler {
       return;
     }
 
-    if (logger.isTraceEnabled()) logger.trace("[{}] Setting final exception", execution.id);
+    if (ybLogger.isDebugEnabled()) ybLogger.debug("[{}] Setting final exception", execution.id);
 
     cancelPendingExecutions(execution);
 
@@ -356,6 +357,9 @@ class RequestHandler {
         while (!isDone.get()
             && (host = queryPlan.next()) != null
             && !queryStateRef.get().isCancelled()) {
+          if (ybLogger.isDebugEnabled()) {
+            ybLogger.debug("[{}] received the host {} from queryPlan", id, host.getEndPoint());
+          }
           if (query(host)) {
             if (hostMetricsEnabled()) {
               metrics().getRegistry().counter(MetricsUtil.hostMetricName("writes.", host)).inc();
@@ -526,8 +530,8 @@ class RequestHandler {
       switch (retryDecision.getType()) {
         case RETRY:
           retriesByPolicy++;
-          if (logger.isDebugEnabled())
-            logger.debug(
+          if (ybLogger.isDebugEnabled())
+            ybLogger.debug(
                 "[{}] Doing retry {} for query {} at consistency {}",
                 id,
                 retriesByPolicy,

@@ -22,6 +22,9 @@ import com.datastax.driver.core.WriteType;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.ReadFailureException;
 import com.datastax.driver.core.exceptions.WriteFailureException;
+import com.datastax.driver.core.policies.RetryPolicy.RetryDecision;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The default retry policy.
@@ -47,6 +50,7 @@ import com.datastax.driver.core.exceptions.WriteFailureException;
 public class DefaultRetryPolicy implements RetryPolicy {
 
   public static final DefaultRetryPolicy INSTANCE = new DefaultRetryPolicy();
+  private static final Logger ybLogger = LoggerFactory.getLogger("YB_SPECIAL_LOGGER");
 
   protected DefaultRetryPolicy() {}
 
@@ -72,11 +76,17 @@ public class DefaultRetryPolicy implements RetryPolicy {
       int receivedResponses,
       boolean dataRetrieved,
       int nbRetry) {
-    if (nbRetry != 0) return RetryDecision.rethrow();
+    if (nbRetry != 0) {
+      ybLogger.info("DefaultRetryPolicy: OnReadTimeout() Rethrow");
+      return RetryDecision.rethrow();
+    }
 
-    return receivedResponses >= requiredResponses && !dataRetrieved
-        ? RetryDecision.retry(cl)
-        : RetryDecision.rethrow();
+    RetryDecision r =
+        receivedResponses >= requiredResponses && !dataRetrieved
+            ? RetryDecision.retry(cl)
+            : RetryDecision.rethrow();
+    ybLogger.info("DefaultRetryPolicy: OnReadTimeout() {}", r.getType());
+    return r;
   }
 
   /**
@@ -101,13 +111,19 @@ public class DefaultRetryPolicy implements RetryPolicy {
       int requiredAcks,
       int receivedAcks,
       int nbRetry) {
-    if (nbRetry != 0) return RetryDecision.rethrow();
+    if (nbRetry != 0) {
+      ybLogger.info("DefaultRetryPolicy: OnWriteTimeout() Rethrow");
+      return RetryDecision.rethrow();
+    }
 
     // If the batch log write failed, retry the operation as this might just be we were unlucky at
     // picking candidates
     // JAVA-764: testing the write type automatically filters out serial consistency levels as these
     // have always WriteType.CAS.
-    return writeType == WriteType.BATCH_LOG ? RetryDecision.retry(cl) : RetryDecision.rethrow();
+    RetryDecision r =
+        writeType == WriteType.BATCH_LOG ? RetryDecision.retry(cl) : RetryDecision.rethrow();
+    ybLogger.info("DefaultRetryPolicy: OnWriteTimeout() {}", r.getType());
+    return r;
   }
 
   /**
@@ -133,7 +149,9 @@ public class DefaultRetryPolicy implements RetryPolicy {
       int requiredReplica,
       int aliveReplica,
       int nbRetry) {
-    return (nbRetry == 0) ? RetryDecision.tryNextHost(null) : RetryDecision.rethrow();
+    RetryDecision r = (nbRetry == 0) ? RetryDecision.tryNextHost(null) : RetryDecision.rethrow();
+    ybLogger.info("DefaultRetryPolicy: onUnavailable() {}", r.getType());
+    return r;
   }
 
   /** {@inheritDoc} */
@@ -143,8 +161,10 @@ public class DefaultRetryPolicy implements RetryPolicy {
     // do not retry these by default as they generally indicate a data problem or
     // other issue that is unlikely to be resolved by a retry.
     if (e instanceof WriteFailureException || e instanceof ReadFailureException) {
+      ybLogger.info("DefaultRetryPolicy: onRequestError() rethrow");
       return RetryDecision.rethrow();
     }
+    ybLogger.info("DefaultRetryPolicy: onRequestError() trynexthost");
     return RetryDecision.tryNextHost(cl);
   }
 
