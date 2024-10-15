@@ -159,7 +159,7 @@ class RequestHandler {
         }
 
         if (ybLogger.isDebugEnabled()) 
-            ybLogger.debug("[{}] Setting final exception", execution.id);
+            ybLogger.debug("[{}] Setting final result", execution.id);
 
         cancelPendingExecutions(execution);
 

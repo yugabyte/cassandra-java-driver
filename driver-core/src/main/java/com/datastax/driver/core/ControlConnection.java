@@ -769,7 +769,7 @@ class ControlConnection implements Connection.Owner {
                 }
                 int startKey = getKey(row.getBytes("start_key"));
                 int endKey = getKey(row.getBytes("end_key"));
-                if (!leaderFound && logger.isDebugEnabled()) {
+                if (!leaderFound && ybLogger.isInfoEnabled()) {
                     msg.append(
                         tableId.getKeyspaceName() + "." + tableId.getTableName() + ": " + startKey + ", ");
                 }
