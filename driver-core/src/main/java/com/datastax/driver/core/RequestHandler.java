@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 class RequestHandler {
     private static final Logger logger = LoggerFactory.getLogger(RequestHandler.class);
+    private static final Logger ybLogger = LoggerFactory.getLogger("YB_SPECIAL_LOGGER");
 
     final String id;
 
@@ -157,8 +158,8 @@ class RequestHandler {
             return;
         }
 
-        if (logger.isTraceEnabled())
-            logger.trace("[{}] Setting final result", execution.id);
+        if (ybLogger.isDebugEnabled()) 
+            ybLogger.debug("[{}] Setting final result", execution.id);
 
         cancelPendingExecutions(execution);
 
@@ -271,6 +272,9 @@ class RequestHandler {
             try {
                 Host host;
                 while (!isDone.get() && (host = queryPlan.next()) != null && !queryStateRef.get().isCancelled()) {
+                    if (ybLogger.isDebugEnabled()) {
+                        ybLogger.debug("[{}] received the host {} from queryPlan", id, host.getAddress());
+                      }
                     if (query(host))
                         return;
                 }
@@ -409,8 +413,8 @@ class RequestHandler {
             switch (retryDecision.getType()) {
                 case RETRY:
                     retriesByPolicy++;
-                    if (logger.isDebugEnabled())
-                        logger.debug("[{}] Doing retry {} for query {} at consistency {}", id, retriesByPolicy, statement, retryDecision.getRetryConsistencyLevel());
+                    if (ybLogger.isDebugEnabled())
+                        ybLogger.debug("[{}] Doing retry {} for query {} at consistency {}", id, retriesByPolicy, statement, retryDecision.getRetryConsistencyLevel());
                     if (metricsEnabled())
                         metrics().getErrorMetrics().getRetries().inc();
                     // log error for the current host if we are switching to another one
