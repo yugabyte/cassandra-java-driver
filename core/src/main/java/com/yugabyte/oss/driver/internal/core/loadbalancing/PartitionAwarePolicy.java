@@ -343,7 +343,12 @@ public class PartitionAwarePolicy extends YugabyteDefaultLoadBalancingPolicy
       for (int i = 0; i < hashIndexes.size(); i++) {
         int index = hashIndexes.get(i);
         DataType type = variables.get(index).getType();
-        ByteBuffer value = stmt.getBytesUnsafe(index).duplicate();
+        ByteBuffer bb = stmt.getBytesUnsafe(index);
+        if (bb == null) {
+          LOG.warn("getKey(): No value found for bind parameter at index {}", index);
+          return -1;
+        }
+        ByteBuffer value = bb.duplicate();
         AppendValueToChannel(type, value, channel);
       }
       channel.close();
