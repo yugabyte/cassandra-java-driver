@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +19,7 @@ package com.datastax.oss.driver.internal.osgi.support;
 
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import java.util.List;
 import java.util.Objects;
 import net.jcip.annotations.GuardedBy;
@@ -36,7 +39,7 @@ public class CcmStagedReactor extends AllConfinedStagedReactor {
 
   static {
     CcmBridge.Builder builder = CcmBridge.builder().withNodes(1);
-    if (CcmBridge.DSE_ENABLEMENT && CcmBridge.VERSION.compareTo(DSE_5_0) >= 0) {
+    if (CcmBridge.isDistributionOf(BackendType.DSE, (dist, cass) -> dist.compareTo(DSE_5_0) >= 0)) {
       builder.withDseWorkloads("graph");
     }
     CCM_BRIDGE = builder.build();
@@ -52,11 +55,10 @@ public class CcmStagedReactor extends AllConfinedStagedReactor {
   @Override
   public synchronized void beforeSuite() {
     if (!running) {
-      boolean dse = CCM_BRIDGE.getDseVersion().isPresent();
       LOGGER.info(
           "Starting CCM, running {} version {}",
-          dse ? "DSE" : "Cassandra",
-          dse ? CCM_BRIDGE.getDseVersion().get() : CCM_BRIDGE.getCassandraVersion());
+          CcmBridge.DISTRIBUTION,
+          CcmBridge.getDistributionVersion());
       CCM_BRIDGE.create();
       CCM_BRIDGE.start();
       LOGGER.info("CCM started");
@@ -79,7 +81,7 @@ public class CcmStagedReactor extends AllConfinedStagedReactor {
     if (running) {
       LOGGER.info("Stopping CCM");
       CCM_BRIDGE.stop();
-      CCM_BRIDGE.remove();
+      CCM_BRIDGE.close();
       running = false;
       LOGGER.info("CCM stopped");
     }

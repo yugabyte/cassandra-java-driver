@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,9 +25,10 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
-import com.datastax.oss.driver.api.testinfra.DseRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.context.EventBus;
@@ -59,8 +62,9 @@ public class NodeMetadataIT {
       assertThat(node.getListenAddress().get().getAddress()).isEqualTo(connectAddress.getAddress());
       assertThat(node.getDatacenter()).isEqualTo("dc1");
       assertThat(node.getRack()).isEqualTo("r1");
-      if (!CcmBridge.DSE_ENABLEMENT) {
-        // CcmBridge does not report accurate C* versions for DSE, only approximated values
+      if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
+        // CcmBridge does not report accurate C* versions for other distributions (e.g. DSE), only
+        // approximated values
         assertThat(node.getCassandraVersion()).isEqualTo(ccmRule.getCassandraVersion());
       }
       assertThat(node.getState()).isSameAs(NodeState.UP);
@@ -90,7 +94,7 @@ public class NodeMetadataIT {
   }
 
   @Test
-  @DseRequirement(min = "5.1")
+  @BackendRequirement(type = BackendType.DSE, minInclusive = "5.1")
   public void should_expose_dse_node_properties() {
     try (CqlSession session = SessionUtils.newSession(ccmRule)) {
 
@@ -103,7 +107,7 @@ public class NodeMetadataIT {
               DseNodeProperties.DSE_WORKLOADS,
               DseNodeProperties.SERVER_ID);
       assertThat(node.getExtras().get(DseNodeProperties.DSE_VERSION))
-          .isEqualTo(ccmRule.getDseVersion().get());
+          .isEqualTo(ccmRule.getDistributionVersion());
       assertThat(node.getExtras().get(DseNodeProperties.SERVER_ID)).isInstanceOf(String.class);
       assertThat(node.getExtras().get(DseNodeProperties.DSE_WORKLOADS)).isInstanceOf(Set.class);
     }

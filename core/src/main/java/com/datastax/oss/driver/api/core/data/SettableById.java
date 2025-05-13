@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -554,6 +556,30 @@ public interface SettableById<SelfT extends SettableById<SelfT>>
     SelfT result = null;
     for (Integer i : allIndicesOf(id)) {
       result = (result == null ? this : result).setCqlDuration(i, v);
+    }
+    assert result != null; // allIndices throws if there are no results
+    return result;
+  }
+
+  /**
+   * Sets the value for all occurrences of {@code id} to the provided {@code vector}.
+   *
+   * <p>By default, this works with CQL type {@code vector}.
+   *
+   * <p>If you want to avoid the overhead of building a {@code CqlIdentifier}, use the variant of
+   * this method that takes a string argument.
+   *
+   * @throws IllegalArgumentException if the id is invalid.
+   */
+  @NonNull
+  @CheckReturnValue
+  default <ElementT> SelfT setVector(
+      @NonNull CqlIdentifier id,
+      @Nullable CqlVector<ElementT> v,
+      @NonNull Class<ElementT> elementsClass) {
+    SelfT result = null;
+    for (Integer i : allIndicesOf(id)) {
+      result = (result == null ? this : result).setVector(i, v, elementsClass);
     }
     assert result != null; // allIndices throws if there are no results
     return result;

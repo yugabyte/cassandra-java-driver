@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +23,6 @@ import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.datastax.oss.driver.internal.core.util.Loggers;
-import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigObject;
@@ -32,6 +33,7 @@ import com.typesafe.config.ConfigValueFactory;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.net.URL;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -50,6 +52,8 @@ public class TypesafeDriverConfig implements DriverConfig {
 
   private final Map<DriverOption, Object> defaultOverrides = new ConcurrentHashMap<>();
 
+  private final TypesafeDriverExecutionProfile.Base defaultProfile;
+
   public TypesafeDriverConfig(Config config) {
     this.lastLoadedConfig = config;
     Map<String, Config> profileConfigs = extractProfiles(config);
@@ -62,6 +66,7 @@ public class TypesafeDriverConfig implements DriverConfig {
           new TypesafeDriverExecutionProfile.Base(entry.getKey(), entry.getValue()));
     }
     this.profiles = builder.build();
+    this.defaultProfile = profiles.get(DriverExecutionProfile.DEFAULT_NAME);
   }
 
   /** @return whether the configuration changed */
@@ -136,14 +141,22 @@ public class TypesafeDriverConfig implements DriverConfig {
     return result.build();
   }
 
+  @Override
+  public DriverExecutionProfile getDefaultProfile() {
+    return defaultProfile;
+  }
+
   @NonNull
   @Override
   public DriverExecutionProfile getProfile(@NonNull String profileName) {
-    Preconditions.checkArgument(
-        profiles.containsKey(profileName),
-        "Unknown profile '%s'. Check your configuration.",
-        profileName);
-    return profiles.get(profileName);
+    if (profileName.equals(DriverExecutionProfile.DEFAULT_NAME)) {
+      return defaultProfile;
+    }
+    return Optional.ofNullable(profiles.get(profileName))
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    String.format("Unknown profile '%s'. Check your configuration.", profileName)));
   }
 
   @NonNull

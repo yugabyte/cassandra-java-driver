@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +23,7 @@ import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.insertInto;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.literal;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import com.datastax.oss.driver.api.core.data.CqlVector;
 import com.datastax.oss.driver.api.querybuilder.term.Term;
 import com.datastax.oss.driver.internal.querybuilder.insert.DefaultInsert;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
@@ -37,6 +40,12 @@ public class RegularInsertTest {
         .hasCql("INSERT INTO ks.foo (a,b) VALUES (1,2)");
     assertThat(insertInto("foo").value("a", bindMarker()).value("b", bindMarker()))
         .hasCql("INSERT INTO foo (a,b) VALUES (?,?)");
+  }
+
+  @Test
+  public void should_generate_vector_literals() {
+    assertThat(insertInto("foo").value("a", literal(CqlVector.newInstance(0.1, 0.2, 0.3))))
+        .hasCql("INSERT INTO foo (a) VALUES ([0.1, 0.2, 0.3])");
   }
 
   @Test

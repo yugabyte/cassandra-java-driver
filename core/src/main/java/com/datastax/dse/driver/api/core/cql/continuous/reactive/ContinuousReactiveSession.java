@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,7 +53,7 @@ public interface ContinuousReactiveSession extends Session {
    *
    * <p>See {@link ContinuousSession} for more explanations about continuous paging.
    *
-   * <p>This feature is only available with Datastax Enterprise. Executing continuous queries
+   * <p>This feature is only available with DataStax Enterprise. Executing continuous queries
    * against an Apache Cassandra&reg; cluster will result in a runtime error.
    *
    * @param query the query to execute.
@@ -68,7 +70,7 @@ public interface ContinuousReactiveSession extends Session {
    *
    * <p>See {@link ContinuousSession} for more explanations about continuous paging.
    *
-   * <p>This feature is only available with Datastax Enterprise. Executing continuous queries
+   * <p>This feature is only available with DataStax Enterprise. Executing continuous queries
    * against an Apache Cassandra&reg; cluster will result in a runtime error.
    *
    * @param statement the statement to execute.

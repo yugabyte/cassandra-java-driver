@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +18,7 @@
 package com.datastax.oss.driver.api.querybuilder.select;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.data.CqlVector;
 import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.querybuilder.BindMarker;
 import com.datastax.oss.driver.api.querybuilder.BuildableQuery;
@@ -144,6 +147,16 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
     return orderBy(CqlIdentifier.fromCql(columnName), order);
   }
 
+  /**
+   * Shortcut for {@link #orderByAnnOf(CqlIdentifier, CqlVector)}, adding an ORDER BY ... ANN OF ...
+   * clause
+   */
+  @NonNull
+  Select orderByAnnOf(@NonNull String columnName, @NonNull CqlVector<?> ann);
+
+  /** Adds the ORDER BY ... ANN OF ... clause, usually used for vector search */
+  @NonNull
+  Select orderByAnnOf(@NonNull CqlIdentifier columnId, @NonNull CqlVector<?> ann);
   /**
    * Adds a LIMIT clause to this query with a literal value.
    *

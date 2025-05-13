@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +26,7 @@ import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
 import com.datastax.oss.driver.internal.core.util.Sizes;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.PrimitiveSizes;
+import edu.umd.cs.findbugs.annotations.CheckReturnValue;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.ArrayList;
@@ -162,6 +165,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * method. However custom implementations may choose to be mutable and return the same instance.
    */
   @NonNull
+  @CheckReturnValue
   BatchStatement setBatchType(@NonNull BatchType newBatchType);
 
   /**
@@ -178,6 +182,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * @see Request#getKeyspace()
    */
   @NonNull
+  @CheckReturnValue
   BatchStatement setKeyspace(@Nullable CqlIdentifier newKeyspace);
 
   /**
@@ -185,6 +190,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * setKeyspace(CqlIdentifier.fromCql(newKeyspaceName))}.
    */
   @NonNull
+  @CheckReturnValue
   default BatchStatement setKeyspace(@NonNull String newKeyspaceName) {
     return setKeyspace(CqlIdentifier.fromCql(newKeyspaceName));
   }
@@ -199,6 +205,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * method. However custom implementations may choose to be mutable and return the same instance.
    */
   @NonNull
+  @CheckReturnValue
   BatchStatement add(@NonNull BatchableStatement<?> statement);
 
   /**
@@ -211,10 +218,12 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * method. However custom implementations may choose to be mutable and return the same instance.
    */
   @NonNull
+  @CheckReturnValue
   BatchStatement addAll(@NonNull Iterable<? extends BatchableStatement<?>> statements);
 
   /** @see #addAll(Iterable) */
   @NonNull
+  @CheckReturnValue
   default BatchStatement addAll(@NonNull BatchableStatement<?>... statements) {
     return addAll(Arrays.asList(statements));
   }
@@ -229,6 +238,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
    * method. However custom implementations may choose to be mutable and return the same instance.
    */
   @NonNull
+  @CheckReturnValue
   BatchStatement clear();
 
   @Override

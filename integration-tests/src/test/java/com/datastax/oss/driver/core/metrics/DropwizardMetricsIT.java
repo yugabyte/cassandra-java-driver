@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -197,6 +199,15 @@ public class DropwizardMetricsIT extends MetricsITBase {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  protected void assertMetricsNotPresent(Object registry) {
+    MetricRegistry dropwizardRegistry = (MetricRegistry) registry;
+    assertThat(dropwizardRegistry.getMetrics()).isEmpty();
+  }
+
+  @Override
+>>>>>>> 5b486210bca69f889692eeca490e7f3f4f087dd1
   protected void assertNodeMetricsEvicted(CqlSession session, Node node) {
     InternalDriverContext context = (InternalDriverContext) session.getContext();
     MetricRegistry registry = (MetricRegistry) context.getMetricRegistry();

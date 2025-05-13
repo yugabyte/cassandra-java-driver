@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,9 +29,11 @@ import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
 import com.datastax.oss.driver.api.testinfra.ccm.BaseCcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
 import java.util.Objects;
-import java.util.Optional;
 import org.junit.rules.ExternalResource;
 
 /**
@@ -151,14 +155,12 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
           Statement.SYNC);
     }
     if (graphName != null) {
-      Optional<Version> dseVersion =
-          (cassandraResource instanceof BaseCcmRule)
-              ? ((BaseCcmRule) cassandraResource).getDseVersion()
-              : Optional.empty();
-      if (!dseVersion.isPresent()) {
+      BaseCcmRule rule =
+          (cassandraResource instanceof BaseCcmRule) ? ((BaseCcmRule) cassandraResource) : null;
+      if (rule == null || !CcmBridge.isDistributionOf(BackendType.DSE)) {
         throw new IllegalArgumentException("DseSessionRule should work with DSE.");
       }
-      if (dseVersion.get().compareTo(V6_8_0) >= 0) {
+      if (rule.getDistributionVersion().compareTo(V6_8_0) >= 0) {
         session()
             .execute(
                 ScriptGraphStatement.newInstance(
@@ -193,7 +195,10 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
               ScriptGraphStatement.SYNC);
     }
     if (keyspace != null) {
-      SessionUtils.dropKeyspace(session, keyspace, slowProfile);
+      SchemaChangeSynchronizer.withLock(
+          () -> {
+            SessionUtils.dropKeyspace(session, keyspace, slowProfile);
+          });
     }
     session.close();
   }

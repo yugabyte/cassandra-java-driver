@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +28,7 @@ import com.datastax.oss.driver.internal.core.util.Sizes;
 import com.datastax.oss.protocol.internal.PrimitiveSizes;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableList;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
+import edu.umd.cs.findbugs.annotations.CheckReturnValue;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
@@ -195,6 +198,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * @see #setNamedValuesWithIds(Map)
    */
   @NonNull
+  @CheckReturnValue
   SimpleStatement setQuery(@NonNull String newQuery);
 
   /**
@@ -207,6 +211,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * @see Request#getKeyspace()
    */
   @NonNull
+  @CheckReturnValue
   SimpleStatement setKeyspace(@Nullable CqlIdentifier newKeyspace);
 
   /**
@@ -214,6 +219,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * setKeyspace(CqlIdentifier.fromCql(newKeyspaceName))}.
    */
   @NonNull
+  @CheckReturnValue
   default SimpleStatement setKeyspace(@NonNull String newKeyspaceName) {
     return setKeyspace(CqlIdentifier.fromCql(newKeyspaceName));
   }
@@ -234,6 +240,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * @see #setQuery(String)
    */
   @NonNull
+  @CheckReturnValue
   SimpleStatement setPositionalValues(@NonNull List<Object> newPositionalValues);
 
   @NonNull
@@ -254,6 +261,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * @see #setQuery(String)
    */
   @NonNull
+  @CheckReturnValue
   SimpleStatement setNamedValuesWithIds(@NonNull Map<CqlIdentifier, Object> newNamedValues);
 
   /**
@@ -261,6 +269,7 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
    * converted on the fly with {@link CqlIdentifier#fromCql(String)}.
    */
   @NonNull
+  @CheckReturnValue
   default SimpleStatement setNamedValues(@NonNull Map<String, Object> newNamedValues) {
     return setNamedValuesWithIds(DefaultSimpleStatement.wrapKeys(newNamedValues));
   }

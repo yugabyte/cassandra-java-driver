@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -351,7 +353,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * Configures the session to use DSE plaintext authentication with the given username and
    * password, and perform proxy authentication with the given authorization id.
    *
-   * <p>This feature is only available in Datastax Enterprise. If connecting to Apache Cassandra,
+   * <p>This feature is only available in DataStax Enterprise. If connecting to Apache Cassandra,
    * the authorization id will be ignored; it is recommended to use {@link
    * #withAuthCredentials(String, String)} instead.
    *

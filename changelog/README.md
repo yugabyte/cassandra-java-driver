@@ -1,6 +1,84 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Changelog
 
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
+
+### 4.19.0
+
+- [bug] JAVA-3055: Prevent PreparedStatement cache to be polluted if a request is cancelled.
+- [bug] JAVA-3168: Copy node info for contact points on initial node refresh only from first match by endpoint
+- [improvement] JAVA-3143: Extend driver vector support to arbitrary subtypes and fix handling of variable length types (OSS C* 5.0)
+- [improvement] CASSJAVA-53: Update Guava version used in cassandra-java-driver
+- [improvement] JAVA-3118: Add support for vector data type in Schema Builder, QueryBuilder
+- [bug] CASSJAVA-55: Remove setting "Host" header for metadata requests
+- [bug] JAVA-3057: Allow decoding a UDT that has more fields than expected
+- [improvement] CASSJAVA-52: Bring java-driver-shaded-guava into the repo as a submodule
+- [bug] CASSJAVA-2: TableMetadata#describe produces invalid CQL when a type of a column is a vector
+- [bug] JAVA-3051: Memory leak in DefaultLoadBalancingPolicy measurement of response times
+- [improvement] CASSJAVA-14: Query builder support for NOT CQL syntax
+- [bug] CASSJAVA-12: DefaultSslEngineFactory missing null check on close
+- [improvement] CASSJAVA-46: Expose table extensions via schema builders
+- [bug] PR 1938: Fix uncaught exception during graceful channel shutdown after exceeding max orphan ids
+- [improvement] PR 1607: Annotate BatchStatement, Statement, SimpleStatement methods with CheckReturnValue
+- [improvement] CASSJAVA-41: Reduce lock held duration in ConcurrencyLimitingRequestThrottler
+- [bug] JAVA-3149: Async Query Cancellation Not Propagated To RequestThrottler
+- [bug] JAVA-3167: CompletableFutures.allSuccessful() may return never completed future
+- [bug] PR 1620: Don't return empty routing key when partition key is unbound
+- [improvement] PR 1623: Limit calls to Conversions.resolveExecutionProfile
+- [improvement] CASSJAVA-29: Update target Cassandra versions for integration tests, support new 5.0.x
+
+### 4.18.1
+
+- [improvement] JAVA-3142: Ability to specify ordering of remote local dc's via new configuration for graceful automatic failovers
+- [bug] CASSANDRA-19457: Object reference in Micrometer metrics prevent GC from reclaiming Session instances
+- [improvement] CASSANDRA-19468: Don't swallow exception during metadata refresh
+- [bug] CASSANDRA-19333: Fix data corruption in VectorCodec when using heap buffers
+- [improvement] CASSANDRA-19290: Replace uses of AttributeKey.newInstance
+- [improvement] CASSANDRA-19352: Support native_transport_(address|port) + native_transport_port_ssl for DSE 6.8 (4.x edition)
+- [improvement] CASSANDRA-19180: Support reloading keystore in cassandra-java-driver
+
+### 4.18.0
+
+- [improvement] PR 1689: Add support for publishing percentile time series for the histogram metrics (nparaddi-walmart)
+- [improvement] JAVA-3104: Do not eagerly pre-allocate array when deserializing CqlVector
+- [improvement] JAVA-3111: upgrade jackson-databind to 2.13.4.2 to address gradle dependency issue
+- [improvement] PR 1617: Improve ByteBufPrimitiveCodec readBytes (chibenwa)
+- [improvement] JAVA-3095: Fix CREATE keyword in vector search example in upgrade guide
+- [improvement] JAVA-3100: Update jackson-databind to 2.13.4.1 and jackson-jaxrs-json-provider to 2.13.4 to address recent CVEs
+- [improvement] JAVA-3089: Forbid wildcard imports
+
+### 4.17.0
+
+- [improvement] JAVA-3070: Make CqlVector and CqlDuration serializable
+- [improvement] JAVA-3085: Initialize c.d.o.d.i.core.util.Dependency at Graal native image build-time
+- [improvement] JAVA-3061: CqlVector API improvements, add support for accessing vectors directly as float arrays
+- [improvement] JAVA-3042: Enable automated testing for Java17
+- [improvement] JAVA-3050: Upgrade Netty to 4.1.94
+
+### 4.16.0
+
+- [improvement] JAVA-3058: Clear prepared statement cache on UDT type change event
+- [improvement] JAVA-3060: Add vector type, codec + support for parsing CQL type
+- [improvement] DOC-2813: Add error handling guidance linking to a helpful blog post
+- [improvement] JAVA-3045: Fix GraalVM native image support for GraalVM 22.2
 
 ### 4.15.0
 
@@ -617,7 +695,26 @@ changelog](https://docs.datastax.com/en/developer/java-driver-dse/latest/changel
 - [bug] JAVA-1499: Wait for load balancing policy at cluster initialization
 - [new feature] JAVA-1495: Add prepared statements
 
+## 3.11.5
+- [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver
+- [improvement] JAVA-3115: SchemaChangeListener#onKeyspaceChanged can fire when keyspace has not changed if using SimpleStrategy replication
+
+## 3.11.4
+- [improvement] JAVA-3079: Upgrade Netty to 4.1.94, 3.x edition
+- [improvement] JAVA-3082: Fix maven build for Apple-silicon
+- [improvement] PR 1671: Fix LatencyAwarePolicy scale docstring
+
+## 3.11.3
+
+- [improvement] JAVA-3023: Upgrade Netty to 4.1.77, 3.x edition
+
+## 3.11.2
+
+- [improvement] JAVA-3008: Upgrade Netty to 4.1.75, 3.x edition
+- [improvement] JAVA-2984: Upgrade Jackson to resolve high-priority CVEs
+
 ## 3.11.1
+
 - [bug] JAVA-2967: Support native transport peer information for DSE 6.8.
 - [bug] JAVA-2976: Support missing protocol v5 error codes CAS_WRITE_UNKNOWN, CDC_WRITE_FAILURE.
 

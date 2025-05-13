@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -103,7 +106,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
     // Just an alias to make the rest of the code more readable
     this.policies = reporters.keySet();
 
-    this.distances = new HashMap<>();
+    this.distances = new WeakHashMap<>();
 
     this.logPrefix = context.getSessionName();
     context.getEventBus().register(NodeStateEvent.class, this::onNodeStateEvent);
@@ -170,6 +173,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   // once it has gone through the filter
   private void processNodeStateEvent(NodeStateEvent event) {
+    DefaultNode node = event.node;
     switch (stateRef.get()) {
       case BEFORE_INIT:
       case DURING_INIT:
@@ -179,13 +183,13 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
       case RUNNING:
         for (LoadBalancingPolicy policy : policies) {
           if (event.newState == NodeState.UP) {
-            policy.onUp(event.node);
+            policy.onUp(node);
           } else if (event.newState == NodeState.DOWN || event.newState == NodeState.FORCED_DOWN) {
-            policy.onDown(event.node);
+            policy.onDown(node);
           } else if (event.newState == NodeState.UNKNOWN) {
-            policy.onAdd(event.node);
+            policy.onAdd(node);
           } else if (event.newState == null) {
-            policy.onRemove(event.node);
+            policy.onRemove(node);
           } else {
             LOG.warn("[{}] Unsupported event: {}", logPrefix, event);
           }

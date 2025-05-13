@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,6 +47,7 @@ import com.datastax.oss.driver.api.mapper.annotations.Transient;
 import com.datastax.oss.driver.api.mapper.annotations.Update;
 import com.datastax.oss.driver.api.mapper.entity.saving.NullSavingStrategy;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -81,22 +84,27 @@ public class EntityPolymorphismIT {
   @BeforeClass
   public static void setup() {
     CqlSession session = SESSION_RULE.session();
-    for (String query :
-        ImmutableList.of(
-            "CREATE TYPE point2d (\"X\" int, \"Y\" int)",
-            "CREATE TYPE point3d (\"X\" int, \"Y\" int, \"Z\" int)",
-            "CREATE TABLE circles (circle_id uuid PRIMARY KEY, center2d frozen<point2d>, radius "
-                + "double, tags set<text>)",
-            "CREATE TABLE rectangles (rect_id uuid PRIMARY KEY, bottom_left frozen<point2d>, top_right frozen<point2d>, tags set<text>)",
-            "CREATE TABLE squares (square_id uuid PRIMARY KEY, bottom_left frozen<point2d>, top_right frozen<point2d>, tags set<text>)",
-            "CREATE TABLE spheres (sphere_id uuid PRIMARY KEY, center3d frozen<point3d>, radius "
-                + "double, tags set<text>)",
-            "CREATE TABLE devices (device_id uuid PRIMARY KEY, name text)",
-            "CREATE TABLE tracked_devices (device_id uuid PRIMARY KEY, name text, location text)",
-            "CREATE TABLE simple_devices (id uuid PRIMARY KEY, in_use boolean)")) {
-      session.execute(
-          SimpleStatement.builder(query).setExecutionProfile(SESSION_RULE.slowProfile()).build());
-    }
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          for (String query :
+              ImmutableList.of(
+                  "CREATE TYPE point2d (\"X\" int, \"Y\" int)",
+                  "CREATE TYPE point3d (\"X\" int, \"Y\" int, \"Z\" int)",
+                  "CREATE TABLE circles (circle_id uuid PRIMARY KEY, center2d frozen<point2d>, radius "
+                      + "double, tags set<text>)",
+                  "CREATE TABLE rectangles (rect_id uuid PRIMARY KEY, bottom_left frozen<point2d>, top_right frozen<point2d>, tags set<text>)",
+                  "CREATE TABLE squares (square_id uuid PRIMARY KEY, bottom_left frozen<point2d>, top_right frozen<point2d>, tags set<text>)",
+                  "CREATE TABLE spheres (sphere_id uuid PRIMARY KEY, center3d frozen<point3d>, radius "
+                      + "double, tags set<text>)",
+                  "CREATE TABLE devices (device_id uuid PRIMARY KEY, name text)",
+                  "CREATE TABLE tracked_devices (device_id uuid PRIMARY KEY, name text, location text)",
+                  "CREATE TABLE simple_devices (id uuid PRIMARY KEY, in_use boolean)")) {
+            session.execute(
+                SimpleStatement.builder(query)
+                    .setExecutionProfile(SESSION_RULE.slowProfile())
+                    .build());
+          }
+        });
     mapper = new EntityPolymorphismIT_TestMapperBuilder(session).build();
   }
 

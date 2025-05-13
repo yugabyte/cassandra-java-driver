@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +24,7 @@ import com.datastax.dse.driver.api.core.cql.reactive.ReactiveRow;
 import com.datastax.dse.driver.api.mapper.reactive.MappedReactiveResultSet;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.mapper.annotations.Dao;
 import com.datastax.oss.driver.api.mapper.annotations.DaoFactory;
@@ -32,27 +35,35 @@ import com.datastax.oss.driver.api.mapper.annotations.Insert;
 import com.datastax.oss.driver.api.mapper.annotations.Mapper;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
 import com.datastax.oss.driver.api.mapper.entity.saving.NullSavingStrategy;
-import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
+import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
-import com.datastax.oss.driver.categories.ParallelizableTests;
 import io.reactivex.Flowable;
 import java.util.UUID;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
-@Category(ParallelizableTests.class)
+// Do not run LWT tests in parallel because they may interfere. Tests operate on the same row.
 public class DeleteReactiveIT extends InventoryITBase {
 
-  private static CcmRule ccmRule = CcmRule.getInstance();
+  private static CustomCcmRule ccmRule = configureCcm(CustomCcmRule.builder()).build();
 
   private static SessionRule<CqlSession> sessionRule = SessionRule.builder(ccmRule).build();
 
   @ClassRule public static TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
+
+  private static CustomCcmRule.Builder configureCcm(CustomCcmRule.Builder builder) {
+    if (!CcmBridge.isDistributionOf(
+        BackendType.DSE, (dist, cass) -> cass.nextStable().compareTo(Version.V4_0_0) >= 0)) {
+      builder.withCassandraConfiguration("enable_sasi_indexes", true);
+    }
+    return builder;
+  }
 
   private static DseProductDao dao;
 

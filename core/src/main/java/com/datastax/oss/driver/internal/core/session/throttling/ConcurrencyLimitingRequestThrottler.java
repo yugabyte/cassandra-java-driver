@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +25,7 @@ import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.locks.ReentrantLock;
@@ -85,6 +88,8 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void register(@NonNull Throttled request) {
+    boolean notifyReadyRequired = false;
+
     lock.lock();
     try {
       if (closed) {
@@ -94,7 +99,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
         // We have capacity for one more concurrent request
         LOG.trace("[{}] Starting newly registered request", logPrefix);
         concurrentRequests += 1;
-        request.onThrottleReady(false);
+        notifyReadyRequired = true;
       } else if (queue.size() < maxQueueSize) {
         LOG.trace("[{}] Enqueuing request", logPrefix);
         queue.add(request);
@@ -110,15 +115,25 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     } finally {
       lock.unlock();
     }
+
+    // no need to hold the lock while allowing the task to progress
+    if (notifyReadyRequired) {
+      request.onThrottleReady(false);
+    }
   }
 
   @Override
   public void signalSuccess(@NonNull Throttled request) {
+    Throttled nextRequest = null;
     lock.lock();
     try {
-      onRequestDone();
+      nextRequest = onRequestDoneAndDequeNext();
     } finally {
       lock.unlock();
+    }
+
+    if (nextRequest != null) {
+      nextRequest.onThrottleReady(true);
     }
   }
 
@@ -129,32 +144,62 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void signalTimeout(@NonNull Throttled request) {
+    Throttled nextRequest = null;
     lock.lock();
     try {
       if (!closed) {
         if (queue.remove(request)) { // The request timed out before it was active
           LOG.trace("[{}] Removing timed out request from the queue", logPrefix);
         } else {
-          onRequestDone();
+          nextRequest = onRequestDoneAndDequeNext();
         }
       }
     } finally {
       lock.unlock();
     }
+
+    if (nextRequest != null) {
+      nextRequest.onThrottleReady(true);
+    }
+  }
+
+  @Override
+  public void signalCancel(@NonNull Throttled request) {
+    Throttled nextRequest = null;
+    lock.lock();
+    try {
+      if (!closed) {
+        if (queue.remove(request)) { // The request has been cancelled before it was active
+          LOG.trace("[{}] Removing cancelled request from the queue", logPrefix);
+        } else {
+          nextRequest = onRequestDoneAndDequeNext();
+        }
+      }
+    } finally {
+      lock.unlock();
+    }
+
+    if (nextRequest != null) {
+      nextRequest.onThrottleReady(true);
+    }
   }
 
   @SuppressWarnings("GuardedBy") // this method is only called with the lock held
-  private void onRequestDone() {
+  @Nullable
+  private Throttled onRequestDoneAndDequeNext() {
     assert lock.isHeldByCurrentThread();
     if (!closed) {
       if (queue.isEmpty()) {
         concurrentRequests -= 1;
       } else {
         LOG.trace("[{}] Starting dequeued request", logPrefix);
-        queue.poll().onThrottleReady(true);
         // don't touch concurrentRequests since we finished one but started another
+        return queue.poll();
       }
     }
+
+    // no next task was dequeued
+    return null;
   }
 
   @Override

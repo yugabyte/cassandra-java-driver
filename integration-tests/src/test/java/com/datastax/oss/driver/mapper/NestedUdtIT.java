@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,8 +40,10 @@ import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
 import com.datastax.oss.driver.api.mapper.annotations.SetEntity;
 import com.datastax.oss.driver.api.mapper.entity.saving.NullSavingStrategy;
-import com.datastax.oss.driver.api.testinfra.CassandraRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -61,7 +65,10 @@ import org.junit.rules.TestRule;
 
 /** Tests that entities with UDTs nested at various levels are properly mapped. */
 @Category(ParallelizableTests.class)
-@CassandraRequirement(min = "2.2", description = "support for unset values")
+@BackendRequirement(
+    type = BackendType.CASSANDRA,
+    minInclusive = "2.2",
+    description = "support for unset values")
 public class NestedUdtIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();
@@ -113,27 +120,45 @@ public class NestedUdtIT {
   public static void setup() {
     CqlSession session = SESSION_RULE.session();
 
-    for (String query :
-        ImmutableList.of(
-            "CREATE TYPE type1(s1 text, s2 text)",
-            "CREATE TYPE type2(i1 int, i2 int)",
-            "CREATE TYPE type1_partial(s1 text)",
-            "CREATE TYPE type2_partial(i1 int)",
-            "CREATE TABLE container(id uuid PRIMARY KEY, "
-                + "list frozen<list<type1>>, "
-                + "map1 frozen<map<text, list<type1>>>, "
-                + "map2 frozen<map<type1, set<list<type2>>>>,"
-                + "map3 frozen<map<type1, map<text, set<type2>>>>"
-                + ")",
-            "CREATE TABLE container_partial(id uuid PRIMARY KEY, "
-                + "list frozen<list<type1_partial>>, "
-                + "map1 frozen<map<text, list<type1_partial>>>, "
-                + "map2 frozen<map<type1_partial, set<list<type2_partial>>>>,"
-                + "map3 frozen<map<type1_partial, map<text, set<type2_partial>>>>"
-                + ")")) {
-      session.execute(
-          SimpleStatement.builder(query).setExecutionProfile(SESSION_RULE.slowProfile()).build());
-    }
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          for (String query :
+              ImmutableList.of(
+                  "CREATE TYPE type1(s1 text, s2 text)",
+                  "CREATE TYPE type2(i1 int, i2 int)",
+                  "CREATE TYPE type1_partial(s1 text)",
+                  "CREATE TYPE type2_partial(i1 int)",
+                  "CREATE TABLE container(id uuid PRIMARY KEY, "
+                      + "list frozen<list<type1>>, "
+                      + "map1 frozen<map<text, list<type1>>>, "
+                      + "map2 frozen<map<type1, set<list<type2>>>>,"
+                      + "map3 frozen<map<type1, map<text, set<type2>>>>"
+                      + ")",
+                  "CREATE TABLE container_partial(id uuid PRIMARY KEY, "
+                      + "list frozen<list<type1_partial>>, "
+                      + "map1 frozen<map<text, list<type1_partial>>>, "
+                      + "map2 frozen<map<type1_partial, set<list<type2_partial>>>>,"
+                      + "map3 frozen<map<type1_partial, map<text, set<type2_partial>>>>"
+                      + ")")) {
+            session.execute(
+                SimpleStatement.builder(query)
+                    .setExecutionProfile(SESSION_RULE.slowProfile())
+                    .build());
+          }
+        });
+
+    UserDefinedType type1Partial =
+        session
+            .getKeyspace()
+            .flatMap(ks -> session.getMetadata().getKeyspace(ks))
+            .flatMap(ks -> ks.getUserDefinedType("type1_partial"))
+            .orElseThrow(AssertionError::new);
+
+    session.execute(
+        SimpleStatement.newInstance(
+            "INSERT INTO container_partial (id, list) VALUES (?, ?)",
+            SAMPLE_CONTAINER.getId(),
+            Lists.newArrayList(type1Partial.newValue("a"), type1Partial.newValue("b"))));
 
     UserDefinedType type1Partial =
         session

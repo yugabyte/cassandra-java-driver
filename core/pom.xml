@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright DataStax, Inc.
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +23,7 @@
   <parent>
     <groupId>com.yugabyte</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.15.0-yb-4-SNAPSHOT</version>
+    <version>4.19.0-yb-1-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-core</artifactId>
   <!-- <packaging>bundle</packaging> -->
@@ -47,8 +49,8 @@
       <artifactId>netty-handler</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.datastax.oss</groupId>
-      <artifactId>java-driver-shaded-guava</artifactId>
+      <groupId>com.yugabyte</groupId>
+      <artifactId>java-driver-guava-shaded</artifactId>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
@@ -117,10 +119,27 @@
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
       <artifactId>jcip-annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.graalvm.sdk</groupId>
+      <artifactId>graal-sdk</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.graalvm.nativeimage</groupId>
+      <artifactId>svm</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor.tools</groupId>
+      <artifactId>blockhound</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.graalvm.sdk</groupId>
@@ -204,6 +223,15 @@
         </excludes>
         <filtering>false</filtering>
       </resource>
+      <resource>
+        <directory>${project.basedir}/..</directory>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE_binary.txt</include>
+          <include>NOTICE.txt</include>
+        </includes>
+        <targetPath>META-INF</targetPath>
+      </resource>
     </resources>
     <testResources>
       <testResource>
@@ -248,6 +276,8 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <jvm>${testing.jvm}/bin/java</jvm>
+          <argLine>${mockitoopens.argline}</argLine>
           <threadCount>1</threadCount>
           <properties>
             <property>
