@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright DataStax, Inc.
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,11 +23,11 @@
   <parent>
     <groupId>com.yugabyte</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.15.0-yb-4-SNAPSHOT</version>
+    <version>4.19.0-yb-1-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-mapper-runtime</artifactId>
   <packaging>bundle</packaging>
-  <name>DataStax Java driver for Apache Cassandra(R) - object mapper runtime</name>
+  <name>Apache Cassandra Java Driver - object mapper runtime</name>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -51,10 +53,12 @@
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
       <artifactId>jcip-annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -94,6 +98,20 @@
     </dependency>
   </dependencies>
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/..</directory>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE_binary.txt</include>
+          <include>NOTICE.txt</include>
+        </includes>
+        <targetPath>META-INF</targetPath>
+      </resource>
+    </resources>
     <testResources>
       <testResource>
         <directory>src/test/resources</directory>
@@ -124,6 +142,7 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <jvm>${testing.jvm}/bin/java</jvm>
           <threadCount>1</threadCount>
           <properties>
             <!-- tell TestNG not to run jUnit tests -->
@@ -150,7 +169,7 @@
           </dependency>
         </dependencies>
       </plugin>
-      <!-- <plugin>
+      <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
         <extensions>true</extensions>
@@ -162,12 +181,13 @@
             <configuration>
               <instructions>
                 <Bundle-SymbolicName>com.datastax.oss.driver.mapper-runtime</Bundle-SymbolicName>
-                
+                <!--
                 Allow importing code from other packages
                 (so reflection-based loading of policies works)
-               
+                -->
                 <DynamicImport-Package>*</DynamicImport-Package>
                 <Import-Package>
+                  <!--
                   1) Don't include the packages below because they contain annotations only and are
                   not required at runtime.
                   !net.jcip.annotations.*, !edu.umd.cs.findbugs.annotations.*,
@@ -177,14 +197,14 @@
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  org.reactivestreams.*;resolution:=optional, *
+                  -->org.reactivestreams.*;resolution:=optional, *
                 </Import-Package>
-                <Export-Package>com.datastax.*.driver.*.mapper.*</Export-Package>
+                <Export-Package>com..*.driver.*.mapper.*</Export-Package>
               </instructions>
             </configuration>
           </execution>
         </executions>
-      </plugin> -->
+      </plugin>
       <plugin>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>

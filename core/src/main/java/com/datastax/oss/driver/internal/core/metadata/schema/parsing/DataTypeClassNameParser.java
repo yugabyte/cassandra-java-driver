@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,6 +34,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -160,6 +163,13 @@ public class DataTypeClassNameParser implements DataTypeParser {
         componentTypesBuilder.add(parse(rawType, userTypes, attachmentPoint, logPrefix));
       }
       return new DefaultTupleType(componentTypesBuilder.build(), attachmentPoint);
+    }
+
+    if (next.startsWith("org.apache.cassandra.db.marshal.VectorType")) {
+      Iterator<String> rawTypes = parser.getTypeParameters().iterator();
+      DataType subtype = parse(rawTypes.next(), userTypes, attachmentPoint, logPrefix);
+      int dimensions = Integer.parseInt(rawTypes.next());
+      return DataTypes.vectorOf(subtype, dimensions);
     }
 
     DataType type = NATIVE_TYPES_BY_CLASS_NAME.get(next);

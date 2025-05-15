@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright DataStax, Inc.
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,10 +23,10 @@
   <parent>
     <groupId>com.yugabyte</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.15.0-yb-4-SNAPSHOT</version>
+    <version>4.19.0-yb-1-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-core-shaded</artifactId>
-  <name>DataStax Java driver for Apache Cassandra(R) - core with shaded deps</name>
+  <name>Apache Cassandra Java Driver - core with shaded deps</name>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -56,8 +58,8 @@
       <artifactId>native-protocol</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.datastax.oss</groupId>
-      <artifactId>java-driver-shaded-guava</artifactId>
+      <groupId>com.yugabyte</groupId>
+      <artifactId>java-driver-guava-shaded</artifactId>
     </dependency>
     <dependency>
       <groupId>com.typesafe</groupId>
@@ -111,10 +113,12 @@
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
       <artifactId>jcip-annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
   <!--
@@ -125,6 +129,20 @@
   4) assembly plugin re-creates the shaded jar by packing target/classes + manifest + shaded pom
   -->
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/..</directory>
+        <includes>
+          <include>LICENSE</include>
+          <include>NOTICE_binary.txt</include>
+          <include>NOTICE.txt</include>
+        </includes>
+        <targetPath>META-INF</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
@@ -256,38 +274,6 @@
             </replacement>
           </replacements>
         </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-javadocs</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <sourcepath>${project.build.directory}/shaded-sources</sourcepath>
-              <excludePackageNames>com.datastax.*.driver.internal*,com.datastax.oss.driver.shaded*</excludePackageNames>
-              <!--
-                javadoc processes the shaded Netty sources (even though they're not included in the
-                report), and will complain if it doesn't find JCTools classes.
-                Add the dependency just to avoid warnings:
-              -->
-              <additionalDependencies>
-                <additionalDependency>
-                  <groupId>org.jctools</groupId>
-                  <artifactId>jctools-core</artifactId>
-                  <version>2.1.2</version>
-                </additionalDependency>
-                <additionalDependency>
-                  <groupId>com.esri.geometry</groupId>
-                  <artifactId>esri-geometry-api</artifactId>
-                  <version>1.2.1</version>
-                </additionalDependency>
-              </additionalDependencies>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.felix</groupId>

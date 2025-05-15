@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,6 +51,8 @@ public class InitialNodeListRefreshTest {
   private UUID hostId1;
   private UUID hostId2;
   private UUID hostId3;
+  private UUID hostId4;
+  private UUID hostId5;
 
   @Before
   public void setup() {
@@ -62,13 +66,15 @@ public class InitialNodeListRefreshTest {
     hostId1 = UUID.randomUUID();
     hostId2 = UUID.randomUUID();
     hostId3 = UUID.randomUUID();
+    hostId4 = UUID.randomUUID();
+    hostId5 = UUID.randomUUID();
 
     DriverExecutionProfile defaultExecutionProfile = mockDefaultExecutionProfile();
     mockDriverContextWithProfiles(context, defaultExecutionProfile);
   }
 
   @Test
-  public void should_copy_contact_points() {
+  public void should_copy_contact_points_on_first_endpoint_match_only() {
     // Given
     Iterable<NodeInfo> newInfos =
         ImmutableList.of(
@@ -80,6 +86,17 @@ public class InitialNodeListRefreshTest {
             DefaultNodeInfo.builder()
                 .withEndPoint(contactPoint2.getEndPoint())
                 .withHostId(hostId2)
+                .build(),
+            DefaultNodeInfo.builder().withEndPoint(endPoint3).withHostId(hostId3).build(),
+            DefaultNodeInfo.builder()
+                // address translator can translate node addresses to the same endpoints
+                .withEndPoint(contactPoint2.getEndPoint())
+                .withHostId(hostId4)
+                .build(),
+            DefaultNodeInfo.builder()
+                // address translator can translate node addresses to the same endpoints
+                .withEndPoint(endPoint3)
+                .withHostId(hostId5)
                 .build());
     InitialNodeListRefresh refresh =
         new InitialNodeListRefresh(newInfos, ImmutableSet.of(contactPoint1, contactPoint2));
@@ -90,11 +107,26 @@ public class InitialNodeListRefreshTest {
     // Then
     // contact points have been copied to the metadata, and completed with missing information
     Map<UUID, Node> newNodes = result.newMetadata.getNodes();
-    assertThat(newNodes).containsOnlyKeys(hostId1, hostId2);
+    assertThat(newNodes).containsOnlyKeys(hostId1, hostId2, hostId3, hostId4, hostId5);
     assertThat(newNodes.get(hostId1)).isEqualTo(contactPoint1);
     assertThat(contactPoint1.getHostId()).isEqualTo(hostId1);
     assertThat(newNodes.get(hostId2)).isEqualTo(contactPoint2);
     assertThat(contactPoint2.getHostId()).isEqualTo(hostId2);
+    // And
+    // node has been added for the new endpoint
+    assertThat(newNodes.get(hostId3).getEndPoint()).isEqualTo(endPoint3);
+    assertThat(newNodes.get(hostId3).getHostId()).isEqualTo(hostId3);
+    // And
+    // nodes have been added for duplicated endpoints
+    assertThat(newNodes.get(hostId4).getEndPoint()).isEqualTo(contactPoint2.getEndPoint());
+    assertThat(newNodes.get(hostId4).getHostId()).isEqualTo(hostId4);
+    assertThat(newNodes.get(hostId5).getEndPoint()).isEqualTo(endPoint3);
+    assertThat(newNodes.get(hostId5).getHostId()).isEqualTo(hostId5);
+    assertThat(result.events)
+        .containsExactlyInAnyOrder(
+            NodeStateEvent.added((DefaultNode) newNodes.get(hostId3)),
+            NodeStateEvent.added((DefaultNode) newNodes.get(hostId4)),
+            NodeStateEvent.added((DefaultNode) newNodes.get(hostId5)));
   }
 
   @Test

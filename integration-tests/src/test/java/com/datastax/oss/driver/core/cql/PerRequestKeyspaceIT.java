@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,8 +30,10 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.api.testinfra.CassandraRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
@@ -64,24 +68,27 @@ public class PerRequestKeyspaceIT {
 
   @Before
   public void setupSchema() {
-    sessionRule
-        .session()
-        .execute(
-            SimpleStatement.builder(
-                    "CREATE TABLE IF NOT EXISTS foo (k text, cc int, v int, PRIMARY KEY(k, cc))")
-                .setExecutionProfile(sessionRule.slowProfile())
-                .build());
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          sessionRule
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS foo (k text, cc int, v int, PRIMARY KEY(k, cc))")
+                      .setExecutionProfile(sessionRule.slowProfile())
+                      .build());
+        });
   }
 
   @Test
-  @CassandraRequirement(min = "2.2")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
   public void should_reject_simple_statement_with_keyspace_in_protocol_v4() {
     should_reject_statement_with_keyspace_in_protocol_v4(
         SimpleStatement.newInstance("SELECT * FROM foo").setKeyspace(sessionRule.keyspace()));
   }
 
   @Test
-  @CassandraRequirement(min = "2.2")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
   public void should_reject_batch_statement_with_explicit_keyspace_in_protocol_v4() {
     SimpleStatement statementWithoutKeyspace =
         SimpleStatement.newInstance(
@@ -94,7 +101,7 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "2.2")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
   public void should_reject_batch_statement_with_inferred_keyspace_in_protocol_v4() {
     SimpleStatement statementWithKeyspace =
         SimpleStatement.newInstance(
@@ -120,7 +127,7 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "4.0")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   public void should_execute_simple_statement_with_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -138,7 +145,7 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "4.0")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   public void should_execute_batch_with_explicit_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -162,7 +169,7 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "4.0")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   public void should_execute_batch_with_inferred_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -194,7 +201,7 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "4.0")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   public void should_prepare_statement_with_keyspace() {
     CqlSession session = sessionRule.session();
     PreparedStatement prepared =
@@ -214,30 +221,34 @@ public class PerRequestKeyspaceIT {
   }
 
   @Test
-  @CassandraRequirement(min = "4.0")
+  @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   public void should_reprepare_statement_with_keyspace_on_the_fly() {
     // Create a separate session because we don't want it to have a default keyspace
-    try (CqlSession session = SessionUtils.newSession(ccmRule)) {
-      executeDdl(
-          session,
-          String.format(
-              "CREATE TABLE IF NOT EXISTS %s.bar (k int primary key)", sessionRule.keyspace()));
-      PreparedStatement pst =
-          session.prepare(
-              SimpleStatement.newInstance("SELECT * FROM bar WHERE k=?")
-                  .setKeyspace(sessionRule.keyspace()));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          try (CqlSession session = SessionUtils.newSession(ccmRule)) {
+            executeDdl(
+                session,
+                String.format(
+                    "CREATE TABLE IF NOT EXISTS %s.bar (k int primary key)",
+                    sessionRule.keyspace()));
+            PreparedStatement pst =
+                session.prepare(
+                    SimpleStatement.newInstance("SELECT * FROM bar WHERE k=?")
+                        .setKeyspace(sessionRule.keyspace()));
 
-      // Drop and re-create the table to invalidate the prepared statement server side
-      executeDdl(session, String.format("DROP TABLE %s.bar", sessionRule.keyspace()));
-      executeDdl(
-          session,
-          String.format("CREATE TABLE %s.bar (k int primary key)", sessionRule.keyspace()));
-      assertThat(preparedStatementExistsOnServer(session, pst.getId())).isFalse();
+            // Drop and re-create the table to invalidate the prepared statement server side
+            executeDdl(session, String.format("DROP TABLE %s.bar", sessionRule.keyspace()));
+            executeDdl(
+                session,
+                String.format("CREATE TABLE %s.bar (k int primary key)", sessionRule.keyspace()));
+            assertThat(preparedStatementExistsOnServer(session, pst.getId())).isFalse();
 
-      // This will re-prepare on the fly
-      session.execute(pst.bind(0));
-      assertThat(preparedStatementExistsOnServer(session, pst.getId())).isTrue();
-    }
+            // This will re-prepare on the fly
+            session.execute(pst.bind(0));
+            assertThat(preparedStatementExistsOnServer(session, pst.getId())).isTrue();
+          }
+        });
   }
 
   private void executeDdl(CqlSession session, String query) {

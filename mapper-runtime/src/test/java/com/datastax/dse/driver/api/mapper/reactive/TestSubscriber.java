@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +16,8 @@
  * limitations under the License.
  */
 package com.datastax.dse.driver.api.mapper.reactive;
+
+import static org.assertj.core.api.Fail.fail;
 
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -68,6 +72,8 @@ public class TestSubscriber<T> implements Subscriber<T> {
   }
 
   public void awaitTermination() {
-    Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES);
+    if (!Uninterruptibles.awaitUninterruptibly(latch, 1, TimeUnit.MINUTES)) {
+      fail("subscriber not terminated");
+    }
   }
 }

@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -201,7 +203,10 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T0, T0})); // unhealthy
+    dsePolicy.responseTimes.put(
+        node1,
+        dsePolicy
+        .new NodeResponseRateSample(new AtomicLongArray(new long[] {T0, T0}))); // unhealthy
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
@@ -230,7 +235,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T1, T1})); // healthy
+    dsePolicy.responseTimes.put(
+        node1,
+        dsePolicy.new NodeResponseRateSample(new AtomicLongArray(new long[] {T1, T1}))); // healthy
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);

@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,6 +38,7 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.api.core.type.codec.registry.MutableCodecRegistry;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
@@ -76,35 +79,39 @@ public class CodecRegistryIT {
 
   @BeforeClass
   public static void createSchema() {
-    // table with simple primary key, single cell.
-    SESSION_RULE
-        .session()
-        .execute(
-            SimpleStatement.builder("CREATE TABLE IF NOT EXISTS test (k text primary key, v int)")
-                .setExecutionProfile(SESSION_RULE.slowProfile())
-                .build());
-    // table with map value
-    SESSION_RULE
-        .session()
-        .execute(
-            SimpleStatement.builder(
-                    "CREATE TABLE IF NOT EXISTS test2 (k0 text, k1 int, v map<int,text>, primary key (k0, k1))")
-                .setExecutionProfile(SESSION_RULE.slowProfile())
-                .build());
-    // table with UDT
-    SESSION_RULE
-        .session()
-        .execute(
-            SimpleStatement.builder("CREATE TYPE IF NOT EXISTS coordinates (x int, y int)")
-                .setExecutionProfile(SESSION_RULE.slowProfile())
-                .build());
-    SESSION_RULE
-        .session()
-        .execute(
-            SimpleStatement.builder(
-                    "CREATE TABLE IF NOT EXISTS test3 (k0 text, k1 int, v map<text,frozen<coordinates>>, primary key (k0, k1))")
-                .setExecutionProfile(SESSION_RULE.slowProfile())
-                .build());
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          // table with simple primary key, single cell.
+          SESSION_RULE
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test (k text primary key, v int)")
+                      .setExecutionProfile(SESSION_RULE.slowProfile())
+                      .build());
+          // table with map value
+          SESSION_RULE
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test2 (k0 text, k1 int, v map<int,text>, primary key (k0, k1))")
+                      .setExecutionProfile(SESSION_RULE.slowProfile())
+                      .build());
+          // table with UDT
+          SESSION_RULE
+              .session()
+              .execute(
+                  SimpleStatement.builder("CREATE TYPE IF NOT EXISTS coordinates (x int, y int)")
+                      .setExecutionProfile(SESSION_RULE.slowProfile())
+                      .build());
+          SESSION_RULE
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test3 (k0 text, k1 int, v map<text,frozen<coordinates>>, primary key (k0, k1))")
+                      .setExecutionProfile(SESSION_RULE.slowProfile())
+                      .build());
+        });
   }
 
   // A simple codec that allows float values to be used for cassandra int column type.

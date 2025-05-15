@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -233,6 +235,12 @@ public class TypedDriverOption<ValueT> {
   /** The keystore password. */
   public static final TypedDriverOption<String> SSL_KEYSTORE_PASSWORD =
       new TypedDriverOption<>(DefaultDriverOption.SSL_KEYSTORE_PASSWORD, GenericType.STRING);
+
+  /** The duration between attempts to reload the keystore. */
+  public static final TypedDriverOption<Duration> SSL_KEYSTORE_RELOAD_INTERVAL =
+      new TypedDriverOption<>(
+          DefaultDriverOption.SSL_KEYSTORE_RELOAD_INTERVAL, GenericType.DURATION);
+
   /** The location of the truststore file. */
   public static final TypedDriverOption<String> SSL_TRUSTSTORE_PATH =
       new TypedDriverOption<>(DefaultDriverOption.SSL_TRUSTSTORE_PATH, GenericType.STRING);
@@ -388,6 +396,10 @@ public class TypedDriverOption<ValueT> {
   /** The consistency level to use for trace queries. */
   public static final TypedDriverOption<String> REQUEST_TRACE_CONSISTENCY =
       new TypedDriverOption<>(DefaultDriverOption.REQUEST_TRACE_CONSISTENCY, GenericType.STRING);
+  /** Whether or not to publish aggregable histogram for metrics */
+  public static final TypedDriverOption<Boolean> METRICS_GENERATE_AGGREGABLE_HISTOGRAMS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.METRICS_GENERATE_AGGREGABLE_HISTOGRAMS, GenericType.BOOLEAN);
   /** List of enabled session-level metrics. */
   public static final TypedDriverOption<List<String>> METRICS_SESSION_ENABLED =
       new TypedDriverOption<>(
@@ -409,6 +421,12 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.METRICS_SESSION_CQL_REQUESTS_SLO,
           GenericType.listOf(GenericType.DURATION));
+  /** Optional pre-defined percentile of cql requests to publish, as a list of percentiles . */
+  public static final TypedDriverOption<List<Double>>
+      METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DefaultDriverOption.METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
   /**
    * The number of significant decimal digits to which internal structures will maintain for
    * requests.
@@ -433,6 +451,12 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.METRICS_SESSION_THROTTLING_SLO,
           GenericType.listOf(GenericType.DURATION));
+  /** Optional pre-defined percentile of throttling delay to publish, as a list of percentiles . */
+  public static final TypedDriverOption<List<Double>>
+      METRICS_SESSION_THROTTLING_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DefaultDriverOption.METRICS_SESSION_THROTTLING_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
   /**
    * The number of significant decimal digits to which internal structures will maintain for
    * throttling.
@@ -457,6 +481,12 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_SLO,
           GenericType.listOf(GenericType.DURATION));
+  /** Optional pre-defined percentile of node cql messages to publish, as a list of percentiles . */
+  public static final TypedDriverOption<List<Double>>
+      METRICS_NODE_CQL_MESSAGES_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
   /**
    * The number of significant decimal digits to which internal structures will maintain for
    * requests.
@@ -621,7 +651,7 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> NETTY_DAEMON =
       new TypedDriverOption<>(DefaultDriverOption.NETTY_DAEMON, GenericType.BOOLEAN);
   /**
-   * The location of the cloud secure bundle used to connect to Datastax Apache Cassandra as a
+   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
    * service.
    */
   public static final TypedDriverOption<String> CLOUD_SECURE_CONNECT_BUNDLE =
@@ -705,6 +735,15 @@ public class TypedDriverOption<ValueT> {
               DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO,
               GenericType.listOf(GenericType.DURATION));
   /**
+   * Optional pre-defined percentile of continuous paging cql requests to publish, as a list of
+   * percentiles .
+   */
+  public static final TypedDriverOption<List<Double>>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
+  /**
    * The number of significant decimal digits to which internal structures will maintain for
    * continuous requests.
    */
@@ -778,6 +817,12 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO,
           GenericType.listOf(GenericType.DURATION));
+  /** Optional pre-defined percentile of graph requests to publish, as a list of percentiles . */
+  public static final TypedDriverOption<List<Double>>
+      METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
   /**
    * The number of significant decimal digits to which internal structures will maintain for graph
    * requests.
@@ -802,6 +847,14 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO,
           GenericType.listOf(GenericType.DURATION));
+  /**
+   * Optional pre-defined percentile of node graph requests to publish, as a list of percentiles .
+   */
+  public static final TypedDriverOption<List<Double>>
+      METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
   /**
    * The number of significant decimal digits to which internal structures will maintain for graph
    * requests.
@@ -842,6 +895,16 @@ public class TypedDriverOption<ValueT> {
           new TypedDriverOption<>(
               DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS,
               GenericType.BOOLEAN);
+
+  /**
+   * Ordered preference list of remote dcs optionally supplied for automatic failover and included
+   * in query plan. This feature is enabled only when max-nodes-per-remote-dc is greater than 0.
+   */
+  public static final TypedDriverOption<List<String>>
+      LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS =
+          new TypedDriverOption<>(
+              DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS,
+              GenericType.listOf(String.class));
 
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {

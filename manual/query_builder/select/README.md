@@ -1,3 +1,22 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## SELECT
 
 Start your SELECT with the `selectFrom` method in [QueryBuilder]. There are several variants
@@ -368,6 +387,29 @@ selectFrom("sensor_data")
 // SELECT reading FROM sensor_data WHERE id=? ORDER BY date DESC
 ```
 
+Vector Search:
+
+```java
+
+import com.datastax.oss.driver.api.core.data.CqlVector;
+
+selectFrom("foo")
+    .all()
+    .where(Relation.column("k").isEqualTo(literal(1)))
+    .orderByAnnOf("c1", CqlVector.newInstance(0.1, 0.2, 0.3));
+// SELECT * FROM foo WHERE k=1 ORDER BY c1 ANN OF [0.1, 0.2, 0.3]
+
+selectFrom("cycling", "comments_vs")
+    .column("comment")
+    .function(
+        "similarity_cosine",
+        Selector.column("comment_vector"),
+        literal(CqlVector.newInstance(0.2, 0.15, 0.3, 0.2, 0.05)))
+    .orderByAnnOf("comment_vector", CqlVector.newInstance(0.1, 0.15, 0.3, 0.12, 0.05))
+    .limit(1);
+// SELECT comment,similarity_cosine(comment_vector,[0.2, 0.15, 0.3, 0.2, 0.05]) FROM cycling.comments_vs ORDER BY comment_vector ANN OF [0.1, 0.15, 0.3, 0.12, 0.05] LIMIT 1
+```
+
 Limits:
 
 ```java
@@ -391,5 +433,5 @@ selectFrom("user").all().allowFiltering();
 // SELECT * FROM user ALLOW FILTERING
 ```
 
-[QueryBuilder]: https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/api/querybuilder/QueryBuilder.html
-[Selector]:     https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/api/querybuilder/select/Selector.html
+[QueryBuilder]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/querybuilder/QueryBuilder.html
+[Selector]:     https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/querybuilder/select/Selector.html

@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -105,5 +107,11 @@ public class AlterTableTest {
   public void should_generate_alter_table_with_no_compression() {
     assertThat(alterTable("bar").withNoCompression())
         .hasCql("ALTER TABLE bar WITH compression={'sstable_compression':''}");
+  }
+
+  @Test
+  public void should_generate_alter_table_with_vector() {
+    assertThat(alterTable("bar").alterColumn("v", DataTypes.vectorOf(DataTypes.FLOAT, 3)))
+        .hasCql("ALTER TABLE bar ALTER v TYPE vector<float, 3>");
   }
 }

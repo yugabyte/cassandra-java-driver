@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,8 +30,10 @@ import com.datastax.dse.driver.api.core.graph.__;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException;
-import com.datastax.oss.driver.api.testinfra.DseRequirement;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -583,7 +587,7 @@ public abstract class GraphTraversalRemoteITBase {
    * @test_category dse:graph
    */
   @Test
-  @DseRequirement(min = "5.1.0")
+  @BackendRequirement(type = BackendType.DSE, minInclusive = "5.1.0")
   public void should_fail_future_returned_from_promise_on_query_error() throws Exception {
     CompletableFuture<?> future =
         graphTraversalSource().V("invalidid").peerPressure().promise(Traversal::next);
@@ -640,9 +644,9 @@ public abstract class GraphTraversalRemoteITBase {
    */
   @Test
   public void should_return_correct_results_when_bulked() {
-    Optional<Version> dseVersion = ccmRule().getCcmBridge().getDseVersion();
     Assumptions.assumeThat(
-            dseVersion.isPresent() && dseVersion.get().compareTo(Version.parse("5.1.2")) > 0)
+            CcmBridge.isDistributionOf(
+                BackendType.DSE, (dist, cass) -> dist.compareTo(Version.parse("5.1.2")) > 0))
         .isTrue();
 
     List<String> results = graphTraversalSource().E().label().barrier().toList();

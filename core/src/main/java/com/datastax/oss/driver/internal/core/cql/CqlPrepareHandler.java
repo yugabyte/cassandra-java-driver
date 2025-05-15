@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -90,6 +92,7 @@ public class CqlPrepareHandler implements Throttled {
   private final Timeout scheduledTimeout;
   private final RequestThrottler throttler;
   private final Boolean prepareOnAllNodes;
+  private final DriverExecutionProfile executionProfile;
   private volatile InitialPrepareCallback initialCallback;
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
@@ -109,7 +112,7 @@ public class CqlPrepareHandler implements Throttled {
     this.initialRequest = request;
     this.session = session;
     this.context = context;
-    DriverExecutionProfile executionProfile = Conversions.resolveExecutionProfile(request, context);
+    executionProfile = Conversions.resolveExecutionProfile(request, context);
     this.queryPlan =
         context
             .getLoadBalancingPolicyWrapper()
@@ -121,6 +124,7 @@ public class CqlPrepareHandler implements Throttled {
           try {
             if (t instanceof CancellationException) {
               cancelTimeout();
+              context.getRequestThrottler().signalCancel(this);
             }
           } catch (Throwable t2) {
             Loggers.warnWithException(LOG, "[{}] Uncaught exception", logPrefix, t2);
@@ -129,7 +133,7 @@ public class CqlPrepareHandler implements Throttled {
         });
     this.timer = context.getNettyOptions().getTimer();
 
-    Duration timeout = Conversions.resolveRequestTimeout(request, context);
+    Duration timeout = Conversions.resolveRequestTimeout(request, executionProfile);
     this.scheduledTimeout = scheduleTimeout(timeout);
     this.prepareOnAllNodes = executionProfile.getBoolean(DefaultDriverOption.PREPARE_ON_ALL_NODES);
 
@@ -297,7 +301,7 @@ public class CqlPrepareHandler implements Throttled {
               false,
               toPrepareMessage(request),
               request.getCustomPayload(),
-              Conversions.resolveRequestTimeout(request, context),
+              Conversions.resolveRequestTimeout(request, executionProfile),
               throttler,
               session.getMetricUpdater(),
               logPrefix);
@@ -430,7 +434,7 @@ public class CqlPrepareHandler implements Throttled {
       } else {
         // Because prepare requests are known to always be idempotent, we call the retry policy
         // directly, without checking the flag.
-        RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(request, context);
+        RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
         RetryVerdict verdict = retryPolicy.onErrorResponseVerdict(request, error, retryCount);
         processRetryVerdict(verdict, error);
       }
@@ -468,7 +472,7 @@ public class CqlPrepareHandler implements Throttled {
       LOG.trace("[{}] Request failure, processing: {}", logPrefix, error.toString());
       RetryVerdict verdict;
       try {
-        RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(request, context);
+        RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
         verdict = retryPolicy.onRequestAbortedVerdict(request, error, retryCount);
       } catch (Throwable cause) {
         setFinalError(

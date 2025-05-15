@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright DataStax, Inc.
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,11 +23,11 @@
   <parent>
     <groupId>com.yugabyte</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.15.0-yb-1-SNAPSHOT</version>
+    <version>4.19.0-yb-1-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-integration-tests</artifactId>
   <packaging>jar</packaging>
-  <name>DataStax Java driver for Apache Cassandra(R) - integration tests</name>
+  <name>Apache Cassandra Java Driver - integration tests</name>
   <properties>
     <skipITs>false</skipITs>
     <skipParallelizableITs>${skipITs}</skipParallelizableITs>
@@ -79,6 +81,11 @@
     <dependency>
       <groupId>com.yugabyte</groupId>
       <artifactId>java-driver-metrics-microprofile</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -229,11 +236,14 @@
               <goal>integration-test</goal>
             </goals>
             <configuration>
+              <jvm>${testing.jvm}/bin/java</jvm>
               <groups>com.datastax.oss.driver.categories.ParallelizableTests</groups>
               <parallel>classes</parallel>
               <threadCountClasses>8</threadCountClasses>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-parallelized.xml</summaryFile>
               <skipITs>${skipParallelizableITs}</skipITs>
+              <argLine>${blockhound.argline}</argLine>
+              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>
@@ -245,6 +255,8 @@
               <excludedGroups>com.datastax.oss.driver.categories.ParallelizableTests, com.datastax.oss.driver.categories.IsolatedTests</excludedGroups>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-serial.xml</summaryFile>
               <skipITs>${skipSerialITs}</skipITs>
+              <argLine>${blockhound.argline}</argLine>
+              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>
@@ -260,6 +272,7 @@
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-isolated.xml</summaryFile>
               <skipITs>${skipIsolatedITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
+              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>

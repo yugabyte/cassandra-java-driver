@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -254,8 +256,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     private final Reconnection reconnection;
     private DriverChannelOptions channelOptions;
     // The last events received for each node
-    private final Map<Node, DistanceEvent> lastDistanceEvents = new WeakHashMap<>();
-    private final Map<Node, NodeStateEvent> lastStateEvents = new WeakHashMap<>();
+    private final Map<Node, NodeDistance> lastNodeDistance = new WeakHashMap<>();
+    private final Map<Node, NodeState> lastNodeState = new WeakHashMap<>();
 
     private SingleThreaded(InternalDriverContext context) {
       this.context = context;
@@ -367,8 +369,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             .whenCompleteAsync(
                 (channel, error) -> {
                   try {
-                    DistanceEvent lastDistanceEvent = lastDistanceEvents.get(node);
-                    NodeStateEvent lastStateEvent = lastStateEvents.get(node);
+                    NodeDistance lastDistance = lastNodeDistance.get(node);
+                    NodeState lastState = lastNodeState.get(node);
                     if (error != null) {
                       if (closeWasCalled || initFuture.isCancelled()) {
                         onSuccess.run(); // abort, we don't really care about the result
@@ -407,8 +409,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           channel);
                       channel.forceClose();
                       onSuccess.run();
-                    } else if (lastDistanceEvent != null
-                        && lastDistanceEvent.distance == NodeDistance.IGNORED) {
+                    } else if (lastDistance == NodeDistance.IGNORED) {
                       LOG.debug(
                           "[{}] New channel opened ({}) but node became ignored, "
                               + "closing and trying next node",
@@ -416,9 +417,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           channel);
                       channel.forceClose();
                       connect(nodes, errors, onSuccess, onFailure);
-                    } else if (lastStateEvent != null
-                        && (lastStateEvent.newState == null /*(removed)*/
-                            || lastStateEvent.newState == NodeState.FORCED_DOWN)) {
+                    } else if (lastNodeState.containsKey(node)
+                        && (lastState == null /*(removed)*/
+                            || lastState == NodeState.FORCED_DOWN)) {
                       LOG.debug(
                           "[{}] New channel opened ({}) but node was removed or forced down, "
                               + "closing and trying next node",
@@ -535,7 +536,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
     private void onDistanceEvent(DistanceEvent event) {
       assert adminExecutor.inEventLoop();
-      this.lastDistanceEvents.put(event.node, event);
+      this.lastNodeDistance.put(event.node, event.distance);
       if (event.distance == NodeDistance.IGNORED
           && channel != null
           && !channel.closeFuture().isDone()
@@ -550,7 +551,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
     private void onStateEvent(NodeStateEvent event) {
       assert adminExecutor.inEventLoop();
-      this.lastStateEvents.put(event.node, event);
+      this.lastNodeState.put(event.node, event.newState);
       if ((event.newState == null /*(removed)*/ || event.newState == NodeState.FORCED_DOWN)
           && channel != null
           && !channel.closeFuture().isDone()

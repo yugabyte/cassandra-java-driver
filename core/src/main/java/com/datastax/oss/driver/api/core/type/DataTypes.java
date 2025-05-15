@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +17,15 @@
  */
 package com.datastax.oss.driver.api.core.type;
 
+import com.datastax.oss.driver.api.core.detach.AttachmentPoint;
 import com.datastax.oss.driver.api.core.detach.Detachable;
+import com.datastax.oss.driver.internal.core.metadata.schema.parsing.DataTypeClassNameParser;
 import com.datastax.oss.driver.internal.core.type.DefaultCustomType;
 import com.datastax.oss.driver.internal.core.type.DefaultListType;
 import com.datastax.oss.driver.internal.core.type.DefaultMapType;
 import com.datastax.oss.driver.internal.core.type.DefaultSetType;
 import com.datastax.oss.driver.internal.core.type.DefaultTupleType;
+import com.datastax.oss.driver.internal.core.type.DefaultVectorType;
 import com.datastax.oss.driver.internal.core.type.PrimitiveType;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -52,14 +57,18 @@ public class DataTypes {
   public static final DataType DURATION = new PrimitiveType(ProtocolConstants.DataType.DURATION);
   public static final DataType JSONB = new PrimitiveType(ProtocolConstants.DataType.JSONB);
 
+  private static final DataTypeClassNameParser classNameParser = new DataTypeClassNameParser();
+
   @NonNull
   public static DataType custom(@NonNull String className) {
+
     // In protocol v4, duration is implemented as a custom type
-    if ("org.apache.cassandra.db.marshal.DurationType".equals(className)) {
-      return DURATION;
-    } else {
-      return new DefaultCustomType(className);
-    }
+    if (className.equals("org.apache.cassandra.db.marshal.DurationType")) return DURATION;
+
+    /* Vector support is currently implemented as a custom type but is also parameterized */
+    if (className.startsWith(DefaultVectorType.VECTOR_CLASS_NAME))
+      return classNameParser.parse(className, AttachmentPoint.NONE);
+    return new DefaultCustomType(className);
   }
 
   @NonNull
@@ -118,5 +127,9 @@ public class DataTypes {
   @NonNull
   public static TupleType tupleOf(@NonNull DataType... componentTypes) {
     return new DefaultTupleType(ImmutableList.copyOf(Arrays.asList(componentTypes)));
+  }
+
+  public static VectorType vectorOf(DataType subtype, int dimensions) {
+    return new DefaultVectorType(subtype, dimensions);
   }
 }
