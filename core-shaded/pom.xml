@@ -145,13 +145,18 @@
     </resources>
     <plugins>
       <plugin>
-        <artifactId>maven-javadoc-plugin</artifactId>
+        <artifactId>maven-jar-plugin</artifactId>
         <executions>
           <execution>
-            <id>attach-javadoc</id>
+            <id>empty-javadoc</id>
+            <phase>package</phase>
             <goals>
               <goal>jar</goal>
             </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.basedir}/src/main/javadoc</classesDirectory>
+            </configuration>
           </execution>
         </executions>
       </plugin>
