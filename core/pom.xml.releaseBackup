@@ -25,9 +25,9 @@
     <artifactId>java-driver-parent</artifactId>
     <version>4.19.0-yb-2-SNAPSHOT</version>
   </parent>
-  <artifactId>java-driver-mapper-runtime</artifactId>
-  <packaging>bundle</packaging>
-  <name>Apache Cassandra Java Driver - object mapper runtime</name>
+  <artifactId>java-driver-core</artifactId>
+  <!-- <packaging>bundle</packaging> -->
+  <name>Java driver for YugabyteDB YCQL - core</name>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -41,14 +41,80 @@
   </dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-core</artifactId>
-      <version>${project.version}</version>
+      <groupId>com.yugabyte</groupId>
+      <artifactId>native-protocol</artifactId>
     </dependency>
     <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-query-builder</artifactId>
-      <version>${project.version}</version>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-handler</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.yugabyte</groupId>
+      <artifactId>java-driver-guava-shaded</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.typesafe</groupId>
+      <artifactId>config</artifactId>
+    </dependency>
+    <!--
+      JNR dependencies are used for native system calls that improve the driver's accuracy, for
+      example using a microsecond-precision clock for query timestamps, and including the PID in
+      UUID generation.
+      These dependencies are recommended but not mandatory, the driver will fall back to pure-Java
+      implementations if they are not available at runtime.
+    -->
+    <dependency>
+      <groupId>com.github.jnr</groupId>
+      <artifactId>jnr-posix</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.lz4</groupId>
+      <artifactId>lz4-java</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.hdrhistogram</groupId>
+      <artifactId>HdrHistogram</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.esri.geometry</groupId>
+      <artifactId>esri-geometry-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tinkerpop</groupId>
+      <artifactId>gremlin-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.tinkerpop</groupId>
+      <artifactId>tinkergraph-gremlin</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.reactivestreams</groupId>
+      <artifactId>reactive-streams</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
@@ -61,28 +127,48 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.graalvm.sdk</groupId>
+      <artifactId>graal-sdk</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.graalvm.nativeimage</groupId>
+      <artifactId>svm</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor.tools</groupId>
+      <artifactId>blockhound</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.graalvm.sdk</groupId>
+      <artifactId>graal-sdk</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.graalvm.nativeimage</groupId>
+      <artifactId>svm</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor.tools</groupId>
+      <artifactId>blockhound</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.reactivestreams</groupId>
-      <artifactId>reactive-streams-tck</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.reactivex.rxjava2</groupId>
-      <artifactId>rxjava</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
+      <groupId>com.tngtech.java</groupId>
+      <artifactId>junit-dataprovider</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -91,16 +177,51 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.yugabyte</groupId>
-      <artifactId>java-driver-core</artifactId>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>io.reactivex.rxjava2</groupId>
+      <artifactId>rxjava</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.reactivestreams</groupId>
+      <artifactId>reactive-streams-tck</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.tomakehurst</groupId>
+      <artifactId>wiremock</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <build>
     <resources>
       <resource>
         <directory>src/main/resources</directory>
+        <includes>
+          <include>com/datastax/oss/driver/Driver.properties</include>
+        </includes>
+        <filtering>true</filtering>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <excludes>
+          <exclude>com/datastax/oss/driver/Driver.properties</exclude>
+        </excludes>
+        <filtering>false</filtering>
       </resource>
       <resource>
         <directory>${project.basedir}/..</directory>
@@ -134,17 +255,45 @@
         <configuration>
           <archive>
             <manifestEntries>
-              <Automatic-Module-Name>com.datastax.oss.driver.mapper.runtime</Automatic-Module-Name>
+              <Automatic-Module-Name>com.datastax.oss.driver.core</Automatic-Module-Name>
             </manifestEntries>
           </archive>
         </configuration>
+        <executions>
+          <execution>
+            <id>javadoc-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+            </configuration>
+          </execution>
+          <execution>
+            <id>test-jar</id>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+            <configuration>
+              <excludes>
+                <exclude>logback-test.xml</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <jvm>${testing.jvm}/bin/java</jvm>
+          <argLine>${mockitoopens.argline}</argLine>
           <threadCount>1</threadCount>
           <properties>
+            <property>
+              <name>listener</name>
+              <value>com.datastax.oss.driver.DriverRunListener</value>
+            </property>
             <!-- tell TestNG not to run jUnit tests -->
             <property>
               <name>junit</name>
@@ -180,7 +329,7 @@
             </goals>
             <configuration>
               <instructions>
-                <Bundle-SymbolicName>com.datastax.oss.driver.mapper-runtime</Bundle-SymbolicName>
+                <Bundle-SymbolicName>com.datastax.oss.driver.core</Bundle-SymbolicName>
                 <!--
                 Allow importing code from other packages
                 (so reflection-based loading of policies works)
@@ -190,16 +339,20 @@
                   <!--
                   1) Don't include the packages below because they contain annotations only and are
                   not required at runtime.
-                  !net.jcip.annotations.*, !edu.umd.cs.findbugs.annotations.*,
-                  2) Use resolution:=optional for optional dependencies in order to make it possible
+                  -->!net.jcip.annotations.*, !edu.umd.cs.findbugs.annotations.*,
+                  <!--
+                  2) Don't include GraalVM.
+                  -->!org.graalvm.*, !com.oracle.svm.*,
+                  <!--
+                  3) Use resolution:=optional for optional dependencies in order to make it possible
                   to use the driver without such dependencies in an OSGi environment, as long as
                   the application does not attempt to access their packages.
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  -->org.reactivestreams.*;resolution:=optional, *
+                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional, org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, org.javatuples.*;resolution:=optional, reactor.blockhound.*;resolution:=optional, *
                 </Import-Package>
-                <Export-Package>com..*.driver.*.mapper.*</Export-Package>
+                <Export-Package>com.datastax.oss.driver.*.core.*, com.datastax.dse.driver.*.core.*</Export-Package>
               </instructions>
             </configuration>
           </execution>
@@ -218,7 +371,7 @@
               <includeScope>runtime</includeScope>
               <outputScope>true</outputScope>
               <excludeGroupIds>com.datastax.cassandra,com.datastax.dse</excludeGroupIds>
-              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/mapper/deps.txt</outputFile>
+              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/deps.txt</outputFile>
             </configuration>
           </execution>
         </executions>
