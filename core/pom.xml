@@ -261,6 +261,16 @@
         </configuration>
         <executions>
           <execution>
+            <id>javadoc-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+            </configuration>
+          </execution>
+          <execution>
             <id>test-jar</id>
             <goals>
               <goal>test-jar</goal>
