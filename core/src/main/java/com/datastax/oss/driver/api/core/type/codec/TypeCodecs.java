@@ -45,6 +45,7 @@ import com.datastax.oss.driver.internal.core.type.codec.TimeUuidCodec;
 import com.datastax.oss.driver.internal.core.type.codec.TimestampCodec;
 import com.datastax.oss.driver.internal.core.type.codec.TinyIntCodec;
 import com.datastax.oss.driver.internal.core.type.codec.TupleCodec;
+import com.datastax.oss.driver.internal.core.type.codec.UInt32Codec;
 import com.datastax.oss.driver.internal.core.type.codec.UdtCodec;
 import com.datastax.oss.driver.internal.core.type.codec.UuidCodec;
 import com.datastax.oss.driver.internal.core.type.codec.VarIntCodec;
@@ -90,6 +91,9 @@ public class TypeCodecs {
 
   /** The default codec that maps CQL type {@code int} to Java's {@code int}. */
   public static final PrimitiveIntCodec INT = new IntCodec();
+
+  /** The default codec that maps CQL type {@code uint32} to Java's {@code long}. */
+  public static final PrimitiveLongCodec UINT32 = new UInt32Codec();
 
   /** The default codec that maps CQL type {@code bigint} to Java's {@code long}. */
   public static final PrimitiveLongCodec BIGINT = new BigIntCodec();

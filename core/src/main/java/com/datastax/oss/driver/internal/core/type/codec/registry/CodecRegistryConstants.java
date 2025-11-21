@@ -39,6 +39,7 @@ public class CodecRegistryConstants {
         TypeCodecs.TIMEUUID,
         TypeCodecs.TIMESTAMP,
         TypeCodecs.INT,
+        TypeCodecs.UINT32,
         TypeCodecs.BIGINT,
         TypeCodecs.BLOB,
         TypeCodecs.DOUBLE,
