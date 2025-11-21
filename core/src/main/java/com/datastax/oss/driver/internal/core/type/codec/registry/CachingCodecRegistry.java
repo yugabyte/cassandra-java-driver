@@ -242,9 +242,15 @@ public abstract class CachingCodecRegistry implements MutableCodecRegistry {
     LOG.trace("[{}] Looking up codec for CQL type {} and object {}", logPrefix, cqlType, value);
 
     TypeCodec<?> primitiveCodec = primitiveCodecsByCode.get(cqlType.getProtocolCode());
-    if (primitiveCodec != null && primitiveCodec.accepts(value)) {
-      LOG.trace("[{}] Found matching primitive codec {}", logPrefix, primitiveCodec);
-      return uncheckedCast(primitiveCodec);
+    if (primitiveCodec != null) {
+      // For primitive codecs, check accepts(value) first, but if it returns false,
+      // still use the codec if the value's Java type matches the codec's Java type.
+      // This allows codecs like UInt32Codec to reject value-only lookups while
+      // still working when the CQL type is explicitly provided.
+      if (primitiveCodec.accepts(value) || primitiveCodec.accepts(value.getClass())) {
+        LOG.trace("[{}] Found matching primitive codec {}", logPrefix, primitiveCodec);
+        return uncheckedCast(primitiveCodec);
+      }
     }
     for (TypeCodec<?> userCodec : userCodecs) {
       if (userCodec.accepts(cqlType) && userCodec.accepts(value)) {

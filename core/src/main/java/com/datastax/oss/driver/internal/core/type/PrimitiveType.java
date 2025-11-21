@@ -97,6 +97,8 @@ public class PrimitiveType implements DataType, Serializable {
         return "FLOAT";
       case ProtocolConstants.DataType.INT:
         return "INT";
+      case ProtocolConstants.DataType.UINT32:
+        return "UINT32";
       case ProtocolConstants.DataType.TIMESTAMP:
         return "TIMESTAMP";
       case ProtocolConstants.DataType.UUID:

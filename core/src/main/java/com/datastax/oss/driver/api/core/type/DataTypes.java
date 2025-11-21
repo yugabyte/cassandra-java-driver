@@ -51,6 +51,7 @@ public class DataTypes {
   public static final DataType TINYINT = new PrimitiveType(ProtocolConstants.DataType.TINYINT);
   public static final DataType DURATION = new PrimitiveType(ProtocolConstants.DataType.DURATION);
   public static final DataType JSONB = new PrimitiveType(ProtocolConstants.DataType.JSONB);
+  public static final DataType UINT32 = new PrimitiveType(ProtocolConstants.DataType.UINT32);
 
   @NonNull
   public static DataType custom(@NonNull String className) {

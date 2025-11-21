@@ -41,6 +41,7 @@
     <dependency>
       <groupId>com.yugabyte</groupId>
       <artifactId>native-protocol</artifactId>
+      <version>1.5.1-yb-3</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
