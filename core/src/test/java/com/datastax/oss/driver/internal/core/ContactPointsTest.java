@@ -171,6 +171,43 @@ public class ContactPointsTest {
     assertLog(Level.WARN, "Duplicate contact point /127.0.0.1:9042");
   }
 
+  @Test
+  public void should_re_resolve_host_name_contact_points() throws UnknownHostException {
+    // Given: a contact point provided as a host name (resolved, or not, at startup)
+    Set<EndPoint> provided =
+        ImmutableSet.of(
+            new DefaultEndPoint(new InetSocketAddress("localhost", 9042)),
+            new DefaultEndPoint(InetSocketAddress.createUnresolved("localhost", 9043)));
+
+    // When
+    Set<EndPoint> endPoints = ContactPoints.reResolve(provided);
+
+    // Then: one endpoint per address DNS returns now, on the original ports
+    int localhostAddresses = InetAddress.getAllByName("localhost").length;
+    assertThat(endPoints).hasSize(2 * localhostAddresses);
+    for (InetAddress address : InetAddress.getAllByName("localhost")) {
+      assertThat(endPoints)
+          .contains(
+              new DefaultEndPoint(new InetSocketAddress(address, 9042)),
+              new DefaultEndPoint(new InetSocketAddress(address, 9043)));
+    }
+  }
+
+  @Test
+  public void should_not_re_resolve_ip_literal_contact_points() {
+    // Given
+    Set<EndPoint> provided =
+        ImmutableSet.of(
+            new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)),
+            new DefaultEndPoint(InetSocketAddress.createUnresolved("::1", 9042)));
+
+    // When
+    Set<EndPoint> endPoints = ContactPoints.reResolve(provided);
+
+    // Then
+    assertThat(endPoints).isEmpty();
+  }
+
   private void assertLog(Level level, String message) {
     verify(appender, atLeast(1)).doAppend(loggingEventCaptor.capture());
     Iterable<ILoggingEvent> logs =

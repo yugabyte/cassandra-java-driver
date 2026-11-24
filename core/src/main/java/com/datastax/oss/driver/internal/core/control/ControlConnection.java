@@ -22,13 +22,16 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.internal.core.ContactPoints;
 import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -49,12 +52,15 @@ import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -371,13 +377,106 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             result.complete(true);
             onSuccessfulReconnect();
           },
-          error -> result.complete(false));
+          error -> {
+            if (initFuture.isDone()
+                && context
+                    .getConfig()
+                    .getDefaultProfile()
+                    .getBoolean(DefaultDriverOption.RE_RESOLVE_CONTACT_POINTS, true)) {
+              tryReResolvedContactPoints(error, result);
+            } else {
+              result.complete(false);
+            }
+          });
       return result;
+    }
+
+    /**
+     * YugabyteDB: every node of the query plan failed (or the plan was empty because every node is
+     * down). On Kubernetes all pods may have been replaced with new IPs before we learned any of
+     * them, but the contact points' host names still resolve to the current pods. Look them up
+     * again and try the addresses we have not just tried. On success, onSuccessfulReconnect()
+     * refreshes the node list through the new channel, which fixes every node's address.
+     *
+     * <p>The throwaway nodes used to connect are not part of the metadata, so no ChannelEvent is
+     * fired for them (see {@link #connect(Queue, List, boolean, Runnable, Consumer)}).
+     */
+    private void tryReResolvedContactPoints(Throwable error, CompletableFuture<Boolean> result) {
+      Set<EndPoint> attempted = new HashSet<>();
+      if (error instanceof AllNodesFailedException) {
+        for (Node node : ((AllNodesFailedException) error).getAllErrors().keySet()) {
+          attempted.add(node.getEndPoint());
+        }
+      }
+      Set<EndPoint> provided = context.getMetadataManager().getProvidedContactPoints();
+      if (provided.isEmpty()) {
+        result.complete(false);
+        return;
+      }
+      // DNS lookups can block for a while if the resolver is slow: keep them off the admin thread.
+      CompletableFuture.supplyAsync(() -> ContactPoints.reResolve(provided))
+          .whenCompleteAsync(
+              (resolved, lookupError) -> {
+                if (lookupError != null || closeWasCalled) {
+                  result.complete(false);
+                  return;
+                }
+                try {
+                  Queue<Node> candidates = new ArrayDeque<>();
+                  for (EndPoint endPoint : resolved) {
+                    if (!attempted.contains(endPoint)) {
+                      candidates.add(new DefaultNode(endPoint, context));
+                    }
+                  }
+                  if (candidates.isEmpty()) {
+                    result.complete(false);
+                    return;
+                  }
+                  LOG.info(
+                      "[{}] Could not reach any known node, "
+                          + "trying contact points re-resolved from DNS: {}",
+                      logPrefix,
+                      candidates);
+                  connect(
+                      candidates,
+                      null,
+                      false,
+                      () -> {
+                        result.complete(true);
+                        onSuccessfulReconnect();
+                      },
+                      e -> result.complete(false));
+                } catch (Throwable t) {
+                  // Complete the attempt in any case, otherwise the reconnection would never retry.
+                  Loggers.warnWithException(
+                      LOG,
+                      "[{}] Unexpected error while trying re-resolved contact points",
+                      logPrefix,
+                      t);
+                  result.complete(false);
+                }
+              },
+              adminExecutor);
     }
 
     private void connect(
         Queue<Node> nodes,
         List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure) {
+      connect(nodes, errors, true, onSuccess, onFailure);
+    }
+
+    /**
+     * @param fireEvents whether to fire ChannelEvents for the nodes. False for throwaway nodes that
+     *     are not in the metadata (re-resolved contact points): NodeStateManager would mark them
+     *     UP, the load balancing policy would then mark them IGNORED (no datacenter), and the
+     *     control connection would immediately reconnect away from them.
+     */
+    private void connect(
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        boolean fireEvents,
         Runnable onSuccess,
         Consumer<Throwable> onFailure) {
       assert adminExecutor.inEventLoop();
@@ -422,8 +521,10 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                         List<Entry<Node, Throwable>> newErrors =
                             (errors == null) ? new ArrayList<>() : errors;
                         newErrors.add(new SimpleEntry<>(node, error));
-                        context.getEventBus().fire(ChannelEvent.controlConnectionFailed(node));
-                        connect(nodes, newErrors, onSuccess, onFailure);
+                        if (fireEvents) {
+                          context.getEventBus().fire(ChannelEvent.controlConnectionFailed(node));
+                        }
+                        connect(nodes, newErrors, fireEvents, onSuccess, onFailure);
                       }
                     } else if (closeWasCalled || initFuture.isCancelled()) {
                       LOG.debug(
@@ -440,7 +541,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           logPrefix,
                           channel);
                       channel.forceClose();
-                      connect(nodes, errors, onSuccess, onFailure);
+                      connect(nodes, errors, fireEvents, onSuccess, onFailure);
                     } else if (lastStateEvent != null
                         && (lastStateEvent.newState == null /*(removed)*/
                             || lastStateEvent.newState == NodeState.FORCED_DOWN)) {
@@ -450,7 +551,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           logPrefix,
                           channel);
                       channel.forceClose();
-                      connect(nodes, errors, onSuccess, onFailure);
+                      connect(nodes, errors, fireEvents, onSuccess, onFailure);
                     } else {
                       LOG.debug("[{}] New channel opened {}", logPrefix, channel);
                       DriverChannel previousChannel = ControlConnection.this.channel;
@@ -462,13 +563,15 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                             "[{}] Forcefully closing previous channel {}", logPrefix, channel);
                         previousChannel.forceClose();
                       }
-                      context.getEventBus().fire(ChannelEvent.channelOpened(node));
+                      if (fireEvents) {
+                        context.getEventBus().fire(ChannelEvent.channelOpened(node));
+                      }
                       channel
                           .closeFuture()
                           .addListener(
                               f ->
                                   adminExecutor
-                                      .submit(() -> onChannelClosed(channel, node))
+                                      .submit(() -> onChannelClosed(channel, node, fireEvents))
                                       .addListener(UncaughtExceptions::log));
                       onSuccess.run();
                     }
@@ -545,10 +648,12 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
     }
 
-    private void onChannelClosed(DriverChannel channel, Node node) {
+    private void onChannelClosed(DriverChannel channel, Node node, boolean fireEvents) {
       assert adminExecutor.inEventLoop();
       if (!closeWasCalled) {
-        context.getEventBus().fire(ChannelEvent.channelClosed(node));
+        if (fireEvents) {
+          context.getEventBus().fire(ChannelEvent.channelClosed(node));
+        }
         // If this channel is the current control channel, we must start a
         // reconnection attempt to get a new control channel.
         if (channel == ControlConnection.this.channel) {

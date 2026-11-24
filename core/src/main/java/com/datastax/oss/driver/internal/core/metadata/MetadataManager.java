@@ -72,6 +72,9 @@ public class MetadataManager implements AsyncAutoCloseable {
   private volatile Boolean schemaEnabledProgrammatically;
   private volatile boolean tokenMapEnabled;
   private volatile Set<DefaultNode> contactPoints;
+  // The contact points exactly as provided (contactPoints' endpoints get rewritten to the addresses
+  // from system.local/system.peers on the first refresh).
+  private volatile Set<EndPoint> providedContactPoints = Collections.emptySet();
   private volatile boolean wasImplicitContactPoint;
 
   public MetadataManager(InternalDriverContext context) {
@@ -148,7 +151,19 @@ public class MetadataManager implements AsyncAutoCloseable {
       }
     }
     this.contactPoints = contactPointsBuilder.build();
+    this.providedContactPoints =
+        (providedContactPoints == null)
+            ? Collections.emptySet()
+            : ImmutableSet.copyOf(providedContactPoints);
     LOG.debug("[{}] Adding initial contact points {}", logPrefix, contactPoints);
+  }
+
+  /**
+   * The contact points as provided by the user, before any resolution done by the driver. Unlike
+   * {@link #getContactPoints()}, their endpoints are never rewritten.
+   */
+  public Set<EndPoint> getProvidedContactPoints() {
+    return providedContactPoints;
   }
 
   /**

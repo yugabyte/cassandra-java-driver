@@ -946,6 +946,14 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: List of {@link String}
    */
   METADATA_SCHEMA_CHANGE_LISTENER_CLASSES("advanced.schema-change-listener.classes"),
+
+  /**
+   * YugabyteDB: whether to look the contact points' host names up again when no known node can be
+   * reached.
+   *
+   * <p>Value-type: boolean
+   */
+  RE_RESOLVE_CONTACT_POINTS("advanced.re-resolve-contact-points"),
   ;
 
   private final String path;
