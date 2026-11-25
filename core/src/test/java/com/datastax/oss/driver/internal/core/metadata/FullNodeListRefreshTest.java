@@ -28,6 +28,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.UUID;
 import org.junit.Before;
@@ -90,6 +91,98 @@ public class FullNodeListRefreshTest {
     DefaultNode node3 = (DefaultNode) result.newMetadata.getNodes().get(hostId3);
     assertThat(result.events)
         .containsOnly(NodeStateEvent.removed(node1), NodeStateEvent.added(node3));
+  }
+
+  @Test
+  public void should_suggest_up_when_known_node_comes_back_on_new_address() {
+    // Given: node1 is replaced (same host_id) and comes back on 127.0.0.3
+    DefaultMetadata oldMetadata =
+        new DefaultMetadata(
+            ImmutableMap.of(node1.getHostId(), node1, node2.getHostId(), node2),
+            Collections.emptyMap(),
+            null,
+            null,
+            null);
+    InetSocketAddress newAddress = (InetSocketAddress) endPoint3.resolve();
+    Iterable<NodeInfo> newInfos =
+        ImmutableList.of(
+            DefaultNodeInfo.builder()
+                .withEndPoint(endPoint3)
+                .withBroadcastRpcAddress(newAddress)
+                .withHostId(node1.getHostId())
+                .build(),
+            DefaultNodeInfo.builder()
+                .withEndPoint(node2.getEndPoint())
+                .withBroadcastRpcAddress(node2.getBroadcastRpcAddress().get())
+                .withHostId(node2.getHostId())
+                .build());
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+
+    // When
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
+
+    // Then
+    assertThat(result.newMetadata.getNodes())
+        .containsOnlyKeys(node1.getHostId(), node2.getHostId());
+    assertThat(node1.getEndPoint()).isEqualTo(endPoint3);
+    assertThat(result.events).containsOnly(TopologyEvent.suggestUp(newAddress));
+  }
+
+  @Test
+  public void should_suggest_up_for_moved_node_alongside_added_and_removed_nodes() {
+    // Given: node1 moves to 127.0.0.4, node2 leaves, a new node3 joins
+    DefaultMetadata oldMetadata =
+        new DefaultMetadata(
+            ImmutableMap.of(node1.getHostId(), node1, node2.getHostId(), node2),
+            Collections.emptyMap(),
+            null,
+            null,
+            null);
+    EndPoint endPoint4 = TestNodeFactory.newEndPoint(4);
+    InetSocketAddress newAddress = (InetSocketAddress) endPoint4.resolve();
+    Iterable<NodeInfo> newInfos =
+        ImmutableList.of(
+            DefaultNodeInfo.builder()
+                .withEndPoint(endPoint4)
+                .withBroadcastRpcAddress(newAddress)
+                .withHostId(node1.getHostId())
+                .build(),
+            DefaultNodeInfo.builder().withEndPoint(endPoint3).withHostId(hostId3).build());
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+
+    // When
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
+
+    // Then
+    assertThat(result.newMetadata.getNodes()).containsOnlyKeys(node1.getHostId(), hostId3);
+    DefaultNode node3 = (DefaultNode) result.newMetadata.getNodes().get(hostId3);
+    assertThat(result.events)
+        .containsOnly(
+            TopologyEvent.suggestUp(newAddress),
+            NodeStateEvent.removed(node2),
+            NodeStateEvent.added(node3));
+  }
+
+  @Test
+  public void should_not_suggest_up_when_moved_node_has_no_broadcast_rpc_address() {
+    // Given
+    DefaultMetadata oldMetadata =
+        new DefaultMetadata(
+            ImmutableMap.of(node1.getHostId(), node1), Collections.emptyMap(), null, null, null);
+    Iterable<NodeInfo> newInfos =
+        ImmutableList.of(
+            DefaultNodeInfo.builder()
+                .withEndPoint(endPoint3)
+                .withHostId(node1.getHostId())
+                .build());
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+
+    // When
+    MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
+
+    // Then
+    assertThat(node1.getEndPoint()).isEqualTo(endPoint3);
+    assertThat(result.events).isEmpty();
   }
 
   @Test

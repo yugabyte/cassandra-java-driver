@@ -51,6 +51,9 @@ public class DefaultPartitionMetadata {
   private final CompletableFuture<Void> closeFuture;
   private final boolean partitionMetadataEnabled;
   private final Map<QualifiedTableName, TableSplitMetadata> tableSplits;
+  // Completes once the asynchronous system.partitions load has finished (exceptionally if it
+  // failed). Lets callers publish this instance only once it is filled.
+  private final CompletableFuture<Void> loadFuture = new CompletableFuture<>();
 
   public DefaultPartitionMetadata(
       String logPrefix,
@@ -69,6 +72,14 @@ public class DefaultPartitionMetadata {
 
   public Map<QualifiedTableName, TableSplitMetadata> getPartitionMap() {
     return tableSplits;
+  }
+
+  /**
+   * Completes when the partition map has been loaded from system.partitions, or exceptionally if
+   * the load failed. Completes immediately if partition metadata is disabled.
+   */
+  public CompletionStage<Void> loaded() {
+    return loadFuture;
   }
 
   /**
@@ -105,6 +116,7 @@ public class DefaultPartitionMetadata {
                       error);
                 }
               });
+      loadFuture.completeExceptionally(new IllegalStateException("closed"));
       return null;
     }
     // Refresh partition metadata (table-specific partition splits).
@@ -129,10 +141,14 @@ public class DefaultPartitionMetadata {
                           + "keeping previous version",
                       logPrefix,
                       error);
+                  loadFuture.completeExceptionally(error);
                 } else {
                   tableSplits.putAll(result.get());
+                  loadFuture.complete(null);
                 }
               });
+    } else {
+      loadFuture.complete(null);
     }
     return tableSplits;
   }

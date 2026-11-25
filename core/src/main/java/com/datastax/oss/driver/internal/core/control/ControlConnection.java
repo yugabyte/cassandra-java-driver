@@ -205,10 +205,35 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         context.getEventBus().fire(TopologyEvent.suggestRemoved(tce.address));
         break;
       case MOVED_NODE:
+        // YugabyteDB sends MOVED_NODE with every periodic topology push
+        // (cql_nodelist_refresh_interval_secs) to make the client refresh its whole view of the
+        // cluster: tablet leaders may have moved, and tservers may have left (the server never
+        // sends REMOVED_NODE).
+        processMovedNode();
         break;
       default:
         LOG.warn("[{}] Unsupported topology change type: {}", logPrefix, tce.changeType);
     }
+  }
+
+  private void processMovedNode() {
+    if (!isInit()) {
+      // Events can arrive before the control channel is fully set up; the initial refresh will
+      // pick up the current topology anyway.
+      return;
+    }
+    context
+        .getMetadataManager()
+        .refreshTopology()
+        .whenComplete(
+            (result, error) -> {
+              if (error != null) {
+                LOG.debug(
+                    "[{}] Error while refreshing topology for a MOVED_NODE event",
+                    logPrefix,
+                    error);
+              }
+            });
   }
 
   private void processStatusChange(Event event) {
@@ -479,6 +504,21 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                       // first successful refresh; make sure the LBP gets initialized (this is a
                       // no-op if it was initialized already).
                       context.getLoadBalancingPolicyWrapper().init();
+                      // YugabyteDB: tablet leaders may have moved while we were disconnected,
+                      // even if the node list did not change.
+                      context
+                          .getMetadataManager()
+                          .refreshPartitionMap()
+                          .whenComplete(
+                              (v, partitionError) -> {
+                                if (partitionError != null) {
+                                  LOG.debug(
+                                      "[{}] Error while refreshing partition map after a "
+                                          + "successful reconnection",
+                                      logPrefix,
+                                      partitionError);
+                                }
+                              });
                       context
                           .getMetadataManager()
                           .refreshSchema(null, false, true)

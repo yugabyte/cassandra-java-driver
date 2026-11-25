@@ -36,6 +36,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.Debouncer;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
+import com.yugabyte.oss.driver.api.core.DefaultPartitionMetadata;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
 import java.net.InetSocketAddress;
@@ -170,6 +171,29 @@ public class MetadataManager implements AsyncAutoCloseable {
         .getTopologyMonitor()
         .refreshNodeList()
         .thenApplyAsync(singleThreaded::refreshNodes, adminExecutor);
+  }
+
+  /**
+   * YugabyteDB: refreshes the node list, then the partition map.
+   *
+   * <p>Tablet leaders can move without any node being added or removed, in which case {@link
+   * #refreshNodes()} leaves the partition map untouched. This also rebuilds it.
+   */
+  public CompletionStage<Void> refreshTopology() {
+    return refreshNodes().thenCompose(v -> refreshPartitionMap());
+  }
+
+  /**
+   * YugabyteDB: reloads the partition map (tablet leaders and replicas) from system.partitions.
+   *
+   * <p>The map reloaded here is published only once it has loaded, so routing never sees it
+   * half-filled. If the load fails, the previous map is kept. (Node and schema refreshes still
+   * rebuild the map their own way.)
+   */
+  public CompletionStage<Void> refreshPartitionMap() {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    RunOrSchedule.on(adminExecutor, () -> singleThreaded.refreshPartitionMap(future));
+    return future;
   }
 
   public CompletionStage<Void> refreshNode(Node node) {
@@ -344,6 +368,37 @@ public class MetadataManager implements AsyncAutoCloseable {
               config.getInt(DefaultDriverOption.METADATA_SCHEMA_MAX_EVENTS));
       this.schemaQueriesFactory = context.getSchemaQueriesFactory();
       this.schemaParserFactory = context.getSchemaParserFactory();
+    }
+
+    private void refreshPartitionMap(CompletableFuture<Void> future) {
+      assert adminExecutor.inEventLoop();
+      if (closeWasCalled) {
+        future.complete(null);
+        return;
+      }
+      DefaultPartitionMetadata newPartitionMetadata;
+      try {
+        newPartitionMetadata = metadata.rebuildPartitionMap(metadata.getNodes(), context);
+      } catch (Throwable t) {
+        future.completeExceptionally(t);
+        return;
+      }
+      newPartitionMetadata
+          .loaded()
+          .whenCompleteAsync(
+              (v, error) -> {
+                if (error != null) {
+                  future.completeExceptionally(error);
+                } else {
+                  // Swap into the current metadata (not a captured instance), so that a node or
+                  // schema refresh that ran in the meantime is not overwritten.
+                  if (!closeWasCalled) {
+                    metadata = metadata.withPartitionMetadata(newPartitionMetadata);
+                  }
+                  future.complete(null);
+                }
+              },
+              adminExecutor);
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {

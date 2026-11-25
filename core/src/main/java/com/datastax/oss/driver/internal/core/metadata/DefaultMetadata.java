@@ -153,6 +153,12 @@ public class DefaultMetadata implements Metadata {
         rebuildPartitionMap(this.nodes, context));
   }
 
+  /** Returns a copy of this metadata with the given (already loaded) partition metadata. */
+  public DefaultMetadata withPartitionMetadata(DefaultPartitionMetadata newPartitionMetadata) {
+    return new DefaultMetadata(
+        this.nodes, this.keyspaces, this.tokenMap, this.clusterName, newPartitionMetadata);
+  }
+
   @Nullable
   protected TokenMap rebuildTokenMap(
       Map<UUID, Node> newNodes,

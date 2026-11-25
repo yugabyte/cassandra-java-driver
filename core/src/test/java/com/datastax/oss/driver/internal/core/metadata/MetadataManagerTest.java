@@ -36,11 +36,13 @@ import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueri
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
+import com.yugabyte.oss.driver.api.core.DefaultPartitionMetadata;
 import io.netty.channel.DefaultEventLoopGroup;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -48,6 +50,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -282,6 +285,87 @@ public class MetadataManagerTest {
     assertThat(metadataManager.refreshes).hasSize(1);
     RemoveNodeRefresh refresh = (RemoveNodeRefresh) metadataManager.refreshes.get(0);
     assertThat(refresh.broadcastRpcAddressToRemove).isEqualTo(broadcastRpcAddress2);
+  }
+
+  @Test
+  public void should_publish_reloaded_partition_map_when_node_list_is_unchanged() throws Exception {
+    // Given
+    DefaultPartitionMetadata oldMap = mock(DefaultPartitionMetadata.class);
+    DefaultPartitionMetadata newMap = mock(DefaultPartitionMetadata.class);
+    when(newMap.loaded()).thenReturn(CompletableFuture.completedFuture(null));
+    MetadataManager manager = managerWith(new PartitionTestMetadata(oldMap, newMap));
+
+    // When
+    CompletionStage<Void> refresh = manager.refreshPartitionMap();
+
+    // Then
+    assertThatStage(refresh).isSuccess();
+    assertThat(manager.getMetadata().getDefaultPartitionMetadata()).contains(newMap);
+  }
+
+  @Test
+  public void should_keep_previous_partition_map_if_reload_fails() throws Exception {
+    // Given
+    DefaultPartitionMetadata oldMap = mock(DefaultPartitionMetadata.class);
+    DefaultPartitionMetadata newMap = mock(DefaultPartitionMetadata.class);
+    CompletableFuture<Void> failedLoad = new CompletableFuture<>();
+    failedLoad.completeExceptionally(new IllegalStateException("mock failure"));
+    when(newMap.loaded()).thenReturn(failedLoad);
+    MetadataManager manager = managerWith(new PartitionTestMetadata(oldMap, newMap));
+
+    // When
+    CompletionStage<Void> refresh = manager.refreshPartitionMap();
+
+    // Then
+    assertThatStage(refresh).isFailed();
+    assertThat(manager.getMetadata().getDefaultPartitionMetadata()).contains(oldMap);
+  }
+
+  @Test
+  public void should_not_reload_partition_map_after_close() throws Exception {
+    // Given
+    DefaultPartitionMetadata oldMap = mock(DefaultPartitionMetadata.class);
+    DefaultPartitionMetadata newMap = mock(DefaultPartitionMetadata.class);
+    when(newMap.loaded()).thenReturn(CompletableFuture.completedFuture(null));
+    PartitionTestMetadata metadata = new PartitionTestMetadata(oldMap, newMap);
+    MetadataManager manager = managerWith(metadata);
+    manager.closeAsync().toCompletableFuture().get(1, TimeUnit.SECONDS);
+
+    // When
+    CompletionStage<Void> refresh = manager.refreshPartitionMap();
+
+    // Then
+    assertThatStage(refresh).isSuccess();
+    assertThat(metadata.rebuilds.get()).isEqualTo(0);
+    assertThat(manager.getMetadata().getDefaultPartitionMetadata()).contains(oldMap);
+  }
+
+  /** A real MetadataManager whose current metadata is the given instance. */
+  private MetadataManager managerWith(DefaultMetadata metadata) throws Exception {
+    MetadataManager manager = new MetadataManager(context);
+    adminEventLoopGroup
+        .submit(
+            () -> manager.apply((old, tokenMapEnabled, c) -> new MetadataRefresh.Result(metadata)))
+        .get(1, TimeUnit.SECONDS);
+    return manager;
+  }
+
+  /** Metadata whose partition map rebuild returns a given instance. */
+  private static class PartitionTestMetadata extends DefaultMetadata {
+    private final DefaultPartitionMetadata next;
+    private final AtomicInteger rebuilds = new AtomicInteger();
+
+    PartitionTestMetadata(DefaultPartitionMetadata current, DefaultPartitionMetadata next) {
+      super(Collections.emptyMap(), Collections.emptyMap(), null, null, current);
+      this.next = next;
+    }
+
+    @Override
+    protected DefaultPartitionMetadata rebuildPartitionMap(
+        Map<UUID, Node> nodes, InternalDriverContext context) {
+      rebuilds.incrementAndGet();
+      return next;
+    }
   }
 
   private static class TestMetadataManager extends MetadataManager {
