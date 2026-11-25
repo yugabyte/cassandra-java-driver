@@ -59,6 +59,10 @@ class FullNodeListRefresh extends NodesRefresh {
     TokenFactory tokenFactory =
         oldMetadata.getTokenMap().map(m -> ((DefaultTokenMap) m).getTokenFactory()).orElse(null);
     boolean tokensChanged = false;
+    // Known nodes that came back on a different address (e.g. a Kubernetes pod replaced with a new
+    // IP but the same host_id). Their pool must reconnect to the new address now, not on its next
+    // backoff attempt.
+    ImmutableList.Builder<Object> movedEventsBuilder = ImmutableList.builder();
 
     for (NodeInfo nodeInfo : nodeInfos) {
       UUID id = nodeInfo.getHostId();
@@ -75,6 +79,15 @@ class FullNodeListRefresh extends NodesRefresh {
           node = new DefaultNode(nodeInfo.getEndPoint(), context);
           LOG.debug("[{}] Adding new node {}", logPrefix, node);
           added.put(id, node);
+        } else if (!node.getEndPoint().equals(nodeInfo.getEndPoint())) {
+          LOG.debug(
+              "[{}] {} moved to {}, suggesting UP to reconnect",
+              logPrefix,
+              node,
+              nodeInfo.getEndPoint());
+          nodeInfo
+              .getBroadcastRpcAddress()
+              .ifPresent(address -> movedEventsBuilder.add(TopologyEvent.suggestUp(address)));
         }
         if (tokenFactory == null && nodeInfo.getPartitioner() != null) {
           tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
@@ -84,6 +97,7 @@ class FullNodeListRefresh extends NodesRefresh {
     }
 
     Set<UUID> removed = Sets.difference(oldNodes.keySet(), seen);
+    ImmutableList<Object> movedEvents = movedEventsBuilder.build();
 
     if (added.isEmpty() && removed.isEmpty()) { // The list didn't change
       if (!oldMetadata.getTokenMap().isPresent() && tokenFactory != null) {
@@ -91,14 +105,16 @@ class FullNodeListRefresh extends NodesRefresh {
         // token map rebuild:
         return new Result(
             oldMetadata.withNodes(
-                oldMetadata.getNodes(), tokenMapEnabled, true, tokenFactory, context));
+                oldMetadata.getNodes(), tokenMapEnabled, true, tokenFactory, context),
+            movedEvents);
       } else {
         // No need to create a new metadata instance
-        return new Result(oldMetadata);
+        return new Result(oldMetadata, movedEvents);
       }
     } else {
       ImmutableMap.Builder<UUID, Node> newNodesBuilder = ImmutableMap.builder();
       ImmutableList.Builder<Object> eventsBuilder = ImmutableList.builder();
+      eventsBuilder.addAll(movedEvents);
 
       newNodesBuilder.putAll(added);
       for (Map.Entry<UUID, Node> entry : oldNodes.entrySet()) {

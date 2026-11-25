@@ -18,6 +18,7 @@ package com.datastax.oss.driver.internal.core.control;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.event.SchemaChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
+import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -125,6 +127,76 @@ public class ControlConnectionEventsTest extends ControlConnectionTestBase {
 
     // Then
     verify(eventBus).fire(TopologyEvent.suggestAdded(ADDRESS1));
+  }
+
+  @Test
+  public void should_refresh_topology_on_moved_node_event() {
+    // Given
+    DriverChannel channel1 = newMockDriverChannel(1);
+    ArgumentCaptor<DriverChannelOptions> optionsCaptor =
+        ArgumentCaptor.forClass(DriverChannelOptions.class);
+    when(channelFactory.connect(eq(node1), optionsCaptor.capture()))
+        .thenReturn(CompletableFuture.completedFuture(channel1));
+    when(metadataManager.refreshTopology()).thenReturn(CompletableFuture.completedFuture(null));
+    controlConnection.init(true, false, false);
+    await().until(() -> optionsCaptor.getValue() != null && controlConnection.isInit());
+    EventCallback callback = optionsCaptor.getValue().eventCallback;
+    // YugabyteDB sends MOVED_NODE with the wildcard address on every periodic topology push
+    TopologyChangeEvent event =
+        new TopologyChangeEvent(
+            ControlConnection.MOVED_NODE, new InetSocketAddress("0.0.0.0", 9042));
+
+    // When
+    callback.onEvent(event);
+
+    // Then
+    verify(metadataManager).refreshTopology();
+  }
+
+  @Test
+  public void should_ignore_moved_node_event_before_init() {
+    // Given: the control channel is not established yet
+    ArgumentCaptor<DriverChannelOptions> optionsCaptor =
+        ArgumentCaptor.forClass(DriverChannelOptions.class);
+    when(channelFactory.connect(eq(node1), optionsCaptor.capture()))
+        .thenReturn(new CompletableFuture<>());
+    controlConnection.init(true, false, false);
+    await().until(() -> optionsCaptor.getValue() != null);
+    assertThat(controlConnection.isInit()).isFalse();
+    EventCallback callback = optionsCaptor.getValue().eventCallback;
+
+    // When
+    callback.onEvent(
+        new TopologyChangeEvent(
+            ControlConnection.MOVED_NODE, new InetSocketAddress("0.0.0.0", 9042)));
+
+    // Then
+    verify(metadataManager, never()).refreshTopology();
+  }
+
+  @Test
+  public void should_not_fail_if_topology_refresh_fails_on_moved_node_event() {
+    // Given
+    DriverChannel channel1 = newMockDriverChannel(1);
+    ArgumentCaptor<DriverChannelOptions> optionsCaptor =
+        ArgumentCaptor.forClass(DriverChannelOptions.class);
+    when(channelFactory.connect(eq(node1), optionsCaptor.capture()))
+        .thenReturn(CompletableFuture.completedFuture(channel1));
+    CompletableFuture<Void> failed = new CompletableFuture<>();
+    failed.completeExceptionally(new IllegalStateException("closed"));
+    when(metadataManager.refreshTopology()).thenReturn(failed);
+    controlConnection.init(true, false, false);
+    await().until(() -> optionsCaptor.getValue() != null && controlConnection.isInit());
+    EventCallback callback = optionsCaptor.getValue().eventCallback;
+    TopologyChangeEvent event =
+        new TopologyChangeEvent(
+            ControlConnection.MOVED_NODE, new InetSocketAddress("0.0.0.0", 9042));
+
+    // When
+    callback.onEvent(event);
+
+    // Then (no exception escapes the event callback)
+    verify(metadataManager).refreshTopology();
   }
 
   @Test
