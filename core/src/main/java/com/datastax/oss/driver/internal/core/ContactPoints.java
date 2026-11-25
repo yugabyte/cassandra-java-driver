@@ -19,12 +19,14 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
+import com.datastax.oss.driver.shaded.guava.common.net.InetAddresses;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -48,6 +50,38 @@ public class ContactPoints {
       }
     }
     return ImmutableSet.copyOf(result);
+  }
+
+  /**
+   * YugabyteDB: looks the host names of the given contact points up again, and returns one endpoint
+   * per address DNS returns now. Used when the driver cannot reach any node it knows (e.g. every
+   * Kubernetes pod was replaced with a new IP).
+   *
+   * <p>Contact points given as IP literals have nothing to re-resolve and are skipped, as are
+   * endpoints that are not {@link DefaultEndPoint}s (e.g. SNI). Names that do not resolve are
+   * skipped. The JVM's DNS cache applies ({@code networkaddress.cache.ttl}, 30 s by default).
+   */
+  public static Set<EndPoint> reResolve(Set<EndPoint> contactPoints) {
+    Set<EndPoint> result = new LinkedHashSet<>();
+    for (EndPoint endPoint : contactPoints) {
+      if (!(endPoint instanceof DefaultEndPoint)) {
+        continue;
+      }
+      InetSocketAddress address = ((DefaultEndPoint) endPoint).resolve();
+      // getHostString() never does a reverse lookup
+      String host = address.getHostString();
+      if (InetAddresses.isInetAddress(host)) {
+        continue;
+      }
+      try {
+        for (InetAddress inetAddress : InetAddress.getAllByName(host)) {
+          result.add(new DefaultEndPoint(new InetSocketAddress(inetAddress, address.getPort())));
+        }
+      } catch (UnknownHostException e) {
+        LOG.debug("Could not re-resolve contact point {}", host, e);
+      }
+    }
+    return result;
   }
 
   private static Set<InetSocketAddress> extract(String spec, boolean resolve) {

@@ -19,25 +19,36 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.MockChannelFactoryHelper;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 
 @RunWith(DataProviderRunner.class)
 public class ControlConnectionTest extends ControlConnectionTestBase {
@@ -173,6 +184,145 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     verify(loadBalancingPolicyWrapper, VERIFY_TIMEOUT).init();
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_reconnect_through_re_resolved_contact_point_when_no_known_node_is_reachable() {
+    // Given: initialized on node1, provided contact point is a host name
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(metadataManager.getProvidedContactPoints())
+        .thenReturn(ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("localhost", 9042))));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    DriverChannel channel2 = newMockDriverChannel(2);
+    mockQueryPlan(node1);
+    when(channelFactory.connect(eq(node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel1));
+    // Any other node is a throwaway node for a re-resolved contact point
+    when(channelFactory.connect(argThat(n -> n != node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel2));
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel1));
+
+    // When: every known node is down, so the query plan is empty
+    mockQueryPlan();
+    channel1.close();
+
+    // Then: the control connection reconnects through the re-resolved contact point and refreshes
+    // the node list through it
+    await().untilAsserted(() -> assertThat(controlConnection.channel()).isEqualTo(channel2));
+    verify(metadataManager, VERIFY_TIMEOUT).refreshNodes();
+    verify(loadBalancingPolicyWrapper, VERIFY_TIMEOUT).init();
+    // and fires no ChannelEvent for the throwaway node, which is not in the metadata
+    ArgumentCaptor<Object> events = ArgumentCaptor.forClass(Object.class);
+    verify(eventBus, atLeastOnce()).fire(events.capture());
+    for (Object event : events.getAllValues()) {
+      if (event instanceof ChannelEvent) {
+        assertThat(((ChannelEvent) event).node).isSameAs(node1);
+      }
+    }
+  }
+
+  @Test
+  public void should_not_retry_an_address_it_just_tried_when_re_resolving_contact_points() {
+    // Given: initialized on node1 (127.0.0.1), whose address is also what "localhost" resolves to
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(metadataManager.getProvidedContactPoints())
+        .thenReturn(ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("localhost", 9042))));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    mockQueryPlan(node1);
+    when(channelFactory.connect(eq(node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel1))
+        .thenReturn(CompletableFutures.failedFuture(new Exception("mock failure")));
+    when(channelFactory.connect(argThat(n -> n != node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFutures.failedFuture(new Exception("mock failure")));
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    assertThatStage(initFuture).isSuccess();
+
+    // When: node1 goes away and fails on reconnection
+    channel1.close();
+
+    // Then: contact points were re-resolved, but 127.0.0.1 (just tried as node1) is not retried
+    verify(metadataManager, timeout(1000).atLeast(2)).getProvidedContactPoints();
+    ArgumentCaptor<Node> attempts = ArgumentCaptor.forClass(Node.class);
+    verify(channelFactory, atLeastOnce()).connect(attempts.capture(), any());
+    for (Node attempt : attempts.getAllValues()) {
+      if (attempt != node1) {
+        assertThat(attempt.getEndPoint()).isNotEqualTo(node1.getEndPoint());
+      }
+    }
+  }
+
+  @Test
+  public void should_not_re_resolve_contact_points_before_init() {
+    // Given: reconnect-on-init, every contact point fails
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(reconnectionPolicy.newControlConnectionSchedule(true)).thenReturn(reconnectionSchedule);
+    mockQueryPlan(node1);
+    when(channelFactory.connect(eq(node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFutures.failedFuture(new Exception("mock failure")));
+
+    // When
+    controlConnection.init(false, true, true);
+
+    // Then
+    verify(channelFactory, timeout(500).atLeast(2)).connect(eq(node1), any());
+    verify(metadataManager, never()).getProvidedContactPoints();
+  }
+
+  @Test
+  public void should_not_re_resolve_contact_points_when_disabled() {
+    // Given: initialized on node1, provided contact point is a host name, option disabled
+    when(defaultProfile.getBoolean(DefaultDriverOption.RE_RESOLVE_CONTACT_POINTS, true))
+        .thenReturn(false);
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(metadataManager.getProvidedContactPoints())
+        .thenReturn(ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("localhost", 9042))));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    mockQueryPlan(node1);
+    when(channelFactory.connect(eq(node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel1))
+        .thenReturn(CompletableFutures.failedFuture(new Exception("mock failure")));
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    assertThatStage(initFuture).isSuccess();
+
+    // When: node1 goes away and fails on reconnection
+    channel1.close();
+
+    // Then: the driver keeps retrying node1 only
+    verify(channelFactory, timeout(500).atLeast(3)).connect(eq(node1), any());
+    verify(metadataManager, never()).getProvidedContactPoints();
+    verify(channelFactory, never()).connect(argThat(n -> n != node1), any());
+  }
+
+  @Test
+  public void should_reconnect_when_channel_to_re_resolved_contact_point_closes() {
+    // Given: the control connection reconnected through a re-resolved contact point
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(metadataManager.getProvidedContactPoints())
+        .thenReturn(ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("localhost", 9042))));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    DriverChannel channel2 = newMockDriverChannel(2);
+    DriverChannel channel3 = newMockDriverChannel(3);
+    mockQueryPlan(node1);
+    when(channelFactory.connect(eq(node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel1))
+        .thenReturn(CompletableFuture.completedFuture(channel3));
+    when(channelFactory.connect(argThat(n -> n != node1), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel2));
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    assertThatStage(initFuture).isSuccess();
+    mockQueryPlan();
+    channel1.close();
+    await().untilAsserted(() -> assertThat(controlConnection.channel()).isEqualTo(channel2));
+
+    // When: that channel closes, and node1 is reachable again
+    mockQueryPlan(node1);
+    channel2.close();
+
+    // Then: the control connection reconnects, even though no ChannelEvent was fired for the
+    // throwaway node
+    await().untilAsserted(() -> assertThat(controlConnection.channel()).isEqualTo(channel3));
   }
 
   @Test

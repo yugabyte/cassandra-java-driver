@@ -105,6 +105,8 @@ abstract class ControlConnectionTestBase {
     when(context.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
     when(defaultProfile.getBoolean(DefaultDriverOption.RECONNECT_ON_INIT)).thenReturn(false);
+    when(defaultProfile.getBoolean(DefaultDriverOption.RE_RESOLVE_CONTACT_POINTS, true))
+        .thenReturn(true);
 
     when(context.getReconnectionPolicy()).thenReturn(reconnectionPolicy);
     // Child classes only cover "runtime" reconnections when the driver is already initialized
@@ -121,6 +123,7 @@ abstract class ControlConnectionTestBase {
     mockQueryPlan(node1, node2);
 
     when(metadataManager.refreshNodes()).thenReturn(CompletableFuture.completedFuture(null));
+    when(metadataManager.refreshPartitionMap()).thenReturn(CompletableFuture.completedFuture(null));
     when(metadataManager.refreshSchema(anyString(), anyBoolean(), anyBoolean()))
         .thenReturn(CompletableFuture.completedFuture(null));
     when(context.getMetadataManager()).thenReturn(metadataManager);

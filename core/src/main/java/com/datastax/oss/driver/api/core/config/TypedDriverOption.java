@@ -603,6 +603,12 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> RESOLVE_CONTACT_POINTS =
       new TypedDriverOption<>(DefaultDriverOption.RESOLVE_CONTACT_POINTS, GenericType.BOOLEAN);
   /**
+   * YugabyteDB: whether to look the contact points' host names up again when no known node can be
+   * reached.
+   */
+  public static final TypedDriverOption<Boolean> RE_RESOLVE_CONTACT_POINTS =
+      new TypedDriverOption<>(DefaultDriverOption.RE_RESOLVE_CONTACT_POINTS, GenericType.BOOLEAN);
+  /**
    * This is how frequent the timer should wake up to check for timed-out tasks or speculative
    * executions.
    */
